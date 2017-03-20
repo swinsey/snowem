@@ -32,6 +32,10 @@
 #ifndef _SNOW_CORE_MEMPOOL_H_
 #define _SNOW_CORE_MEMPOOL_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 
 #include "types.h"
@@ -53,7 +57,6 @@ struct snw_mempool {
    int mp_type;
 };
 
-
 /* create a memory pool with a chunk size and total size
    an return the pointer to the memory pool */
 snw_mempool_t*
@@ -74,6 +77,10 @@ snw_mempool_destroy(snw_mempool_t *mp);
 /* return the number of free chunks */
 int
 snw_mempool_capacity(snw_mempool_t *mp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //_SNOW_CORE_MEMPOOL_H_ 
 

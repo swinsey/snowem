@@ -2,7 +2,6 @@
 #define _SNOW_CORE_TYPES_H_
 
 #include <stdint.h>
-#include "list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +9,7 @@ extern "C" {
 
 typedef struct snw_log snw_log_t;
 typedef struct snw_context snw_context_t;
+typedef struct snw_module snw_module_t;
 
 enum  SGN_CMD{
    SGN_ROOM = 1,
@@ -63,6 +63,8 @@ enum SGN_INTERNAL_SUBCMD {
 #define SNW_MALLOC(type_) (type_*)malloc(sizeof(type_))
 #define SNW_FREE(p_) { if (p_!=NULL) free(p_); }
 #define SNW_MEMZERO(p_,type_) memset(p_,0,sizeof(type_))
+
+#define MAX_BUFFER_SIZE 16*1024*1024
 
 #ifdef __cplusplus
 }

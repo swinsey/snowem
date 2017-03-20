@@ -1,5 +1,5 @@
-#ifndef _RECORDPLAY_H_
-#define _RECORDPLAY_H_
+#ifndef _SNOW_MODULES_RECORDPLAY_H_
+#define _SNOW_MODULES_RECORDPLAY_H_
 
 #include "session.h"
 #include "types.h"

@@ -90,7 +90,7 @@ static void pending_read(struct bufferevent *bev, void *pending_ptr) {
   struct evbuffer_ptr end = evbuffer_search(input, "\r\n\r\n", 4, NULL);
   size_t len = evbuffer_get_length(input);
 
-  //DEBUG("pending read, len=%u,pos=%d",len,end.pos);
+  //WSS_DEBUG("pending read, len=%u,pos=%d",len,end.pos);
   //char buf[4096] = {0};
   //evbuffer_copyout(input,buf,len);
   //hexdump(buf,len,"frame");
@@ -145,28 +145,28 @@ static void pending_event(struct bufferevent *bev, short events,
     void *pending_ptr) {
   struct evwspendingconn* pending = (struct evwspendingconn *)pending_ptr;
   if (events & BEV_EVENT_EOF) {
-    ERROR("Connection closed");
+    WSS_ERROR("Connection closed");
   } else if (events & BEV_EVENT_ERROR) {
-    ERROR("Connection error, errno=%d",errno);
+    WSS_ERROR("Connection error, errno=%d",errno);
     if (errno != 0) {
-      ERROR("Got an error on the connection: %s", strerror(errno));
+      WSS_ERROR("Got an error on the connection: %s", strerror(errno));
     }
     unsigned long ssl_error = ERR_get_error();
     if (ssl_error != 0) {
-      ERROR("SSL error: %s", ERR_error_string(ssl_error, NULL));
+      WSS_ERROR("SSL error: %s", ERR_error_string(ssl_error, NULL));
     }
     ssl_error = bufferevent_get_openssl_error(bev);
     if (ssl_error != 0) {
-      ERROR("Got an SSL error on the connection: %s",
+      WSS_ERROR("Got an SSL error on the connection: %s",
           ERR_error_string(ssl_error, NULL));
     }
 
   } else if (events & BEV_EVENT_CONNECTED) {
-    DEBUG("SSL connected");
+    WSS_DEBUG("SSL connected");
 
     return; // SSL connected
   } else {
-    ERROR("Unknown event: %x", (int)events);
+    WSS_ERROR("Unknown event: %x", (int)events);
   }
 
   remove_pending(pending);
@@ -184,20 +184,20 @@ static void lev_cb(struct evconnlistener *evlistener,
   pending->levws = levws;
 
   if (levws->server_ctx == NULL) {
-    //DEBUG("handle normal bev, fd=%u",fd);
+    //WSS_DEBUG("handle normal bev, fd=%u",fd);
     pending->bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
   } else {
     SSL *client_ctx = SSL_new(levws->server_ctx);
     if (client_ctx == NULL) {
-      ERROR("Unable to get client_ctx, fd=%d",fd);
+      WSS_ERROR("Unable to get client_ctx, fd=%d",fd);
       exit(-1);
     }
-    //DEBUG("handle ssl bev, fd=%u",fd);
+    //WSS_DEBUG("handle ssl bev, fd=%u",fd);
     pending->bev = bufferevent_openssl_socket_new(base, fd, client_ctx,
         BUFFEREVENT_SSL_ACCEPTING, BEV_OPT_CLOSE_ON_FREE);
 
     if ( pending->bev == NULL ) {
-       ERROR("failed to create ssl bev, fd=%u",fd);
+       WSS_ERROR("failed to create ssl bev, fd=%u",fd);
     }
   }
 
@@ -245,17 +245,20 @@ struct evwsconnlistener *evwsconnlistener_new_bind(struct event_base *base,
     evwsconnlistener_cb cb, void *user_data, unsigned flags, int backlog,
     const char* subprotocols[], SSL_CTX* server_ctx,
     const struct sockaddr *addr, int socklen) {
+
   struct evwsconnlistener *levws =
       (struct evwsconnlistener *)malloc(sizeof(struct evwsconnlistener));
   if (!levws)
     return NULL;
-
   levws->lev = evconnlistener_new_bind(base, lev_cb, levws, flags, backlog,
       addr, socklen);
+
   if (!levws->lev) {
+    perror("cannot bind ip\n");
     free(levws);
     return NULL;
   }
+
   levws->cb = cb;
   levws->errorcb = NULL;
   levws->user_data = user_data;

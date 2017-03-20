@@ -64,6 +64,7 @@ snw_ice_init(snw_context_t *ctx) {
    g_ice_context.ipv6_enabled = 0; 
    g_ice_context.ice_tcp_enabled = 0; */
 
+   event_base_dispatch(ctx->ev_base);
    return;
 }
 

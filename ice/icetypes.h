@@ -2,7 +2,7 @@
 #define _SNOW_ICE_ICETYPES_H_
 
 #include <stdint.h>
-#include "list.h"
+#include "linux_list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,8 +29,8 @@ typedef struct snw_ice_context snw_ice_context_t;
 #define ICE_DEBUG2(...) do {} while(0)
 #define ICE_ERROR2(...) do {} while(0)
 
-#define SNW_BUFSIZE   8192
-#define SNW_USEC_PER_SEC 1000000
+#define ICE_BUFSIZE   8192
+#define ICE_USEC_PER_SEC 1000000
 
 //status
 #define WEBRTC_START           0x0001

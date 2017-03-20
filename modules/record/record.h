@@ -1,5 +1,5 @@
-#ifndef _ICE_RECORD_H
-#define _ICE_RECORD_H
+#ifndef _SNOW_MODULES_RECORD_H
+#define _SNOW_MODULES_RECORD_H
 
 #include <inttypes.h>
 #include <string.h>

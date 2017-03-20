@@ -36,4 +36,23 @@ find_package_handle_standard_args(EVENT
 )
 mark_as_advanced(EVENT_INCLUDE_DIR EVENT_LIBRARY)
 
+find_path(EVENT_OPENSSL_INCLUDE_DIR bufferevent_ssl.h
+  PATHS /usr/include
+  PATH_SUFFIXES event2
+)
+
+find_library(EVENT_OPENSSL_LIBRARY event_openssl)
+set(EVENT_OPENSSL_LIBRARIES ${EVENT_OPENSSL_LIBRARY} )
+
+find_package_handle_standard_args(EVENT_OPENSSL
+  DEFAULT_MSG
+  EVENT_OPENSSL_INCLUDE_DIR
+  EVENT_OPENSSL_LIBRARIES
+)
+
+#find_library (LIBEVENT_OPENSSL event_openssl)
+#if (NOT LIBEVENT_OPENSSL)
+#   message(FATAL_ERROR "libevent_openssl not found, reinstall libevent with openssl")
+#endif()
+
 

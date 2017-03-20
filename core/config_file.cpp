@@ -120,7 +120,6 @@ inline string CFileConfig::parent_path(const deque<string>& path)
 	return string(s.c_str(),1,s.length()-1);
 }
 
-// 得到sub路径，调用前判断是否为空
 inline string CFileConfig::sub_path(const deque<string>& path)
 {
 	deque<string>::reverse_iterator it;
@@ -177,7 +176,7 @@ void CFileConfig::Load()
 			break;
 		case T_NULL:
 			break;
-		case T_PAIR: // 同时也作为domain
+		case T_PAIR:
 			if(path_stack.size() == 0) {
 				throw conf_load_error("CFileConfig::Load: path is null");
 			}
@@ -316,7 +315,7 @@ void mqf::base::CFileConfig::Load( string& scontent )
             break;
         case T_NULL:
             break;
-        case T_PAIR: // 同时也作为domain
+        case T_PAIR:
             if(path_stack.size() == 0) {
                 throw conf_load_error("CFileConfig::Load: path is null");
             }
@@ -335,7 +334,7 @@ void mqf::base::CFileConfig::Load( string& scontent )
             throw conf_load_error(string("CFileConfig::Load: invalid:")+sreal);
         }		
     }
-    //文件解析完要判断path_stack是否为空
+
     if(path_stack.size() != 0) {
         throw conf_load_error("CFileConfig::Load: path havenot over");
     }

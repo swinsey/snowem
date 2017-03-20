@@ -61,22 +61,22 @@ struct http_wsparse_info {
 static int on_header_field(http_parser* parser, const char *data, size_t len) {
   struct http_wsparse_info* info = (struct http_wsparse_info*)parser->data;
 
-  //DEBUG("get header field, len=%u,h=%s",len,data);
+  //WSS_DEBUG("get header field, len=%u,h=%s",len,data);
 
   if (STRNCASEEQL(data, "Upgrade", len)) {
-    //DEBUG("get Upgrate header");
+    //WSS_DEBUG("get Upgrate header");
     info->header = UPGRADE;
   } else if (STRNCASEEQL(data, "Connection", len)) {
-    //DEBUG("get Connection header");
+    //WSS_DEBUG("get Connection header");
     info->header = CONNECTION;
   } else if (STRNCASEEQL(data, "Sec-WebSocket-Key", len)) {
-    //DEBUG("get Sec-Websocket-Key header");
+    //WSS_DEBUG("get Sec-Websocket-Key header");
     info->header = SEC_WEBSOCKET_KEY;
   } else if (STRNCASEEQL(data, "Sec-WebSocket-Version", len)) {
-    //DEBUG("get Sec-Websocket-Version header");
+    //WSS_DEBUG("get Sec-Websocket-Version header");
     info->header = SEC_WEBSOCKET_VERSION;
   } else if (STRNCASEEQL(data, "Sec-WebSocket-Protocol", len)) {
-    //DEBUG("get Sec-Websocket-Protocol header");
+    //WSS_DEBUG("get Sec-Websocket-Protocol header");
     info->header = SEC_WEBSOCKET_PROTOCOL;
   } else {
     info->header = NOT_RELEVANT;
@@ -197,7 +197,7 @@ static int on_header_value(http_parser* parser, const char *data, size_t len) {
     break;
   case SEC_WEBSOCKET_PROTOCOL: {
     if (info->supported_subprotocols == NULL) {
-      ERROR("On Sec-Websocket-Protocol, no subprotocols");
+      WSS_ERROR("On Sec-Websocket-Protocol, no subprotocols");
       return -1;
     }
     int bestPos = -1;
@@ -211,7 +211,7 @@ static int on_header_value(http_parser* parser, const char *data, size_t len) {
       }
     }
     if (bestPos == -1) {
-      ERROR("On Sec-Websocket-Protocol, no found subprotocols");
+      WSS_ERROR("On Sec-Websocket-Protocol, no found subprotocols");
       return -1;
     }
     *info->subprotocol = info->supported_subprotocols[bestIndex];
@@ -244,7 +244,7 @@ int evaluate_websocket_handshake(const char* data, size_t len,
     const char** subprotocol) {
   http_parser parser;
 
-  //DEBUG("start handshake");
+  //WSS_DEBUG("start handshake");
   //hexdump((char*)data,len,"frame");
 
   http_parser_init(&parser, HTTP_REQUEST);
@@ -264,7 +264,7 @@ int evaluate_websocket_handshake(const char* data, size_t len,
   size_t plen = http_parser_execute(&parser, &settings, (char*)data, len);
 
   if (plen != len || !parser.upgrade) {
-    ERROR("failed to parse http, plen=%u,len=%u,upgrade=%d",plen,len,parser.upgrade);
+    WSS_ERROR("failed to parse http, plen=%u,len=%u,upgrade=%d",plen,len,parser.upgrade);
     return -1;
   }
 

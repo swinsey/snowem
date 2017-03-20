@@ -5,7 +5,7 @@
 
 #include "cicero/agent.h"
 #include "stream.h"
-#include "record.h"
+//#include "record.h"
 
 struct ice_session {
    uint32_t flowid;
@@ -44,8 +44,8 @@ struct ice_session {
    char ruser[32];                   /* ice username */
    char rpass[64];                   /* ice password */
 
-   recorder_t* a_recorder;
-   recorder_t* v_recorder;
+   //recorder_t* a_recorder;
+   //recorder_t* v_recorder;
 };
 
 

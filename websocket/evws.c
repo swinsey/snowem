@@ -154,7 +154,7 @@ static void internal_evwsconn_free(evutil_socket_t sock, short events,
 struct evwsconn* evwsconn_new(struct bufferevent* bev,
     const char* subprotocol) {
 
-  DEBUG("evwsconn new");
+  WSS_DEBUG("evwsconn new");
 
   struct evwsconn *conn = (struct evwsconn *)malloc(sizeof(struct evwsconn));
   memset(conn, 0, sizeof(struct evwsconn));

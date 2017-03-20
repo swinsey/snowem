@@ -21,6 +21,13 @@
 extern "C" {
 #endif
 
+// shared mem info for message queues
+#define SHAREDMEM_SIZE 33554432
+#define ICE2CORE_KEY 1168647512
+#define CORE2ICE_KEY 1168647513
+#define NET2CORE_KEY 1168647514
+#define CORE2NET_KEY 1168647515
+
 struct snw_context {
    snw_log_t          *log;
    time_t              cur_time;
@@ -28,20 +35,30 @@ struct snw_context {
    SSL_CTX            *ssl_ctx;
 
    const char         *config_file;
-   const char         *cert_file;
-   const char         *key_file;
+   const char         *ice_cert_file;
+   const char         *ice_key_file;
+
+   const char         *wss_cert_file;
+   const char         *wss_key_file;
+   const char         *wss_ip;
+   uint16_t            wss_port;
 
    /* ice stuff */
    snw_ice_context_t  *ice_ctx;
   
    /* message queues */
    snw_shmmq_t  *snw_ice2core_mq;
+   snw_shmmq_t  *snw_core2ice_mq;
+   snw_shmmq_t  *snw_net2core_mq;
+   snw_shmmq_t  *snw_core2net_mq;
 
    /* caches */
    snw_hashbase_t *session_cache;
 
    /* mempool for fixed-size objects */
    snw_mempool_t *rcvvars_mp;
+
+   snw_module_t  *module;
 };
 
 snw_context_t*

@@ -81,6 +81,10 @@ snw_log_write(snw_log_t *log, uint32_t level, const char* sourcefilename, int li
 #define ERROR(_log_,_fmt, ...) do {LOG(_log_, SNW_ERROR,_fmt,##__VA_ARGS__);} while(0)
 #define FATAL(_log_,_fmt, ...) do {} while(0)
 
+
+#define WSS_DEBUG(...)  do {} while(0)
+#define WSS_ERROR(...)  do {} while(0)
+
 #ifdef __cplusplus
 }
 #endif

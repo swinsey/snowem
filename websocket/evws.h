@@ -124,12 +124,12 @@ struct evwsconn {
   evwsconn_close_cb close_cb;
   evwsconn_error_cb error_cb;
   const char* subprotocol;
-  void* user_data;
+
   uint32_t   ip;
   uint32_t   port;
   uint32_t   flowid;
-
-  void* ice_handle;
+  void      *user_data;
+  void      *ice_handle;
 };
 
 

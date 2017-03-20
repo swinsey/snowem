@@ -634,7 +634,7 @@ size_t http_parser_execute (http_parser *parser,
   for (p=data; p != data + len; p++) {
     ch = *p;
 
-    //DEBUG("parsing, len=%u,method=%u,state=%u,ch=%c",p-data,parser->method,parser->state,ch);
+    //WSS_DEBUG("parsing, len=%u,method=%u,state=%u,ch=%c",p-data,parser->method,parser->state,ch);
 
     if (PARSING_HEADER(parser->state)) {
       ++parser->nread;
@@ -919,7 +919,7 @@ size_t http_parser_execute (http_parser *parser,
         const char *matcher;
         if (ch == '\0') {
           SET_ERRNO(HPE_INVALID_METHOD);
-          ERROR("error parsing, method=%u",parser->method);
+          WSS_ERROR("error parsing, method=%u",parser->method);
           goto error;
         }
 
@@ -1223,14 +1223,14 @@ size_t http_parser_execute (http_parser *parser,
             parser->header_state = h_general;
             break;
         }
-        //DEBUG("start parsing header, token=%c,ch=%u,header_state=%u",c,ch,parser->header_state);
+        //WSS_DEBUG("start parsing header, token=%c,ch=%u,header_state=%u",c,ch,parser->header_state);
         break;
       }
 
       case s_header_field:
       {
         c = TOKEN(ch);
-        //DEBUG("token, header_state=%u,c=%c",parser->header_state,c);
+        //WSS_DEBUG("token, header_state=%u,c=%c",parser->header_state,c);
         if (c) {
           switch (parser->header_state) {
             case h_general:
@@ -1313,7 +1313,7 @@ size_t http_parser_execute (http_parser *parser,
 
             case h_matching_upgrade:
               parser->index++;
-              //DEBUG("h matching upgrade, c=%u,upgrade[%d]=%u",c,parser->index,UPGRADE[parser->index]);
+              //WSS_DEBUG("h matching upgrade, c=%u,upgrade[%d]=%u",c,parser->index,UPGRADE[parser->index]);
               if (parser->index > sizeof(UPGRADE)-1
                   || c != UPGRADE[parser->index]) {
                 parser->header_state = h_general;
@@ -1548,16 +1548,16 @@ size_t http_parser_execute (http_parser *parser,
 
       case s_header_value_lws:
       {
-        //DEBUG("header value lws, parser->state=%u",parser->state);
+        //WSS_DEBUG("header value lws, parser->state=%u",parser->state);
         if (ch == ' ' || ch == '\t') 
         {
           parser->state = s_header_value_start;
-          //DEBUG("header value lws --> header value start, parser->state=%u",parser->state);
+          //WSS_DEBUG("header value lws --> header value start, parser->state=%u",parser->state);
         } 
         else
         {
           parser->state = s_header_field_start;
-          //DEBUG("header value lws --> header field start, parser->state=%u",parser->state);
+          //WSS_DEBUG("header value lws --> header field start, parser->state=%u",parser->state);
           goto reexecute_byte;
         }
         break;
@@ -1567,7 +1567,7 @@ size_t http_parser_execute (http_parser *parser,
       {
         STRICT_CHECK(ch != LF);
 
-        //DEBUG("headers almost done, parser->state=%u",parser->state);
+        //WSS_DEBUG("headers almost done, parser->state=%u",parser->state);
 
         if (parser->flags & F_TRAILING) {
           /* End of a chunked request */
@@ -1578,7 +1578,7 @@ size_t http_parser_execute (http_parser *parser,
 
         parser->state = s_headers_done;
 
-        //DEBUG("headers done, parser->flags=%u,parser->method=u",parser->flags,parser->method);
+        //WSS_DEBUG("headers done, parser->flags=%u,parser->method=u",parser->flags,parser->method);
         /* Set this here so that on_headers_complete() callbacks can see it */
         parser->upgrade =
           (parser->flags & F_UPGRADE || parser->method == HTTP_CONNECT);

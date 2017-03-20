@@ -175,7 +175,7 @@ int recorder_close(recorder_t *recorder) {
 		fseek(recorder->file, 0L, SEEK_END);
 		size_t fsize = ftell(recorder->file);
 		fseek(recorder->file, 0L, SEEK_SET);
-		MODULE_DEBUG("File is %zu bytes: %s\n", fsize, recorder->filename);
+		MODULE_DEBUG("File is %zu bytes: %s\n", fsize, recorder->filename); (void)fsize;
 	}
 	return 0;
 }
