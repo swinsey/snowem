@@ -334,8 +334,6 @@ done:
    return ret;
 }
 
-
-
 int 
 snw_shmmq_enqueue(snw_shmmq_t *mq, 
       const time_t uiCurTime, const void* data, 

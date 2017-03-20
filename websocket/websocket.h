@@ -17,7 +17,10 @@ struct snw_websocket_context {
 };
 
 void
-snw_websocket_init(snw_context_t *ctx);
+snw_websocket_init(snw_context_t *ctx, dispatch_fn cb);
+
+int
+snw_websocket_send_msg(snw_websocket_context_t *ctx, char *buf, int len, uint32_t flow);
 
 #ifdef __cplusplus
 }

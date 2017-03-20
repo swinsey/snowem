@@ -17,7 +17,7 @@ SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 file(GLOB sources 
        core/*.c core/*.cpp core/*.h 
        ice/*.c ice/*.h 
-       modules/*.c modules/*.h 
+       #modules/*.c modules/*.h 
        jsoncpp/*.cpp jsoncpp/json/*.h
        websocket/*.c websocket/*.h)
 file(GLOB c_sources core/*.c ice/*.c websocket/*.c)

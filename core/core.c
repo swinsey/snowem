@@ -109,6 +109,41 @@ snw_net_init_ssl(snw_context_t *ctx) {
    return 0;
 }
 
+
+void
+snw_net_dispatch_msg(int fd, short int event,void* data) {
+   static char buf[MAX_BUFFER_SIZE];
+   snw_websocket_context_t *ws_ctx = (snw_websocket_context_t *)data;
+   snw_context_t *ctx = ws_ctx->ctx;
+   uint32_t len = 0;
+   uint32_t flowid = 0;
+   uint32_t cnt = 0;
+   int ret = 0; 
+   //time_t cur_time = time(0);
+   
+   DEBUG(ctx->log,"net dispatch msg");
+   while(true){
+     len = 0;
+     flowid = 0;
+     cnt++;
+     //if ( cnt % 10000 == 0 ) break;
+     if ( cnt >= 100) {
+         //DEBUG("dequeue_from_ccd: breaking the loop, cnt=%d", cnt);
+         break;
+     }
+
+     ret = snw_shmmq_dequeue(ctx->snw_core2net_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
+     DEBUG(ctx->log,"core2net fd=%d, ret=%d, len=%u, flowid=%u",
+                    ctx->snw_core2net_mq->_fd, ret, len, flowid);
+     if ( (len == 0 && ret == 0) || (ret < 0) )
+        return;
+
+     snw_websocket_send_msg(ws_ctx,buf,len,flowid);
+   }
+
+   return;
+}
+
 int
 snw_net_init_shmqueue(snw_context_t *ctx) {
    int ret = 0;
@@ -126,6 +161,21 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
       ERROR(ctx->log,"failed to init net2core mq");
       return -2;
    }
+
+   ctx->snw_core2net_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_net2core_mq));
+   if (ctx->snw_net2core_mq == 0) {
+      return -1;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_core2net_mq,
+             "/tmp/snw_core2net_mq.fifo", 0, 0, 
+             CORE2NET_KEY, SHAREDMEM_SIZE, 0);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to init net2core mq");
+      return -2;
+   }
+   DEBUG(ctx->log,"core2net fd=%d",ctx->snw_core2net_mq->_fd);
 
    return 0;
 }
@@ -147,7 +197,7 @@ snw_net_setup(snw_context_t *ctx) {
    snw_net_init_ssl(ctx);
 
    DEBUG(ctx->log,"start websocket process");
-   snw_websocket_init(ctx);
+   snw_websocket_init(ctx,snw_net_dispatch_msg);
   
    return;
 }

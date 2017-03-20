@@ -1,8 +1,10 @@
 #include <stdio.h>
+
 #include <sofia-sip/sdp.h>
 
 #include "core.h"
 #include "ice.h"
+#include "json/json.h"
 #include "log.h"
 #include "session.h"
 
@@ -65,6 +67,16 @@ snw_ice_init(snw_context_t *ctx) {
    g_ice_context.ice_tcp_enabled = 0; */
 
    event_base_dispatch(ctx->ev_base);
+   return;
+}
+
+void
+snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, void *r) {
+   snw_log_t *log = ctx->log;
+   //Json::Value *root = (Json::Value*)r;
+
+   DEBUG(log,"ice handler");
+   
    return;
 }
 

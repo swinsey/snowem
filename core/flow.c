@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #include "flow.h"
@@ -93,8 +94,21 @@ snw_flowset_setobj(snw_flowset_t *s, uint32_t id, void *obj) {
  
    flow = s->data + id; 
    flow->obj = obj;
-
    return;
+}
+
+void*
+snw_flowset_getobj(snw_flowset_t *s, uint32_t id) {
+   snw_flow_t *flow = 0;
+
+   if (s == 0 || id == 0)
+      return 0;
+   
+   if (id >= s->totalnum)
+      return 0;
+ 
+   flow = s->data + id; 
+   return flow->obj;
 }
 
 void

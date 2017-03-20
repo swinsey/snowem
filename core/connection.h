@@ -15,11 +15,11 @@ enum {
 
 typedef struct snw_connection snw_connection_t;
 struct snw_connection {
-   uint32_t   flowid;
-   uint32_t   userid;
-   uint32_t   srctype;
-   uint32_t   ipaddr;
-   uint16_t   port;
+   uint32_t       flowid;
+   uint32_t       userid;
+   uint32_t       srctype;
+   uint32_t       ipaddr;
+   uint16_t       port;
 };
 
 #ifdef __cplusplus

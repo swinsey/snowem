@@ -104,7 +104,7 @@ new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn,
      return;
   }
 
-  DEBUG(ctx->log, "new connection, flowid=%u", flowid);
+  DEBUG(ctx->log, "new connection, conn=%p, flowid=%u", conn, flowid);
   conn->flowid = flowid;
   conn->ip = ((struct sockaddr_in*) address)->sin_addr.s_addr;
   conn->port = ((struct sockaddr_in*) address)->sin_port;
@@ -123,7 +123,8 @@ void ws_listener_error(struct evwsconnlistener *wslistener, void* user_data) {
 
 
 void
-snw_websocket_init(snw_context_t *ctx) {
+snw_websocket_init(snw_context_t *ctx, dispatch_fn cb) {
+   struct event *q_event;
    struct sockaddr_in sin;
    struct evwsconnlistener* levws = 0;
    snw_websocket_context_t *ws_ctx = 0;
@@ -145,6 +146,11 @@ snw_websocket_init(snw_context_t *ctx) {
       assert(0);
    }
    ws_ctx->flowset = flowset;
+
+   DEBUG(ctx->log,"core2net fd=%d",ctx->snw_core2net_mq->_fd);
+   q_event = event_new(ctx->ev_base, ctx->snw_core2net_mq->_fd, 
+         EV_TIMEOUT|EV_READ|EV_PERSIST, cb, ws_ctx);
+   event_add(q_event, NULL);   
 
    memset(&sin, 0, sizeof(sin));
    sin.sin_family = AF_INET;
@@ -168,5 +174,25 @@ snw_websocket_init(snw_context_t *ctx) {
    return;
 }
 
+int
+snw_websocket_send_msg(snw_websocket_context_t *ws_ctx, char *buf, int len, uint32_t flow) {
+   snw_context_t *ctx = ws_ctx->ctx;
+   struct evwsconn* conn = 0;
+
+   if (flow > ws_ctx->flowset->totalnum) {
+      return -1;
+   }
+
+   conn = (struct evwsconn*)snw_flowset_getobj(ws_ctx->flowset,flow);
+   if (conn == NULL) {
+      ERROR(ctx->log, "connection not found, flowid=%u", flow);
+      return -3;
+   }
+
+   ERROR(ctx->log, "send msg, conn=%p, flowid=%u, num=%u", conn, flow, ws_ctx->flowset->totalnum);
+   evwsconn_send_message(conn, EVWS_DATA_TEXT, (const unsigned char*)buf, len);
+
+   return 0;
+}
 
 

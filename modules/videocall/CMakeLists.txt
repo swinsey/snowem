@@ -17,7 +17,7 @@ add_library(videocall SHARED ${sources})
 target_compile_options(videocall PUBLIC -g -Wall)
 
 # This allows to include files relative to the root of the src directory with a <> pair
-target_include_directories(videocall PUBLIC . ../../ ../../core ../../ice)
+target_include_directories(videocall PUBLIC . ../../ ../../core ../../ice ../../jsoncpp)
 
 
 target_link_libraries(videocall PUBLIC

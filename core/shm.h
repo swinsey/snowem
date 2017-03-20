@@ -31,9 +31,12 @@
 #ifndef _SNOW_CORE_SHM_H_
 #define _SNOW_CORE_SHM_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <sys/shm.h>
 #include <stdint.h>
-
 
 typedef struct snw_shm snw_shm_t;
 struct snw_shm
@@ -62,6 +65,10 @@ snw_shm_alloc(snw_shm_t *shm);
 void 
 snw_shm_free(snw_shm_t *shm);
 
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif//_SNOW_CORE_SHM_H_
 

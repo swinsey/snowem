@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 
 #include "module.h"
+#include "mq.h"
 
 void
 snw_module_init(snw_context_t *ctx) {
@@ -30,4 +31,9 @@ snw_module_init(snw_context_t *ctx) {
 }
 
 
+void
+snw_module_enqueue(void *mq, const time_t curtime, const void* data,
+       uint32_t len, uint32_t flow) {
+   snw_shmmq_enqueue((snw_shmmq_t *)mq, curtime, data, len, flow);
+}
 

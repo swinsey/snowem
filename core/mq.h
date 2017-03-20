@@ -31,6 +31,10 @@
 #ifndef _SNOW_CORE_MQ_H_
 #define _SNOW_CORE_MQ_H_ 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "shm.h"
 
 //static const int E_DEQUEUE_BUF_NOT_ENOUGH = -13001;
@@ -94,5 +98,9 @@ void
 snw_shmmq_clear_flag(uint32_t _fd);
 
 	
-#endif//_USNET_MQ_H_
+#ifdef __cplusplus
+}
+#endif
+
+#endif//_SNOW_CORE_MQ_H_
 

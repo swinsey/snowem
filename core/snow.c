@@ -50,12 +50,26 @@ snw_conf_init(snw_context_t *ctx, const char *file) {
 
    return 0;
 }
+int
+snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
+   snw_log_t *log = ctx->log;
+   
+   DEBUG(log, "module handling, type=%x", type);   
+
+   if (ctx->module->type == type) {
+      ctx->module->methods->handle_msg(ctx,conn,data,len);
+      //call snw_videocall_handle_msg
+   }
+
+   return 0;
+}
 
 int
 snw_net_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    Json::Value root;
    Json::Reader reader;
+   uint32_t msgtype = 0;
    int ret;
 
    ret = reader.parse(data,data+len,root,0);
@@ -64,6 +78,25 @@ snw_net_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint
       return -1;
    }
    DEBUG(log, "get msg, data=%s", data);
+   try {
+      msgtype = root["msgtype"].asUInt();
+      switch(msgtype) {
+         case SNW_ICE:
+            snw_ice_handler(ctx,conn,&root);
+            break;
+         case SNW_RTP: 
+         case SNW_RTCP: 
+            break;
+
+         default:
+            snw_module_handler(ctx,conn,msgtype,data,len);
+            break;
+      }
+      
+   } catch (...) {
+      ERROR(log, "json format error, data=%s", data);
+   }
+
 
    return 0;
 }
@@ -99,6 +132,7 @@ snw_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flow
    }
 
    memset(&conn, 0, sizeof(conn));
+   conn.flowid = flowid;
    conn.srctype = WSS_SOCKET_UDP;
    conn.port = header->port;
    conn.ipaddr = header->ipaddr;
@@ -187,7 +221,21 @@ snw_main_process(snw_context_t *ctx) {
       ERROR(ctx->log,"failed to init net2core mq");
       return;
    }
- 
+
+   ctx->snw_core2net_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_core2net_mq));
+   if (ctx->snw_net2core_mq == 0) {
+      return;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_core2net_mq,
+             "/tmp/snw_core2net_mq.fifo", 0, 0, 
+             CORE2NET_KEY, SHAREDMEM_SIZE, 0);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to init core2net mq");
+      return;
+   }
+
    q_event = event_new(ctx->ev_base, ctx->snw_net2core_mq->_fd, 
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_dispatch_msg, ctx);
    event_add(q_event, NULL);

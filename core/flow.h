@@ -38,6 +38,9 @@ snw_flowset_freeid(snw_flowset_t *s, uint32_t id);
 void
 snw_flowset_setobj(snw_flowset_t *s, uint32_t id, void *obj);
 
+void*
+snw_flowset_getobj(snw_flowset_t *s, uint32_t id);
+
 void
 snw_flowset_free(snw_flowset_t *set);
 

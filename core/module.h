@@ -7,19 +7,26 @@ extern "C" {
 
 #include "core.h"
 
+/* Built-in module type */
 enum {
    SNW_MIN = 1,
    SNW_ICE = SNW_MIN,
    SNW_RTP = 2,
    SNW_RTCP = 3,
-   SNW_RSTP = 4,
    /* reserve range */
    SNW_MAX = 255,
 };
 
+typedef struct snw_module_callbacks snw_module_callbacks_t;
+struct snw_module_callbacks {
+
+int   (*enqueue)(void *mq, const time_t curtime, const void* data, 
+                 uint32_t len, uint32_t flow);
+};
+
 typedef struct snw_module_methods snw_module_methods_t;
 struct snw_module_methods {
-   void               (*handle_msg)(void *ctx, char *buffer, int len);
+   void               (*handle_msg)(void *ctx, void *conn, char *buffer, int len);
 };
 
 struct snw_module {
@@ -37,6 +44,10 @@ struct snw_module {
 
 void
 snw_module_init(snw_context_t *ctx);
+
+void
+snw_module_enqueue(void *mq, const time_t curtime, const void* data,
+                  uint32_t len, uint32_t flow);
 
 
 #ifdef __cplusplus

@@ -28,6 +28,7 @@ extern "C" {
 #define NET2CORE_KEY 1168647514
 #define CORE2NET_KEY 1168647515
 
+typedef void (*dispatch_fn)(int fd, short int event,void* data);
 struct snw_context {
    snw_log_t          *log;
    time_t              cur_time;
