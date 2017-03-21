@@ -7,6 +7,9 @@
 #include <jansson.h>
 #include <json/json.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*#include "config_file.h"
 #include "base/base_str.h"
 #include "net/ipc_mq.h"
@@ -41,5 +44,8 @@ int verify_disabled_streams(ice_session_t *session, int audio, int video, const 
 
 int try_ice_start(ice_session_t *session);*/
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _PROCESS_H_

@@ -61,7 +61,7 @@ snw_cache_init(snw_hashbase_t *base, uint32_t key,
       isemptyfn isempty_fn, setemptyfn setempty_fn);
 
 void*
-snw_cache_get(snw_hashbase_t *base, void *sitem);
+snw_cache_get(snw_hashbase_t *base, void *sitem, int *is_new);
 
 void*
 snw_cache_search(snw_hashbase_t *base, void *sitem);
@@ -78,7 +78,7 @@ snw_cache_finit(snw_hashbase_t *base);
 void*
 snw_cache_search_new(snw_hashbase_t *base, void *sitem, eqfn _eqfn);
 
-#define CACHE_GET(base, item, type) (type)(snw_cache_get(base, item));
+#define CACHE_GET(base, item, is_new, type) (type)(snw_cache_get(base, item, is_new));
 #define CACHE_SEARCH(base, item, type) (type)(snw_cache_search(base, item));
 #define CACHE_INSERT(base, item, type) (type)snw_cache_insert(base, item);
 #define CACHE_REMOVE(base, item) snw_cache_remove(base, item);

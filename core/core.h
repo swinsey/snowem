@@ -44,9 +44,6 @@ struct snw_context {
    const char         *wss_ip;
    uint16_t            wss_port;
 
-   /* ice stuff */
-   snw_ice_context_t  *ice_ctx;
-  
    /* message queues */
    snw_shmmq_t  *snw_ice2core_mq;
    snw_shmmq_t  *snw_core2ice_mq;

@@ -9,8 +9,12 @@
 #include "session.h"
 #include "types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct snw_ice_context {
-   void      *main_ctx;
+   void      *ctx;
    snw_log_t *log;
 
    int        rtcpmux_enabled;
@@ -32,10 +36,10 @@ void
 snw_ice_init(snw_context_t *ctx);
 
 void
-snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, void *root);
-
-void
 ice_srtp_handshake_done(ice_session_t *session, ice_component_t *component);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif //_SNOW_ICE_ICE_H_

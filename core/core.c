@@ -276,6 +276,20 @@ snw_ice_init_shmqueue(snw_context_t *ctx) {
       return -2;
    }
 
+   ctx->snw_core2ice_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_core2ice_mq));
+   if (ctx->snw_ice2core_mq == 0) {
+      return -1;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_core2ice_mq,
+             "/tmp/snw_core2ice_mq.fifo", 0, 0, 
+             CORE2ICE_KEY, SHAREDMEM_SIZE, 0);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to init ice2core mq");
+      return -2;
+   }
+
    return 0;
 }
 

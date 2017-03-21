@@ -50,6 +50,15 @@ snw_conf_init(snw_context_t *ctx, const char *file) {
 
    return 0;
 }
+
+int
+snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
+
+   DEBUG(ctx->log, "ice handler, flowid=%u, len=%u", conn->flowid, len);
+   snw_shmmq_enqueue(ctx->snw_core2ice_mq, 0, data, len, conn->flowid);
+   return 0;
+}
+
 int
 snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
@@ -65,7 +74,7 @@ snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, ch
 }
 
 int
-snw_net_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint32_t len) {
+snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    Json::Value root;
    Json::Reader reader;
@@ -82,7 +91,7 @@ snw_net_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint
       msgtype = root["msgtype"].asUInt();
       switch(msgtype) {
          case SNW_ICE:
-            snw_ice_handler(ctx,conn,&root);
+            snw_ice_handler(ctx,conn,msgtype,data,len);
             break;
          case SNW_RTP: 
          case SNW_RTCP: 
@@ -102,7 +111,7 @@ snw_net_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint
 }
 
 int
-snw_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
+snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
    snw_event_t* header = (snw_event_t*) buffer; 
    snw_log_t *log = (snw_log_t*)ctx->log;
    snw_connection_t conn;
@@ -146,13 +155,54 @@ snw_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flow
        len - sizeof(snw_event_t));
 
 
-   snw_net_process_msg(ctx,&conn,buffer+sizeof(snw_event_t),len-sizeof(snw_event_t));
+   snw_core_process_msg(ctx,&conn,buffer+sizeof(snw_event_t),len-sizeof(snw_event_t));
 
    return 0;
 }
 
+int
+snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
+
+   DEBUG(ctx->log, "ice preprocess msg, msg=%s",buffer);
+   snw_shmmq_enqueue(ctx->snw_core2net_mq, 0, buffer, len, flowid);
+   return 0;
+}
+
 void
-snw_dispatch_msg(int fd, short int event,void* data) {
+snw_ice_msg(int fd, short int event,void* data) {
+   static char buffer[MAX_BUFFER_SIZE];
+   snw_context_t *ctx = (snw_context_t *)data;
+   uint32_t len = 0;
+   uint32_t flowid = 0;
+   uint32_t cnt = 0;
+
+#ifdef USE_ADAPTIVE_CONTROL
+   while(true){
+      len = 0; flowid = 0; cnt++;
+      if ( cnt >= 10000) {
+         DEBUG(ctx->log, "breaking the loop, cnt=%d", cnt);
+         break;
+      }
+#endif
+      // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
+      snw_shmmq_dequeue(ctx->snw_ice2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
+
+      if (len == 0) return;
+
+      DEBUG(ctx->log,"dequeue msg from ice, flowid=%u, len=%u, cnt=%d",
+          flowid, len, cnt);
+      snw_process_msg_from_ice(ctx,buffer,len,flowid);
+
+#ifdef USE_ADAPTIVE_CONTROL
+   }
+#endif
+
+   return;
+
+}
+
+void
+snw_net_msg(int fd, short int event,void* data) {
    static char buffer[MAX_BUFFER_SIZE];
    snw_context_t *ctx = (snw_context_t *)data;
    uint32_t len = 0;
@@ -174,7 +224,7 @@ snw_dispatch_msg(int fd, short int event,void* data) {
 
       DEBUG(ctx->log,"dequeue msg from net, flowid=%u, len=%u, cnt=%d",
           flowid, len, cnt);
-      snw_preprocess_msg(ctx,buffer,len,flowid);
+      snw_net_preprocess_msg(ctx,buffer,len,flowid);
 
 #ifdef USE_ADAPTIVE_CONTROL
    }
@@ -205,9 +255,6 @@ snw_main_process(snw_context_t *ctx) {
 
    snw_module_init(ctx);
 
-   //test methods
-   //ctx->module->methods->handle_msg(ctx,0,0);
-
    ctx->snw_net2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_net2core_mq));
    if (ctx->snw_net2core_mq == 0) {
@@ -237,8 +284,41 @@ snw_main_process(snw_context_t *ctx) {
    }
 
    q_event = event_new(ctx->ev_base, ctx->snw_net2core_mq->_fd, 
-        EV_TIMEOUT|EV_READ|EV_PERSIST, snw_dispatch_msg, ctx);
+        EV_TIMEOUT|EV_READ|EV_PERSIST, snw_net_msg, ctx);
    event_add(q_event, NULL);
+
+   ctx->snw_ice2core_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_ice2core_mq));
+   if (ctx->snw_ice2core_mq == 0) {
+      return;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_ice2core_mq,
+             "/tmp/snw_ice2core_mq.fifo", 0, 0, 
+             ICE2CORE_KEY, SHAREDMEM_SIZE, 0);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to init core2net mq");
+      return;
+   }
+
+   ctx->snw_core2ice_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_core2ice_mq));
+   if (ctx->snw_core2ice_mq == 0) {
+      return;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_core2ice_mq,
+             "/tmp/snw_core2ice_mq.fifo", 0, 0, 
+             CORE2ICE_KEY, SHAREDMEM_SIZE, 0);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to init core2net mq");
+      return;
+   }
+
+   q_event = event_new(ctx->ev_base, ctx->snw_ice2core_mq->_fd, 
+        EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_msg, ctx);
+   event_add(q_event, NULL);
+
    event_base_dispatch(ctx->ev_base);
 
    return;

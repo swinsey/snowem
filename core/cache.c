@@ -166,7 +166,7 @@ snw_cache_init(snw_hashbase_t *base, uint32_t key,
 }
 
 void*
-snw_cache_get(snw_hashbase_t *base, void *sitem) 
+snw_cache_get(snw_hashbase_t *base, void *sitem, int *is_new) 
 {
    void *item = 0;
    char *table = 0;
@@ -182,8 +182,14 @@ snw_cache_get(snw_hashbase_t *base, void *sitem)
       value = base->hb_keyfn(sitem) % base->hb_base[i];
       item = table + i*base->hb_len*base->hb_objsize
                    + value*base->hb_objsize;
-      if ( base->hb_isemptyfn(item) ) 
+      if (base->hb_isemptyfn(item)) {
+         *is_new = 1;
          return item;
+      }
+      if (base->hb_eqfn(item, sitem)) {
+         *is_new = 0;
+         return item;
+      }
    }   
    
    return NULL;
@@ -206,7 +212,7 @@ snw_cache_search(snw_hashbase_t *base, void *sitem)
       value = base->hb_keyfn(sitem) % base->hb_base[i];
       item = table + i*base->hb_len*base->hb_objsize
                    + value*base->hb_objsize;
-      if ( base->hb_eqfn(item, sitem) )
+      if (base->hb_eqfn(item, sitem))
          return item;
    }   
    

@@ -51,8 +51,9 @@ ice_session_init(snw_ice_context_t *ctx) {
 ice_session_t*
 ice_session_get(snw_ice_context_t *ctx, ice_session_t *key) {
    ice_session_t *so;
+   int is_new = 0;
 
-   so = CACHE_GET(ctx->session_cache, key, ice_session_t*);
+   so = CACHE_GET(ctx->session_cache, key, &is_new, ice_session_t*);
 
    if (so == 0)
       return 0;

@@ -13,8 +13,22 @@ enum {
    SNW_ICE = SNW_MIN,
    SNW_RTP = 2,
    SNW_RTCP = 3,
+
    /* reserve range */
    SNW_MAX = 255,
+};
+
+/* ICE api */
+enum {
+   SNW_ICE_MIN = 1,
+   SNW_ICE_CREATE = SNW_ICE_MIN,
+   SNW_ICE_START = 2,
+   SNW_ICE_STOP = 3,
+   SNW_ICE_SDP = 4,
+   SNW_ICE_CANDIDATE = 5,
+
+   /* reserve range */
+   SNW_ICE_MAX = 255,
 };
 
 typedef struct snw_module_callbacks snw_module_callbacks_t;
