@@ -1,5 +1,5 @@
 #include "log.h"
-#include "icetypes.h"
+#include "ice_types.h"
 #include "rtcp.h"
 
 int rtcp_parse(char *packet, int len) {

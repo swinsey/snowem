@@ -1,16 +1,20 @@
-#ifndef _ICE_COMPONENT_H_
-#define _ICE_COMPONENT_H_
+#ifndef _SNOW_ICE_COMPONENT_H_
+#define _SNOW_ICE_COMPONENT_H_
 
 #include <stdint.h>
 #include <jansson.h>
 
 #include "cicero/agent.h"
+#include "core.h"
 #include "dtls.h"
-#include "types.h"
+#include "ice_types.h"
 #include "packet.h"
-#include "vp8.h"
 #include "rtp.h"
+#include "vp8.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct stats_item stats_item_t;
 struct stats_item {
@@ -20,10 +24,10 @@ struct stats_item {
   
 typedef struct ice_trickle ice_trickle_t;
 struct ice_trickle {
-   ice_session_t *session;    /* Janus ICE handle this trickle candidate belongs to */
-   int64_t received;         /* Monotonic time of when this trickle candidate has been received */
-   char *transaction;        /* Janus API transaction ID of the original trickle request */
-   json_t *candidate;        /* JSON object of the trickle candidate(s) */
+   snw_ice_session_t *session;
+   int64_t received;
+   char *transaction;             /* Janus API transaction ID of the original trickle request */
+   json_t *candidate;
 };
 
 /* Media statistics */
@@ -43,7 +47,7 @@ struct ice_stats {
 
 #define LAST_SEQS_MAX_LEN 160
 struct ice_component {
-   ice_stream_t *stream;
+   snw_ice_stream_t *stream;
    uint32_t stream_id;
    uint32_t component_id;
 
@@ -75,13 +79,26 @@ struct ice_component {
    struct list_head list;
 };
 
-void component_mempool_init();
-ice_component_t* component_allocate();
-void component_deallocate(ice_component_t* p);
-ice_component_t* component_find(ice_component_t *head, uint32_t id);
-void component_insert(ice_component_t *head, ice_component_t *item);
+void
+snw_component_mempool_init(snw_ice_context_t *ctx);
 
-#endif // ICE_COMPONENT_H_
+ice_component_t*
+snw_component_allocate();
+
+void
+snw_component_deallocate(ice_component_t* p);
+
+ice_component_t*
+snw_component_find(ice_component_t *head, uint32_t id);
+
+void
+snw_component_insert(ice_component_t *head, ice_component_t *item);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // _SNOW_ICE_COMPONENT_H_
 
 
 

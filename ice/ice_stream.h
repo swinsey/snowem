@@ -1,17 +1,22 @@
-#ifndef _MEDIASVR_STREAM_H_
-#define _MEDIASVR_STREAM_H_
+#ifndef _SNOW_ICE_STREAM_H_
+#define _SNOW_ICE_STREAM_H_
 
 #include <inttypes.h>
 
+#include "core.h"
 #include "dtls.h"
-#include "icetypes.h"
+#include "ice_component.h"
+#include "ice_types.h"
 #include "linux_list.h"
-#include "component.h"
 
-struct ice_stream {
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct snw_ice_stream {
    uint32_t stream_id;
 
-   ice_session_t *session;
+   snw_ice_session_t *session;
 
    uint32_t audio_ssrc;
    uint32_t video_ssrc;
@@ -39,16 +44,30 @@ struct ice_stream {
    struct list_head list;
 };
 
-void stream_mempool_init();
-ice_stream_t* stream_allocate();
-void stream_deallocate(ice_stream_t* p);
-ice_stream_t* stream_find(ice_stream_t *head, uint32_t id);
-void stream_insert(ice_stream_t *head, ice_stream_t *item);
-void stream_free(ice_stream_t *streams, ice_stream_t *stream);
+void
+snw_stream_mempool_init(snw_ice_context_t *ctx);
+
+snw_ice_stream_t*
+snw_stream_allocate(snw_ice_context_t *ctx);
+
+void
+snw_stream_deallocate(snw_ice_context *ctx, snw_ice_stream_t* p);
+
+snw_ice_stream_t* 
+snw_stream_find(snw_ice_stream_t *head, uint32_t id);
+
+void
+stream_insert(snw_ice_stream_t *head, snw_ice_stream_t *item);
+
+void
+stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream);
 
 
+#ifdef __cplusplus
+}
+#endif
 
-#endif // _CCD_STREAM_H_
+#endif // _SNOW_ICE_STREAM_H_
 
 
 

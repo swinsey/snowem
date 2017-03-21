@@ -3,6 +3,8 @@
 
 #include "log.h"
 #include "ice.h"
+#include "ice_types.h"
+#include "ice_session.h"
 #include "utils.h"
 #include "session.h"
 
@@ -198,8 +200,8 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
 int
 srtp_dtls_setup(dtls_ctx_t *dtls) {
    ice_component_t *component = NULL;
-   ice_stream_t *stream = NULL;
-   ice_session_t *session = NULL;
+   snw_ice_stream_t *stream = NULL;
+   snw_ice_session_t *session = NULL;
 
    if (dtls == NULL) {
       return -1;
@@ -322,7 +324,8 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          }
 done:
          if (dtls->srtp_valid) {
-            ice_srtp_handshake_done(session, component);
+            //FIXME: uncomment
+            //ice_srtp_handshake_done(session, component);
          } else {
             srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
          }
@@ -436,13 +439,13 @@ void srtp_callback(const SSL *ssl, int where, int ret) {
       return;
    }
 
-   ice_stream_t *stream = (ice_stream_t*)component->stream;
+   snw_ice_stream_t *stream = (snw_ice_stream_t*)component->stream;
    if (!stream) {
       ICE_ERROR2("no ice stream, where=%d, ret=%d", where, ret);
       return;
    }
 
-   ice_session_t *handle = stream->session;
+   snw_ice_session_t *handle = stream->session;
    if (!handle) {
       ICE_ERROR2("no ice session, where=%d, ret=%d", where, ret);
       return;
@@ -460,9 +463,9 @@ int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
 }
 
 int srtp_send_data(dtls_ctx_t *dtls) {
-   ice_session_t *session = NULL;
+   snw_ice_session_t *session = NULL;
    ice_component_t *component = NULL;
-   ice_stream_t *stream = NULL;
+   snw_ice_stream_t *stream = NULL;
    int pending = 0;
 
    if (dtls == NULL) {

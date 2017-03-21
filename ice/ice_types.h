@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-typedef struct ice_session ice_session_t;
-typedef struct ice_stream ice_stream_t;
+typedef struct snw_ice_session snw_ice_session_t;
+typedef struct snw_ice_stream snw_ice_stream_t;
 typedef struct ice_component ice_component_t;
 typedef struct snw_ice_context snw_ice_context_t;
 
@@ -45,8 +45,8 @@ typedef struct snw_ice_context snw_ice_context_t;
 #define WEBRTC_VIDEO           0x0080
 
 // client role
-#define ICE_SENDER             0x0100
-#define ICE_RECEIVER           0x0200
+#define ICE_PUBLISHER          0x0100
+#define ICE_SUBSCRIBER         0x0200
 #define ICE_REPLAY             0x0400
 
 

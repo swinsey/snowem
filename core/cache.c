@@ -177,7 +177,6 @@ snw_cache_get(snw_hashbase_t *base, void *sitem, int *is_new)
       return NULL;
 
    table = (char*)base->hb_cache;
-
    for (i=0; i < base->hb_time; i++ ) { 
       value = base->hb_keyfn(sitem) % base->hb_base[i];
       item = table + i*base->hb_len*base->hb_objsize
@@ -192,6 +191,7 @@ snw_cache_get(snw_hashbase_t *base, void *sitem, int *is_new)
       }
    }   
    
+   *is_new = 0;
    return NULL;
 }
 

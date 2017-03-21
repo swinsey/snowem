@@ -1,9 +1,10 @@
 #include <assert.h>
 
 #include "core.h"
-#include "snw_event.h"
 #include "evws.h"
+#include "log.h"
 #include "types.h"
+#include "snw_event.h"
 #include "websocket.h"
 #include "wslistener.h"
 

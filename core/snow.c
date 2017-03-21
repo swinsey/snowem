@@ -9,6 +9,7 @@
 #include "config_file.h"
 #include "connection.h"
 #include "core.h"
+#include "log.h"
 #include "module.h"
 #include "snow.h"
 #include "snw_event.h"

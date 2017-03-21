@@ -1,9 +1,11 @@
-#include "rtp.h"
-#include "ice.h"
-#include "process.h"
-#include "utils.h"
+
 #include "log.h"
-#include "session.h"
+#include "ice.h"
+#include "ice_session.h"
+#include "json/json.h"
+#include "process.h"
+#include "rtp.h"
+#include "utils.h"
 
 /* RTP/RTCP port range */
 uint16_t g_rtp_range_min = 0;
@@ -60,9 +62,9 @@ int ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len) {
    return (s <= n && n < e) || (s <= nh && nh < e);
 }
 
-void ice_handle_incoming_rtp(ice_session_t *session, int type, int video, char *buf, int len) {
+void ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, char *buf, int len) {
 
-   if ( IS_FLAG(session,ICE_SENDER) ) {
+   if (IS_FLAG(session,ICE_PUBLISHER)) {
 	   Json::Value root;
    	Json::FastWriter writer;
    	std::string output;
@@ -88,7 +90,7 @@ void ice_handle_incoming_rtp(ice_session_t *session, int type, int video, char *
       /*FIXME: uncomment the below line*/
    	//enqueue_msg_to_mcd(output.c_str(),output.size(), session->flowid);
 
-   } else if ( IS_FLAG(session,ICE_RECEIVER )) {
+   } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
       if ( type == 1 ) {
          //DEBUG("forward receiver rtcp pkt, flowid=%u", session->flowid);
       }

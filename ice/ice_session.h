@@ -4,10 +4,9 @@
 #include <stdint.h>
 
 #include "cicero/agent.h"
-#include "stream.h"
-//#include "record.h"
+#include "ice_stream.h"
 
-struct ice_session {
+struct snw_ice_session {
    uint32_t flowid;
    uint32_t roomid;
 
@@ -27,9 +26,9 @@ struct ice_session {
    char *video_mid;                  /* Video mid (media ID) */
    int streams_num;                  /* Number of streams */
 
-   ice_stream_t streams;
-   ice_stream_t *audio_stream;       /* Audio stream */
-   ice_stream_t *video_stream;       /* Video stream */
+   snw_ice_stream_t streams;
+   snw_ice_stream_t *audio_stream;       /* Audio stream */
+   snw_ice_stream_t *video_stream;       /* Video stream */
 
    char *rtp_profile;                /* RTP profile set by caller (so that we can match it) */
    char *local_sdp;                  /* SDP generated locally (just for debugging purposes) */
@@ -52,16 +51,16 @@ struct ice_session {
 int
 ice_session_init(snw_ice_context_t *ctx);
 
-ice_session_t*
-ice_session_get(snw_ice_context_t *ctx, ice_session_t *key);
+snw_ice_session_t*
+ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new);
 
-ice_session_t*
-ice_session_search(snw_ice_context_t *ctx, ice_session_t *sitem);
+snw_ice_session_t*
+snw_ice_session_search(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
-ice_session_t*
-ice_session_insert(snw_ice_context_t *ctx, ice_session_t *sitem);
+snw_ice_session_t*
+ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
 int 
-ice_session_remove(snw_ice_context_t *ctx, ice_session_t *sitem);
+ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
 #endif //_ICE_SESSION_H_

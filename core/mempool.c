@@ -132,7 +132,7 @@ snw_mempool_free(snw_mempool_t *mp, void *p)
 {
    mem_chunk_t mcp = (mem_chunk_t)p;
 
-   if ( p == 0 )
+   if (p == 0)
       return;
 
    assert(((char *)p - mp->mp_startptr) % mp->mp_chunk_size == 0);

@@ -4,6 +4,7 @@
 
 #include "module.h"
 #include "mq.h"
+#include "log.h"
 
 void
 snw_module_init(snw_context_t *ctx) {

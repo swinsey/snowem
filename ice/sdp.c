@@ -1,38 +1,42 @@
+
+#include <sofia-sip/sdp.h>
+
 #include "log.h"
-#include "icetypes.h"
+#include "ice_types.h"
+#include "ice_session.h"
+#include "ice_stream.h"
 #include "sdp.h"
-#include "session.h"
 #include "utils.h"
 
 static su_home_t *g_home = NULL;
 
-/*int ice_sdp_init(void) {
+int
+ice_sdp_init(snw_ice_context_t *ctx) {
 
-   ICE_DEBUG2("sdp initialization");
+   DEBUG(ctx->log,"sdp initialization");
    g_home = (su_home_t*)su_home_new(sizeof(su_home_t));
    if(su_home_init(g_home) < 0) {
-      ICE_ERROR2("Ops, error setting up sofia-sdp?");
-      return -1;
-   }
+      ERROR(ctx->log,"Ops, error setting up sofia-sdp?");
+      return -1; 
+   }   
    return 0;
-}*/
+}
 
-/*void ice_sdp_deinit(void) {
+void ice_sdp_deinit(void) {
    su_home_deinit(g_home);
    su_home_unref(g_home);
    g_home = NULL;
-}*/
+}
 
-sdp_parser_t *ice_sdp_get_parser(const char *sdp) {
+sdp_parser_t *ice_sdp_get_parser(snw_ice_context_t *ctx, const char *sdp) {
    sdp_parser_t *parser = NULL;
 
    if (!sdp) {
-      ICE_ERROR2("sdp is null, sdp=%p",sdp);
+      ERROR(ctx->log,"sdp is null, sdp=%p",sdp);
       return NULL;
-   }
+   }   
 
-   parser = sdp_parse(g_home, sdp, strlen(sdp), 0);
-
+   parser = sdp_parse(g_home, sdp, strlen(sdp), 0); 
    return parser;
 }
 
@@ -114,7 +118,7 @@ int ice_get_sdp_attr(sdp_parser_t *parser, ice_sdp_attr_t *sdp_attr) {
    return 0;
 }
 
-void ice_sdp_add_global_attrs(ice_session_t *session, sdp_session_t *orig_sdp, const char* sdpstr, char* sdp) {
+void ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp, const char* sdpstr, char* sdp) {
    char wms[ICE_BUFSIZE];
    char buffer[512];
 
@@ -184,7 +188,7 @@ void ice_sdp_add_global_attrs(ice_session_t *session, sdp_session_t *orig_sdp, c
    return;
 }
 
-void ice_sdp_add_media_application(ice_session_t *session, sdp_media_t *m, char* sdp) {
+void ice_sdp_add_media_application(snw_ice_session_t *session, sdp_media_t *m, char* sdp) {
    char buffer[512];
 
    if (m->m_type != sdp_media_application) {
@@ -228,8 +232,8 @@ void ice_sdp_add_media_application(ice_session_t *session, sdp_media_t *m, char*
    return;
 }
 
-void ice_sdp_add_credentials(ice_session_t *session, sdp_media_t *m, int video, char* sdp) {
-   ice_stream_t *stream = NULL;
+void ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int video, char* sdp) {
+   snw_ice_stream_t *stream = NULL;
    char buffer[512];
    char *ufrag = NULL;
    char *password = NULL;
@@ -243,9 +247,9 @@ void ice_sdp_add_credentials(ice_session_t *session, sdp_media_t *m, int video, 
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
 
-      stream = stream_find(&session->streams, id);
+      stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_id);
    }
 
    if ( stream == NULL )
@@ -287,7 +291,7 @@ void ice_sdp_add_credentials(ice_session_t *session, sdp_media_t *m, int video, 
    return;
 }
 
-void ice_sdp_copy_attributes(ice_session_t *session, sdp_media_t *m, char *sdp) {
+void ice_sdp_copy_attributes(snw_ice_session_t *session, sdp_media_t *m, char *sdp) {
    char buffer[512];
 
    if (m && m->m_attributes) {
@@ -307,8 +311,8 @@ void ice_sdp_copy_attributes(ice_session_t *session, sdp_media_t *m, char *sdp) 
    return;
 }
 
-void ice_sdp_add_single_ssrc(ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
-   ice_stream_t *stream = NULL;
+void ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
+   snw_ice_stream_t *stream = NULL;
    char buffer[512];
 
    if ( m == NULL )
@@ -322,9 +326,9 @@ void ice_sdp_add_single_ssrc(ice_session_t *session, sdp_media_t *m, int video, 
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
 
-      stream = stream_find(&session->streams, id);
+      stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_id);
    }
 
    if ( stream == NULL )
@@ -353,8 +357,8 @@ void ice_sdp_add_single_ssrc(ice_session_t *session, sdp_media_t *m, int video, 
    return;
 }
 
-void ice_sdp_add_candidates(ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
-   ice_stream_t *stream = NULL;
+void ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
+   snw_ice_stream_t *stream = NULL;
 
    if ( m == NULL )
       return;
@@ -363,9 +367,9 @@ void ice_sdp_add_candidates(ice_session_t *session, sdp_media_t *m, int video, c
       uint32_t id = session->video_id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
-      stream = stream_find(&session->streams, id);
+      stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_id);
    }
 
    if ( stream == NULL )
@@ -379,16 +383,16 @@ void ice_sdp_add_candidates(ice_session_t *session, sdp_media_t *m, int video, c
    return;
 }
 
-void ice_sdp_send_candidates(ice_session_t *session, int video) {
-   ice_stream_t *stream = NULL;
+void ice_sdp_send_candidates(snw_ice_session_t *session, int video) {
+   snw_ice_stream_t *stream = NULL;
 
    if ( video ) {
       uint32_t id = session->video_id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
-      stream = stream_find(&session->streams, id);
+      stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_id);
    }
 
    if ( stream == NULL )
@@ -403,7 +407,7 @@ void ice_sdp_send_candidates(ice_session_t *session, int video) {
 }
 
 
-void ice_sdp_add_mline(ice_session_t *session, sdp_media_t *m, int inactive, int video, char* sdp) {
+void ice_sdp_add_mline(snw_ice_session_t *session, sdp_media_t *m, int inactive, int video, char* sdp) {
    char buffer[512];
    int ipv6 = 0; //ipv6 not support now
 
@@ -478,7 +482,7 @@ void ice_sdp_add_mline(ice_session_t *session, sdp_media_t *m, int inactive, int
    return;
 }
 
-char *ice_sdp_merge(ice_session_t *session, const char *sdpstr) {
+char *ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
    char wms[ICE_BUFSIZE];
    sdp_session_t *orig_sdp = NULL;
    sdp_parser_t *parser = NULL;
@@ -541,7 +545,7 @@ char *ice_sdp_merge(ice_session_t *session, const char *sdpstr) {
    return sdp;
 }
 
-void ice_try_start_component(ice_session_t *session, ice_stream_t *stream, ice_component_t *component, candidate_t *candidate) {
+void ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream, ice_component_t *component, candidate_t *candidate) {
    candidate_t candidates;
    candidate_t *c = NULL;
    int added = 0;
@@ -606,8 +610,8 @@ ice_remote_candidate_new(char *type, char *transport) {
    return c;
 }
 
-int ice_sdp_handle_candidate(ice_stream_t *stream, const char *candidate) {
-   ice_session_t *session = NULL;
+int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
+   snw_ice_session_t *session = NULL;
    ice_component_t *component = NULL;
    candidate_t *c = NULL;
    char foundation[16], transport[4], type[6]; 
@@ -635,7 +639,7 @@ int ice_sdp_handle_candidate(ice_stream_t *stream, const char *candidate) {
          ret, component_id, stream->stream_id, type, transport, relip, relport, ip, port);
 
    if (ret >= 7) {
-      component = component_find(&stream->components, component_id);
+      component = snw_component_find(&stream->components, component_id);
       if (component == NULL) {
          ICE_ERROR2("component not found, cid=%u, sid=%u", component_id, stream->stream_id);
          return -3;
@@ -672,7 +676,7 @@ int ice_sdp_handle_candidate(ice_stream_t *stream, const char *candidate) {
    return 0;
 }
 
-int sdp_stream_update_ssrc(ice_stream_t *stream, const char *ssrc_attr, int video) {
+int sdp_stream_update_ssrc(snw_ice_stream_t *stream, const char *ssrc_attr, int video) {
    int64_t ssrc;
 
    if (stream == NULL || ssrc_attr == NULL)
@@ -704,7 +708,7 @@ int sdp_stream_update_ssrc(ice_stream_t *stream, const char *ssrc_attr, int vide
 }
 
 int
-ice_sdp_get_local_credentials(ice_session_t *session, ice_stream_t *stream, sdp_media_t *m) {
+ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_media_t *m) {
    sdp_attribute_t *a;
    const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
    
@@ -771,7 +775,7 @@ ice_sdp_get_local_credentials(ice_session_t *session, ice_stream_t *stream, sdp_
    return 0;
 }
 
-int ice_sdp_get_global_credentials(ice_session_t *session, sdp_session_t *remote_sdp) {
+int ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *remote_sdp) {
    sdp_attribute_t *a = NULL;
    const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
 
@@ -814,7 +818,7 @@ int ice_sdp_get_global_credentials(ice_session_t *session, sdp_session_t *remote
    return 0;
 }
 
-int ice_sdp_get_local_credentials(ice_session_t *session, ice_stream_t *stream, sdp_session_t *remote_sdp) {
+int ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_session_t *remote_sdp) {
    sdp_attribute_t *a = NULL;
    sdp_media_t *m = NULL;
    const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
@@ -878,7 +882,7 @@ int ice_sdp_get_local_credentials(ice_session_t *session, ice_stream_t *stream, 
    return 0;
 }
 
-int ice_sdp_get_candidate(ice_session_t *session, ice_stream_t *stream, sdp_media_t *m) {
+int ice_sdp_get_candidate(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_media_t *m) {
    sdp_attribute_t *a = NULL;
 
    a = m->m_attributes;
@@ -905,8 +909,8 @@ int ice_sdp_get_candidate(ice_session_t *session, ice_stream_t *stream, sdp_medi
    return 0;
 }
 
-int ice_sdp_handle_answer(ice_session_t *session, sdp_parser_t *parser) {
-   ice_stream_t *stream = NULL;
+int ice_sdp_handle_answer(snw_ice_session_t *session, sdp_parser_t *parser) {
+   snw_ice_stream_t *stream = NULL;
    sdp_session_t *remote_sdp = NULL;
    sdp_media_t *m = NULL;
    int audio = 0, video = 0; 
@@ -932,7 +936,7 @@ int ice_sdp_handle_answer(ice_session_t *session, sdp_parser_t *parser) {
                m = m->m_next;
                continue;
             }
-            stream = stream_find(&session->streams, session->audio_id);
+            stream = snw_stream_find(&session->streams, session->audio_id);
          } else {
             CLEAR_FLAG(session, WEBRTC_AUDIO);
          }
@@ -947,10 +951,10 @@ int ice_sdp_handle_answer(ice_session_t *session, sdp_parser_t *parser) {
                continue;
             }
             if(!IS_FLAG(session, WEBRTC_BUNDLE)) {
-               stream = stream_find(&session->streams, session->video_id);
+               stream = snw_stream_find(&session->streams, session->video_id);
             } else {
                uint32_t id = session->audio_id > 0 ? session->audio_id : session->video_id;
-               stream = stream_find(&session->streams, id);
+               stream = snw_stream_find(&session->streams, id);
             }
          } else {
             CLEAR_FLAG(session, WEBRTC_VIDEO);

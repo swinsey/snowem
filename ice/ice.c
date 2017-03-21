@@ -1,15 +1,15 @@
 #include <stdio.h>
 
-#include <sofia-sip/sdp.h>
 
 #include "core.h"
 #include "ice.h"
-#include "json/json.h"
+#include "ice_session.h"
+#include "ice_stream.h"
 #include "log.h"
-#include "module.h"
-#include "session.h"
+#include "sdp.h"
+#include "process.h"
 
-static su_home_t *g_home = NULL;
+/*static su_home_t *g_home = NULL;
 
 int ice_sdp_init(snw_ice_context_t *ctx) {
 
@@ -38,75 +38,8 @@ sdp_parser_t *ice_sdp_get_parser(snw_ice_context_t *ctx, const char *sdp) {
 
    parser = sdp_parse(g_home, sdp, strlen(sdp), 0); 
    return parser;
-}
+}*/
 
-void
-snw_ice_create(snw_ice_context_t *ice_ctx, Json::Value root, uint32_t flowid) {
-   snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
-   snw_log_t *log = ctx->log;
-   Json::FastWriter writer;
-   std::string output;
-
-   try {
-      root["id"] = flowid;
-      root["sessionid"] = flowid;
-      root["rc"] = 0;
-      output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
-
-      DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
-                ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
-
-   } catch (...) {
-      ERROR(log, "json format error, data=%s", output.c_str());
-      return;
-   }
-
-   return;
-}
-
-void
-snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
-   snw_log_t *log = ice_ctx->log;
-   Json::Value root;
-   Json::Reader reader;
-   Json::FastWriter writer;
-   std::string output;
-   uint32_t msgtype = 0, api = 0;
-   int ret;
-
-   ret = reader.parse(data,data+len,root,0);
-   if (!ret) {
-      ERROR(log,"error json format, s=%s",data);
-      return;
-   }
-   DEBUG(log, "get ice msg, data=%s", data);
-   try {
-      msgtype = root["msgtype"].asUInt();
-      if (msgtype != SNW_ICE) {
-         ERROR(log, "wrong msg, msgtype=%u data=%s", msgtype, data);
-         return;
-      }
-      api = root["api"].asUInt();
-   } catch (...) {
-      ERROR(log, "json format error, data=%s", data);
-   }
-
-   switch(api) {
-      case SNW_ICE_CREATE:
-         snw_ice_create(ice_ctx,root,flowid);
-         break;
-
-      default:
-         ERROR(log, "unknow api, api=%u", api);
-         break;
-   }
-
-
-
-
-   return;
-}
 
 void
 snw_ice_dispatch_msg(int fd, short int event,void* data) {
@@ -124,11 +57,7 @@ snw_ice_dispatch_msg(int fd, short int event,void* data) {
      len = 0;
      flowid = 0;
      cnt++;
-     //if ( cnt % 10000 == 0 ) break;
-     if ( cnt >= 100) {
-         //DEBUG("dequeue_from_ccd: breaking the loop, cnt=%d", cnt);
-         break;
-     }
+     if (cnt >= 100) break;
 
      ret = snw_shmmq_dequeue(ctx->snw_core2ice_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
      DEBUG(ice_ctx->log,"core2ice fd=%d, ret=%d, len=%u, flowid=%u",
@@ -158,17 +87,14 @@ snw_ice_init(snw_context_t *ctx) {
    ice_ctx->log = ctx->log;
 
    ice_sdp_init(ice_ctx);
-
    ice_session_init(ice_ctx);
-   /*cache_handle_init(0x91001,10,100,1);
 
-   stream_mempool_init();
-   component_mempool_init();
-   memset(&g_ice_context,0,sizeof(g_ice_context));
-   g_ice_context.rtcpmux_enabled = 0; 
-   g_ice_context.ice_lite_enabled = 1; 
-   g_ice_context.ipv6_enabled = 0; 
-   g_ice_context.ice_tcp_enabled = 0; */
+   snw_stream_mempool_init(ice_ctx);
+   snw_component_mempool_init(ice_ctx);
+   ice_ctx->rtcpmux_enabled = 0; 
+   ice_ctx->ice_lite_enabled = 1; 
+   ice_ctx->ipv6_enabled = 0; 
+   ice_ctx->ice_tcp_enabled = 0;
 
    DEBUG(ctx->log,"core2ice fd=%d",ctx->snw_core2ice_mq->_fd);
    q_event = event_new(ctx->ev_base, ctx->snw_core2ice_mq->_fd, 
@@ -179,33 +105,9 @@ snw_ice_init(snw_context_t *ctx) {
    return;
 }
 
+/*
 void
-snw_ice_start(snw_context_t *ctx, snw_connection_t *conn, Json::Value *root) {
-   snw_log_t *log = ctx->log;
-   Json::FastWriter writer;
-   std::string output;
-
-   try {
-      (*root)["id"] = conn->flowid;
-      (*root)["sessionid"] = conn->flowid;
-      (*root)["rc"] = 0;
-      output = writer.write(*root);
-      //snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
-
-      DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
-                ctx->snw_core2net_mq, conn->flowid, output.size(), output.c_str());
-
-   } catch (...) {
-      ERROR(log, "json format error, data=%s", output.c_str());
-      return;
-   }
-
-   return;
-}
-
-
-void
-ice_srtp_handshake_done(ice_session_t *session, ice_component_t *component) {
+ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) {
 
    if (!session || !component)
       return;
@@ -232,4 +134,7 @@ ice_srtp_handshake_done(ice_session_t *session, ice_component_t *component) {
    //ice_rtp_established(session); //FIXME: uncomment
    return;
 }
+*/
+
+
 

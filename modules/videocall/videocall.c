@@ -2,7 +2,7 @@
 
 #include "module.h"
 #include "json/json.h"
-
+#include "log.h"
 #include "videocall.h"
 
 void
