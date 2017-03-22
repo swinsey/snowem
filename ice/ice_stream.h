@@ -57,10 +57,10 @@ snw_ice_stream_t*
 snw_stream_find(snw_ice_stream_t *head, uint32_t id);
 
 void
-stream_insert(snw_ice_stream_t *head, snw_ice_stream_t *item);
+snw_stream_insert(snw_ice_stream_t *head, snw_ice_stream_t *item);
 
 void
-stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream);
+snw_stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream);
 
 
 #ifdef __cplusplus

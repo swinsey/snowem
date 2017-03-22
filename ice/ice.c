@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-
 #include "core.h"
 #include "ice.h"
 #include "ice_session.h"
@@ -8,38 +7,6 @@
 #include "log.h"
 #include "sdp.h"
 #include "process.h"
-
-/*static su_home_t *g_home = NULL;
-
-int ice_sdp_init(snw_ice_context_t *ctx) {
-
-   DEBUG(ctx->log,"sdp initialization");
-   g_home = (su_home_t*)su_home_new(sizeof(su_home_t));
-   if(su_home_init(g_home) < 0) {
-      ERROR(ctx->log,"Ops, error setting up sofia-sdp?");
-      return -1; 
-   }   
-   return 0;
-}
-
-void ice_sdp_deinit(void) {
-   su_home_deinit(g_home);
-   su_home_unref(g_home);
-   g_home = NULL;
-}
-
-sdp_parser_t *ice_sdp_get_parser(snw_ice_context_t *ctx, const char *sdp) {
-   sdp_parser_t *parser = NULL;
-
-   if (!sdp) {
-      ERROR(ctx->log,"sdp is null, sdp=%p",sdp);
-      return NULL;
-   }   
-
-   parser = sdp_parse(g_home, sdp, strlen(sdp), 0); 
-   return parser;
-}*/
-
 
 void
 snw_ice_dispatch_msg(int fd, short int event,void* data) {
@@ -53,19 +20,19 @@ snw_ice_dispatch_msg(int fd, short int event,void* data) {
    //time_t cur_time = time(0);
    
    DEBUG(ctx->log,"ice dispatch msg");
-   while(true){
-     len = 0;
-     flowid = 0;
-     cnt++;
-     if (cnt >= 100) break;
+   while (true) {
+      len = 0;
+      flowid = 0;
+      cnt++;
+      if (cnt >= 100) break;
 
-     ret = snw_shmmq_dequeue(ctx->snw_core2ice_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
-     DEBUG(ice_ctx->log,"core2ice fd=%d, ret=%d, len=%u, flowid=%u",
+      ret = snw_shmmq_dequeue(ctx->snw_core2ice_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
+      DEBUG(ice_ctx->log,"core2ice fd=%d, ret=%d, len=%u, flowid=%u",
                     ctx->snw_core2ice_mq->_fd, ret, len, flowid);
-     if ( (len == 0 && ret == 0) || (ret < 0) )
-        return;
+      if ( (len == 0 && ret == 0) || (ret < 0) )
+         return;
 
-     snw_ice_process_msg(ice_ctx,buf,len,flowid);
+      snw_ice_process_msg(ice_ctx,buf,len,flowid);
    }
 
    return;
@@ -86,9 +53,8 @@ snw_ice_init(snw_context_t *ctx) {
    ice_ctx->ctx = ctx;
    ice_ctx->log = ctx->log;
 
-   ice_sdp_init(ice_ctx);
+   snw_ice_sdp_init(ice_ctx);
    ice_session_init(ice_ctx);
-
    snw_stream_mempool_init(ice_ctx);
    snw_component_mempool_init(ice_ctx);
    ice_ctx->rtcpmux_enabled = 0; 

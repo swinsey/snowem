@@ -83,10 +83,10 @@ void
 snw_component_mempool_init(snw_ice_context_t *ctx);
 
 ice_component_t*
-snw_component_allocate();
+snw_component_allocate(snw_ice_context_t *ctx);
 
 void
-snw_component_deallocate(ice_component_t* p);
+snw_component_deallocate(snw_ice_context_t *ctx, ice_component_t* p);
 
 ice_component_t*
 snw_component_find(ice_component_t *head, uint32_t id);

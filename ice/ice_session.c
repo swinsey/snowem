@@ -5,6 +5,7 @@
 #include "ice.h"
 #include "ice_session.h"
 #include "ice_types.h"
+#include "sdp.h"
 
 inline int
 ice_session_key(const void *item)
@@ -117,6 +118,5 @@ ice_session_remove(uint32_t key)
 
    return;
 }*/
-
 
 

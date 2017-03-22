@@ -3,8 +3,6 @@
 #include "ice_component.h"
 #include "mempool.h"
 
-snw_mempool_t *g_component_mempool = NULL;
-
 void
 snw_component_mempool_init(snw_ice_context_t *ctx) {
 
@@ -17,14 +15,14 @@ snw_component_mempool_init(snw_ice_context_t *ctx) {
 }
 
 ice_component_t* 
-snw_component_allocate() {
+snw_component_allocate(snw_ice_context_t *ctx) {
    ice_component_t* component;
 
-   if ( g_component_mempool == NULL )
-      return NULL;
+   if (!ctx->component_mempool)
+      return 0;
    
-   component = (ice_component_t*) snw_mempool_allocate(g_component_mempool); 
-   if ( component == NULL )
+   component = (ice_component_t*) snw_mempool_allocate(ctx->component_mempool); 
+   if (!component)
       return NULL;
    memset(component,0,sizeof(*component));
    INIT_LIST_HEAD(&component->list);
@@ -35,12 +33,12 @@ snw_component_allocate() {
 }
 
 void 
-snw_component_deallocate(ice_component_t* p) {
+snw_component_deallocate(snw_ice_context_t *ctx, ice_component_t* p) {
 
-   if ( g_component_mempool == NULL )
+   if (!ctx->component_mempool)
       return;
 
-   snw_mempool_free(g_component_mempool, p);
+   snw_mempool_free(ctx->component_mempool, p);
 
    return;
 }

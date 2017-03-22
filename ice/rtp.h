@@ -44,30 +44,6 @@ typedef struct rtp_header_extension {
 	uint16_t length;
 } rtp_header_extension;
 
-/* SDP offer/answer templates */
-#define OPUS_PT      111
-#define VP8_PT    100
-#define sdp_template \
-      "v=0\r\n" \
-      "o=- %lu %lu IN IP4 127.0.0.1\r\n"  /* We need current time here */ \
-      "s=%s\r\n"                          /* Recording playout id */ \
-      "t=0 0\r\n" \
-      "%s%s"                              /* Audio and/or video m-lines */
-#define sdp_audio_mline \
-      "m=audio 1 RTP/SAVPF %d\r\n"        /* Opus payload type */ \
-      "c=IN IP4 1.1.1.1\r\n" \
-      "a=%s\r\n"                          /* Media direction */ \
-      "a=rtpmap:%d opus/48000/2\r\n"      /* Opus payload type */
-#define sdp_video_mline \
-      "m=video 1 RTP/SAVPF %d\r\n"        /* VP8 payload type */ \
-      "c=IN IP4 1.1.1.1\r\n" \
-      "a=%s\r\n"                          /* Media direction */ \
-      "a=rtpmap:%d VP8/90000\r\n"         /* VP8 payload type */ \
-      "a=rtcp-fb:%d ccm fir\r\n"          /* VP8 payload type */ \
-      "a=rtcp-fb:%d nack\r\n"             /* VP8 payload type */ \
-      "a=rtcp-fb:%d nack pli\r\n"         /* VP8 payload type */ \
-      "a=rtcp-fb:%d goog-remb\r\n"        /* VP8 payload type */
-
 #define DEFAULT_MAX_NACK_QUEUE   300
 #define MAX_NACK_IGNORE       100000 /* retransmission time (100ms) */
 #define SEQ_MISSING_WAIT 12000 /*  12ms */
