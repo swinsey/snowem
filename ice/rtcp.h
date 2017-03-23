@@ -1,5 +1,5 @@
-#ifndef _ICE_RTCP_H
-#define _ICE_RTCP_H
+#ifndef _SNOW_ICE_RTCP_H
+#define _SNOW_ICE_RTCP_H
 
 #include <arpa/inet.h>
 #ifdef __MACH__
@@ -11,7 +11,7 @@
 #include <string.h>
 #include <vector>
 
-/*! \brief RTCP Packet Types (http://www.networksorcery.com/enp/protocol/rtcp.htm) */
+/*! http://www.networksorcery.com/enp/protocol/rtcp.htm */
 typedef enum {
     RTCP_FIR = 192,
     RTCP_SR = 200,
@@ -24,7 +24,7 @@ typedef enum {
 } rtcp_type;
  
  
-/*! \brief RTCP Header (http://tools.ietf.org/html/rfc3550#section-6.1) */
+/* http://tools.ietf.org/html/rfc3550#section-6.1 */
 typedef struct rtcp_header
 {
 #if __BYTE_ORDER == __BIG_ENDIAN
@@ -41,7 +41,7 @@ typedef struct rtcp_header
 	uint16_t length:16;
 } rtcp_header;
 
-/*! \brief RTCP Sender Information (http://tools.ietf.org/html/rfc3550#section-6.4.1) */
+/* http://tools.ietf.org/html/rfc3550#section-6.4.1 */
 typedef struct sender_info
 {
 	uint32_t ntp_ts_msw;
@@ -51,7 +51,7 @@ typedef struct sender_info
 	uint32_t s_octets;
 } sender_info;
 
-/*! \brief RTCP Report Block (http://tools.ietf.org/html/rfc3550#section-6.4.1) */
+/* http://tools.ietf.org/html/rfc3550#section-6.4.1 */
 typedef struct report_block
 {
 	uint32_t ssrc;
@@ -62,7 +62,7 @@ typedef struct report_block
 	uint32_t delay;
 } report_block;
 
-/*! \brief RTCP Sender Report (http://tools.ietf.org/html/rfc3550#section-6.4.1) */
+/* http://tools.ietf.org/html/rfc3550#section-6.4.1 */
 typedef struct rtcp_sr
 {
 	rtcp_header header;
@@ -71,7 +71,7 @@ typedef struct rtcp_sr
 	report_block rb[1];
 } rtcp_sr;
 
-/*! \brief RTCP Receiver Report (http://tools.ietf.org/html/rfc3550#section-6.4.2) */
+/* http://tools.ietf.org/html/rfc3550#section-6.4.2 */
 typedef struct rtcp_rr
 {
 	rtcp_header header;
@@ -79,7 +79,7 @@ typedef struct rtcp_rr
 	report_block rb[1];
 } rtcp_rr;
 
-/*! \brief RTCP SDES (http://tools.ietf.org/html/rfc3550#section-6.5) */
+/* http://tools.ietf.org/html/rfc3550#section-6.5 */
 typedef struct rtcp_sdes_chunk
 {
 	uint32_t csrc;
@@ -100,14 +100,14 @@ typedef struct rtcp_sdes
 	rtcp_sdes_item item;
 } rtcp_sdes;
 
-/*! \brief RTCP BYE (http://tools.ietf.org/html/rfc3550#section-6.6) */
+/* http://tools.ietf.org/html/rfc3550#section-6.6 */
 typedef struct rtcp_bye
 {
 	rtcp_header header;
 	uint32_t ssrc[1];
 } rtcp_bye_t;
 
-/*! \brief RTCP APP (http://tools.ietf.org/html/rfc3550#section-6.7) */
+/* http://tools.ietf.org/html/rfc3550#section-6.7 */
 typedef struct rtcp_app
 {
 	rtcp_header header;
@@ -115,21 +115,20 @@ typedef struct rtcp_app
 	char name[4];
 } rtcp_app_t;
 
-/*! \brief RTCP NACK (http://tools.ietf.org/html/rfc4585#section-6.2.1) */
+/* http://tools.ietf.org/html/rfc4585#section-6.2.1 */
 typedef struct rtcp_nack
 {
 	uint16_t pid;
 	uint16_t blp;
 } rtcp_nack;
 
-/*! \brief Janus representation (linked list) of sequence numbers to send again */
 typedef struct nack_seq {
 	uint16_t seq_no;
 	struct nack_seq *next;
 } nack_seq;
 
 
-/*! \brief RTCP REMB (http://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03) */
+/* look at http://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03 */
 typedef struct rtcp_remb
 {
 	char id[4];
@@ -138,7 +137,7 @@ typedef struct rtcp_remb
 } rtcp_remb;
 
 
-/*! \brief RTCP FIR (http://tools.ietf.org/search/rfc5104#section-4.3.1.1) */
+/* look at http://tools.ietf.org/search/rfc5104#section-4.3.1.1 */
 typedef struct rtcp_fir
 {
 	uint32_t ssrc;
@@ -146,7 +145,7 @@ typedef struct rtcp_fir
 } rtcp_fir;
 
 
-/*! \brief RTCP-FB (http://tools.ietf.org/html/rfc4585) */
+/* look at http://tools.ietf.org/html/rfc4585 */
 typedef struct rtcp_fb
 {
 	rtcp_header header;
@@ -155,21 +154,52 @@ typedef struct rtcp_fb
 	char fci[1];
 } rtcp_fb;
 
-uint32_t rtcp_get_sender_ssrc(char *packet, int len);
-uint32_t rtcp_get_receiver_ssrc(char *packet, int len);
-int rtcp_parse(char *packet, int len);
-int rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr);
-int rtcp_has_fir(char *packet, int len);
-int rtcp_has_pli(char *packet, int len);
-void ice_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist);
-int rtcp_remove_nacks(char *packet, int len);
-uint64_t rtcp_get_remb(char *packet, int len);
-int rtcp_cap_remb(char *packet, int len, uint64_t bitrate);
-int gen_rtcp_sdes(char *packet, int len, const char *cname, int cnamelen);
-int gen_rtcp_remb(char *packet, int len, uint64_t bitrate);
-int gen_rtcp_fir(char *packet, int len, int *seqnr);
-int gen_rtcp_fir_legacy(char *packet, int len, int *seqnr);
-int gen_rtcp_pli(char *packet, int len);
-int ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks);
+uint32_t
+snw_rtcp_get_sender_ssrc(char *packet, int len);
+
+uint32_t
+snw_rtcp_get_receiver_ssrc(char *packet, int len);
+
+int
+snw_rtcp_parse(char *packet, int len);
+
+int
+snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr);
+
+int
+snw_rtcp_has_fir(char *packet, int len);
+
+int
+snw_rtcp_has_pli(char *packet, int len);
+
+void 
+snw_ice_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist);
+
+int 
+snw_rtcp_remove_nacks(char *packet, int len);
+
+uint64_t
+snw_rtcp_get_remb(char *packet, int len);
+
+int
+snw_rtcp_cap_remb(char *packet, int len, uint64_t bitrate);
+
+int
+snw_gen_rtcp_sdes(char *packet, int len, const char *cname, int cnamelen);
+
+int
+snw_gen_rtcp_remb(char *packet, int len, uint64_t bitrate);
+
+int
+snw_gen_rtcp_fir(char *packet, int len, int *seqnr);
+
+int
+snw_gen_rtcp_fir_legacy(char *packet, int len, int *seqnr);
+
+int
+snw_gen_rtcp_pli(char *packet, int len);
+
+int
+snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks);
 
 #endif

@@ -2,11 +2,13 @@
 #include "ice_types.h"
 #include "rtcp.h"
 
-int rtcp_parse(char *packet, int len) {
-   return rtcp_fix_ssrc(packet, len, 0, 0, 0);
+int
+snw_rtcp_parse(char *packet, int len) {
+   return snw_rtcp_fix_ssrc(packet, len, 0, 0, 0);
 }
 
-uint32_t rtcp_get_sender_ssrc(char *packet, int len) {
+uint32_t
+snw_rtcp_get_sender_ssrc(char *packet, int len) {
 	if(packet == NULL || len == 0)
 		return 0;
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -57,7 +59,8 @@ uint32_t rtcp_get_sender_ssrc(char *packet, int len) {
 	return 0;
 }
 
-uint32_t rtcp_get_receiver_ssrc(char *packet, int len) {
+uint32_t
+snw_rtcp_get_receiver_ssrc(char *packet, int len) {
 	rtcp_header *rtcp = NULL;
 	int pno = 0, total = len;
 
@@ -106,7 +109,8 @@ uint32_t rtcp_get_receiver_ssrc(char *packet, int len) {
 	return 0;
 }
 
-int rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr) {
+int
+snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr) {
 	rtcp_header *rtcp = NULL;
 	int pno = 0, total = len;
 
@@ -333,7 +337,8 @@ int rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 	return 0;
 }
 
-int rtcp_has_fir(char *packet, int len) {
+int
+snw_rtcp_has_fir(char *packet, int len) {
 	int got_fir = 0;
 	/* Parse RTCP compound packet */
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -361,7 +366,7 @@ int rtcp_has_fir(char *packet, int len) {
 	return got_fir ? 1 : 0;
 }
 
-int rtcp_has_pli(char *packet, int len) {
+int snw_rtcp_has_pli(char *packet, int len) {
 	int got_pli = 0;
 	/* Parse RTCP compound packet */
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -392,7 +397,8 @@ int rtcp_has_pli(char *packet, int len) {
 	return got_pli ? 1 : 0;
 }
 
-void ice_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist) {
+void
+snw_ice_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist) {
 	rtcp_header *rtcp = NULL;
 
 	if (packet == NULL || len == 0)
@@ -449,63 +455,8 @@ void ice_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist) {
 	return;
 }
 
-
-/*GSList *rtcp_get_nacks(char *packet, int len) {
-	rtcp_header *rtcp = NULL;
-
-	if (packet == NULL || len == 0)
-		return NULL;
-
-	rtcp = (rtcp_header *)packet;
-	if (rtcp->version != 2)
-		return NULL;
-
-	// Get list of sequence numbers we should send again 
-	GSList *list = NULL;
-	int total = len;
-	while(rtcp) {
-		if(rtcp->type == RTCP_RTPFB) {
-			int fmt = rtcp->rc;
-			if(fmt == 1) {
-				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-				int nacks = ntohs(rtcp->length)-2;	// Skip SSRCs
-				if(nacks > 0) {
-					ICE_DEBUG2("Got nacks, num=%d", nacks);
-					rtcp_nack *nack = NULL;
-					uint16_t pid = 0;
-					uint16_t blp = 0;
-					int i=0, j=0;
-					char bitmask[20];
-					for(i=0; i< nacks; i++) {
-						nack = (rtcp_nack *)rtcpfb->fci + i;
-						pid = ntohs(nack->pid);
-						list = g_slist_append(list, GUINT_TO_POINTER(pid));
-						blp = ntohs(nack->blp);
-						memset(bitmask, 0, 20);
-						for(j=0; j<16; j++) {
-							bitmask[j] = (blp & ( 1 << j )) >> j ? '1' : '0';
-							if((blp & ( 1 << j )) >> j)
-								list = g_slist_append(list, GUINT_TO_POINTER(pid+j+1));
-						}
-						bitmask[16] = '\n';
-						ICE_DEBUG2("[%d] %u / %s", i, pid, bitmask);
-					}
-				}
-			}
-		}
-		// Is this a compound packet? 
-		int length = ntohs(rtcp->length);
-		if(length == 0)
-			break;
-		total -= length*4+4;
-		if(total <= 0)
-			break;
-		rtcp = (rtcp_header *)((uint32_t*)rtcp + length + 1);
-	}
-	return list;
-}*/
-
-int rtcp_remove_nacks(char *packet, int len) {
+int
+snw_rtcp_remove_nacks(char *packet, int len) {
 	if(packet == NULL || len == 0)
 		return len;
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -553,8 +504,8 @@ int rtcp_remove_nacks(char *packet, int len) {
 	return len;
 }
 
-/* Query an existing REMB message */
-uint64_t rtcp_get_remb(char *packet, int len) {
+uint64_t
+snw_rtcp_get_remb(char *packet, int len) {
 	if(packet == NULL || len == 0)
 		return 0;
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -595,8 +546,8 @@ uint64_t rtcp_get_remb(char *packet, int len) {
 	return 0;
 }
 
-/* Change an existing REMB message */
-int rtcp_cap_remb(char *packet, int len, uint64_t bitrate) {
+int 
+snw_rtcp_cap_remb(char *packet, int len, uint64_t bitrate) {
 	if(packet == NULL || len == 0)
 		return -1;
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -658,8 +609,8 @@ int rtcp_cap_remb(char *packet, int len, uint64_t bitrate) {
 	return 0;
 }
 
-/* Generate a new SDES message */
-int gen_rtcp_sdes(char *packet, int len, const char *cname, int cnamelen) {
+int
+snw_gen_rtcp_sdes(char *packet, int len, const char *cname, int cnamelen) {
 	if(packet == NULL || len <= 0 || cname == NULL || cnamelen <= 0)
 		return -1;
 	memset(packet, 0, len);
@@ -685,8 +636,8 @@ int gen_rtcp_sdes(char *packet, int len, const char *cname, int cnamelen) {
 	return plen;
 }
 
-/* Generate a new REMB message */
-int gen_rtcp_remb(char *packet, int len, uint64_t bitrate) {
+int 
+snw_gen_rtcp_remb(char *packet, int len, uint64_t bitrate) {
 	if(packet == NULL || len != 24)
 		return -1;
 	rtcp_header *rtcp = (rtcp_header *)packet;
@@ -724,8 +675,7 @@ int gen_rtcp_remb(char *packet, int len, uint64_t bitrate) {
 	return 24;
 }
 
-/* Generate a new FIR message */
-int gen_rtcp_fir(char *packet, int len, int *seqnr) {
+int snw_gen_rtcp_fir(char *packet, int len, int *seqnr) {
 	if(packet == NULL || len != 20 || seqnr == NULL)
 		return -1;
    memset(packet, 0, len);
@@ -746,8 +696,8 @@ int gen_rtcp_fir(char *packet, int len, int *seqnr) {
 	return 20;
 }
 
-/* Generate a new legacy FIR message */
-int gen_rtcp_fir_legacy(char *packet, int len, int *seqnr) {
+int
+snw_gen_rtcp_fir_legacy(char *packet, int len, int *seqnr) {
 	/* FIXME Right now, this is identical to the new FIR, with the difference that we use 192 as PT */
 	if(packet == NULL || len != 20 || seqnr == NULL)
 		return -1;
@@ -769,8 +719,7 @@ int gen_rtcp_fir_legacy(char *packet, int len, int *seqnr) {
 	return 20;
 }
 
-/* Generate a new PLI message */
-int gen_rtcp_pli(char *packet, int len) {
+int snw_gen_rtcp_pli(char *packet, int len) {
 	if(packet == NULL || len != 12)
 		return -1;
 	memset(packet, 0, len);
@@ -783,53 +732,8 @@ int gen_rtcp_pli(char *packet, int len) {
 	return 12;
 }
 
-/* Generate a new NACK message */
-/*int rtcp_nacks(char *packet, int len, GSList *nacks) {
-	if(packet == NULL || len < 16 || nacks == NULL)
-		return -1;
-	memset(packet, 0, len);
-	rtcp_header *rtcp = (rtcp_header *)packet;
-	// Set header
-	rtcp->version = 2;
-	rtcp->type = RTCP_RTPFB;
-	rtcp->rc = 1;	// FMT=1
-	// Now set NACK stuff
-	rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-	rtcp_nack *nack = (rtcp_nack *)rtcpfb->fci;
-	// FIXME We assume the GSList list is already ordered... 
-	uint16_t pid = GPOINTER_TO_UINT(nacks->data);
-	nack->pid = htons(pid);
-	nacks = nacks->next;
-	int words = 3;
-	while(nacks) {
-		uint16_t npid = GPOINTER_TO_UINT(nacks->data);
-		if(npid-pid < 1) {
-			ICE_DEBUG2("Skipping PID to NACK, npid=%u, pid=%u", npid, pid);
-		} else if(npid-pid > 16) {
-			// We need a new block: this sequence number will be its root PID 
-			ICE_DEBUG2("Adding another block of NACKs, npid=%u, pid=%u, delta=%u", npid, pid, npid-pid);
-			words++;
-			if(len < (words*4+4)) {
-				ICE_DEBUG2("Buffer too small, len=%d, nack_blocks=%d, words=%d", len, words, words*4+4);
-				return -1;
-			}
-			char *new_block = packet + words*4;
-			nack = (rtcp_nack *)new_block;
-			pid = GPOINTER_TO_UINT(nacks->data);
-			nack->pid = htons(pid);
-		} else {
-			uint16_t blp = ntohs(nack->blp);
-			blp |= 1 << (npid-pid-1);
-			nack->blp = htons(blp);
-		}
-		nacks = nacks->next;
-	}
-	rtcp->length = htons(words);
-	return words*4+4;
-}*/
-
-/* Generate a new NACK message */
-int ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks) {
+int 
+snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks) {
 	if(packet == NULL || len < 16 || nacks.size() == 0)
 		return -1;
 	memset(packet, 0, len);

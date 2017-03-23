@@ -9,7 +9,8 @@ snw_stream_mempool_init(snw_ice_context_t *ctx) {
 
    if (!ctx) return;
 
-   ctx->stream_mempool = snw_mempool_create(sizeof(snw_ice_stream_t),1024,1);
+   ctx->stream_mempool = snw_mempool_create(
+         sizeof(snw_ice_stream_t),sizeof(snw_ice_stream_t)*1024,1);
    assert(ctx->stream_mempool!=NULL);
 
    return;

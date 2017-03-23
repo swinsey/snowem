@@ -112,6 +112,25 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
 }
 
 int
+snw_core_disconnect(snw_context_t *ctx, snw_connection_t *conn) {
+   Json::Value root;
+   Json::FastWriter writer;
+   std::string output;
+
+   try {
+      root["msgtype"] = SNW_ICE;
+      root["api"] = SNW_ICE_STOP;
+      root["id"] = conn->flowid;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch(...) {
+      return -1;
+   }
+
+   return 0;
+}
+
+int
 snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
    snw_event_t* header = (snw_event_t*) buffer; 
    snw_log_t *log = (snw_log_t*)ctx->log;
@@ -125,11 +144,17 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
       return -1;
    }
 
-   if(header->magic_num != SNW_EVENT_MAGIC_NUM) {        
-      ERROR(log, "no ccd event header, len=%u,flowid=%u, magic=%u",
+   if (header->magic_num != SNW_EVENT_MAGIC_NUM) {        
+      ERROR(log, "no event header, len=%u,flowid=%u, magic=%u",
             len,flowid,header->magic_num);
       return -2;
    }    
+
+   memset(&conn, 0, sizeof(conn));
+   conn.flowid = flowid;
+   conn.srctype = WSS_SOCKET_UDP;
+   conn.port = header->port;
+   conn.ipaddr = header->ipaddr;
 
    if(header->event_type == snw_ev_connect) {     
       ERROR(log, "event connect error, len=%u,flowid=%u",len,flowid);
@@ -138,14 +163,9 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 
    if(header->event_type == snw_ev_disconnect) {     
       ERROR(log, "event disconnect error, len=%u,flowid=%u",len,flowid);
+      snw_core_disconnect(ctx,&conn);
       return -3;
    }
-
-   memset(&conn, 0, sizeof(conn));
-   conn.flowid = flowid;
-   conn.srctype = WSS_SOCKET_UDP;
-   conn.port = header->port;
-   conn.ipaddr = header->ipaddr;
 
    DEBUG(log, "get msg, srctype: %u, ip: %s, port: %u, flow: %u, data_len: %u, msg_len: %u",
        conn.srctype,

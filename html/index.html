@@ -66,12 +66,17 @@
      PeerCall.init(
         {api_key: "demo", version: "version"},
         function() {
-           console.log("peercall is sucessfully initialized");
+
+           PeerCall.listen('onCreate', function(agent) {
+              console.log("agent: " + JSON.stringify(agent));
+              agent.publish();
+           });
 
            //API calls go here.
            document.getElementById("sdkBtn").addEventListener("click", function() {
-              var channelId = PeerCall.getAvailableChannel();
-              PeerCall.publish({channel_id: channelId});
+              //var channelId = PeerCall.getAvailableChannel();
+              //PeerCall.publish({channel_id: channelId});
+              PeerCall.create();
            });
         }
      );

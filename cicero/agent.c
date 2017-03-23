@@ -143,7 +143,7 @@ ice_agent_new(struct event_base *base, IceCompatibility compat, int control_mode
    agent->max_conn_checks = 100;
    agent->timer_ta = ICE_AGENT_TIMER_TA_DEFAULT;
 
-   if ( base != NULL ) {
+   if (base != NULL) {
       agent->base = base;
    } else if (g_base != NULL ) {
       ICE_DEBUG("use default event base");

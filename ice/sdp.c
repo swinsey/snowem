@@ -7,6 +7,7 @@
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "sdp.h"
+#include "process.h"
 #include "utils.h"
 
 static su_home_t *g_home = NULL;
@@ -14,10 +15,9 @@ static su_home_t *g_home = NULL;
 int
 snw_ice_sdp_init(snw_ice_context_t *ctx) {
 
-   DEBUG(ctx->log,"sdp initialization");
    g_home = (su_home_t*)su_home_new(sizeof(su_home_t));
    if(su_home_init(g_home) < 0) {
-      ERROR(ctx->log,"Ops, error setting up sofia-sdp?");
+      ERROR(ctx->log,"error setting up sofia-sdp?");
       return -1; 
    }   
    return 0;
@@ -248,16 +248,20 @@ snw_ice_sdp_add_media_application(snw_ice_session_t *session, sdp_media_t *m, ch
 
 void 
 snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int video, char* sdp) {
-   snw_ice_stream_t *stream = NULL;
+   snw_log_t *log = 0;
+   snw_ice_stream_t *stream = 0;
    char buffer[512];
-   char *ufrag = NULL;
-   char *password = NULL;
-   const char *dtls_role = NULL;
+   char *ufrag = 0;
+   char *password = 0;
+   const char *dtls_role = 0;
 
-   if ( video ) {
+   if (!session) return;
+   log = session->ice_ctx->log;
+
+   if (video) {
       uint32_t id = session->video_id;
 
-      ICE_DEBUG2("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
+      DEBUG(log, "add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
 
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
@@ -267,8 +271,7 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
       stream = snw_stream_find(&session->streams, session->audio_id);
    }
 
-   if ( stream == NULL )
-      return;
+   if (!stream) return;
 
    ice_agent_get_local_credentials(session->agent, stream->stream_id, &ufrag, &password);
    memset(buffer, 0, 512);
@@ -375,13 +378,112 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
 }
 
 void 
+ice_generate_candidate_attribute(snw_ice_session_t *session, char *sdp, 
+      uint32_t stream_id, uint32_t component_id) {
+   snw_log_t *log = 0;
+   agent_t* agent = 0;
+   snw_ice_stream_t *stream = 0;
+   ice_component_t *component = 0;
+   struct list_head *i,*n;
+   candidate_t *candidates;
+
+
+   if (!session || !session->agent || !sdp)
+      return;
+   log = session->ice_ctx->log;
+
+   agent = session->agent;
+   stream = snw_stream_find(&session->streams, stream_id);
+   if(!stream) {
+      ERROR(log, "no stream found, sid=%u", stream_id);
+      return;
+   }
+
+   component = snw_component_find(&stream->components, component_id);
+   if (!component) {
+      ERROR(log, "no component found, cid=%u, sid=%u", component_id, stream_id);
+      return;
+   }
+
+   candidates = ice_agent_get_local_candidates(agent, stream_id, component_id);
+   if (candidates == NULL )
+      return;
+
+   DEBUG(log, "got candidates, size=%u, sid=%u, cid=%u",
+         list_size(&candidates->list), stream_id, component_id);
+
+   list_for_each_safe(i,n,&candidates->list) {
+      char buffer[100] = {0};
+      candidate_t *c = list_entry(i,candidate_t,list);
+      char address[ICE_ADDRESS_STRING_LEN], base_address[ICE_ADDRESS_STRING_LEN];
+      int port = 0, base_port = 0;
+      address_to_string(&(c->addr), (char *)&address);
+      port = address_get_port(&(c->addr));
+      address_to_string(&(c->base_addr), (char *)&base_address);
+      base_port = address_get_port(&(c->base_addr));
+
+      DEBUG(log, "candidate info, sid=%u, cid=%u, addr=%s, port=%u, priority=%u, foundation=%u",
+            c->stream_id, c->component_id, address, port, c->priority, c->foundation);
+
+      if (c->type == ICE_CANDIDATE_TYPE_HOST) {
+         if (c->transport == ICE_CANDIDATE_TRANSPORT_UDP) {
+            //snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ host\r\n",
+            snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ host generation 0\r\n",
+                  c->foundation, c->component_id, "udp", c->priority, address, port);
+         } else {
+            DEBUG(log, "only ice-udp supported");
+            candidate_free(c);
+            continue;
+         }
+      } else if (c->type == ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE) {
+         if (c->transport == ICE_CANDIDATE_TRANSPORT_UDP) {
+            address_to_string(&(c->base_addr), (char *)&base_address);
+            int base_port = address_get_port(&(c->base_addr));
+            snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ srflx raddr %s rport %d\r\n",
+                  c->foundation, c->component_id, "udp", c->priority, address, port, base_address, base_port);
+         } else {
+            DEBUG(log, "only ice-udp supported");
+            candidate_free(c);
+            continue;
+         }
+      } else if(c->type == ICE_CANDIDATE_TYPE_PEER_REFLEXIVE) {
+         DEBUG(log, "skipping prflx candidate");
+         candidate_free(c);
+         continue;
+      } else if(c->type == ICE_CANDIDATE_TYPE_RELAYED) {
+         if(c->transport == ICE_CANDIDATE_TRANSPORT_UDP) {
+            snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ relay raddr %s rport %d\r\n",
+                  c->foundation, c->component_id, "udp", c->priority, address, port, base_address, base_port);
+         } else {
+            DEBUG(log, "only ice-udp supported");
+            candidate_free(c);
+            continue;
+         }
+      }
+      strncat(sdp, buffer, ICE_BUFSIZE);
+      DEBUG(log, "output, sdp=%s", buffer);
+      candidate_free(c);
+   }
+
+   DEBUG(log, "FXIME: free list of candidates");
+   /*list_for_each_safe(i,n,&candidates->list) {
+      candidate_t *c = list_entry(i,candidate_t,list);
+      candidate_free(c);
+      list_del(i);
+   }*/
+
+   return;
+}
+
+
+void 
 snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
    snw_ice_stream_t *stream = NULL;
 
-   if ( m == NULL )
+   if (m == NULL)
       return;
 
-   if ( video ) {
+   if (video) {
       uint32_t id = session->video_id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_id > 0 ? session->audio_id : session->video_id;
@@ -560,8 +662,7 @@ snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream
    }
 
    if (!component->is_started) {
-      //FIXME: uncomment
-      //ice_setup_remote_candidates(session, component->stream_id, component->component_id);
+      ice_setup_remote_candidates(session, component->stream_id, component->component_id);
    } else {
       c = candidate_copy(candidate);
       memset(&candidates,0,sizeof(candidate_t));
@@ -912,18 +1013,28 @@ snw_ice_sdp_get_candidate(snw_ice_session_t *session, snw_ice_stream_t *stream, 
 }
 
 int 
-snw_ice_sdp_handle_answer(snw_ice_session_t *session, sdp_parser_t *parser) {
+snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
+   snw_log_t *log = 0;
    snw_ice_stream_t *stream = NULL;
    sdp_session_t *remote_sdp = NULL;
    sdp_media_t *m = NULL;
+   sdp_parser_t *parser = 0;
    int audio = 0, video = 0; 
 
-   if (!session || !parser)
+   if (!session) return -1;
+   log = session->ice_ctx->log;
+
+   parser = snw_ice_sdp_get_parser(session->ice_ctx, sdp);
+   if (!parser) {
+      ERROR(log, "invalid sdp, sdp=%s",sdp);
       return -1;
+   }
 
    remote_sdp = sdp_session(parser);
-   if (!remote_sdp)
+   if (!remote_sdp) {
+      sdp_parser_free(parser);
       return -1;
+   }
 
    snw_ice_sdp_get_global_credentials(session,remote_sdp);
 
@@ -976,6 +1087,7 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, sdp_parser_t *parser) {
       m = m->m_next;
    }
 
+   sdp_parser_free(parser);
    return 0;
 }
 

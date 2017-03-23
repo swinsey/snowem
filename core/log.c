@@ -180,12 +180,12 @@ void snw_log_write(snw_log_t *log, uint32_t level, const char* sourcefilename, i
             open_log_file();
         }
         */
-        char dest[1024] = {0};
+        static char dest[4*1024] = {0};
         //time_t curTime;
         //char* date;
         va_list argptr;
         va_start(argptr, msg);
-        vsprintf(dest, msg, argptr);
+        vsnprintf(dest, 4*1024, msg, argptr);
         va_end(argptr);
         //check level, if higher, then log the msg ( set time of msg arrival, human readable).
 

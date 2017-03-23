@@ -51,19 +51,19 @@ struct snw_ice_session {
 
 
 int
-ice_session_init(snw_ice_context_t *ctx);
+snw_ice_session_init(snw_ice_context_t *ctx);
 
 snw_ice_session_t*
-ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new);
+snw_ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new);
 
 snw_ice_session_t*
-snw_ice_session_search(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
+snw_ice_session_search(snw_ice_context_t *ctx, uint32_t flowid);
 
 snw_ice_session_t*
-ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
+snw_ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
 int 
-ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
+snw_ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
 #endif //_SNOW_ICE_SESSION_H_
 

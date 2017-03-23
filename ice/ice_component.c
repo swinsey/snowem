@@ -8,7 +8,8 @@ snw_component_mempool_init(snw_ice_context_t *ctx) {
 
    if (!ctx) return;
 
-   ctx->component_mempool = snw_mempool_create(sizeof(ice_component_t),2*1024,1);
+   ctx->component_mempool = snw_mempool_create(
+         sizeof(ice_component_t),sizeof(ice_component_t)*1024,1);
    assert(ctx->component_mempool!=NULL);
 
    return;

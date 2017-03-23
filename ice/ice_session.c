@@ -39,7 +39,7 @@ ice_session_setempty(const void *arg)
 
 
 int
-ice_session_init(snw_ice_context_t *ctx) {
+snw_ice_session_init(snw_ice_context_t *ctx) {
    ctx->session_cache = (snw_hashbase_t *)malloc(sizeof(snw_hashbase_t *));
    if (ctx->session_cache == 0)
       return -1;
@@ -50,7 +50,7 @@ ice_session_init(snw_ice_context_t *ctx) {
 }
 
 snw_ice_session_t*
-ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new) {
+snw_ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new) {
    snw_ice_session_t key;
    snw_ice_session_t *so;
    
@@ -72,19 +72,21 @@ ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new) {
 
 /*CACHE_SEARCH(ctx->session_cache, sitem, snw_ice_session_t*);*/
 snw_ice_session_t*
-ice_session_search(snw_ice_context_t *ctx, snw_ice_session_t *sitem) {
-   return (snw_ice_session_t*)snw_cache_search(ctx->session_cache, sitem);
+snw_ice_session_search(snw_ice_context_t *ctx, uint32_t flowid) {
+   snw_ice_session_t sitem;
+   sitem.flowid = flowid;
+   return (snw_ice_session_t*)snw_cache_search(ctx->session_cache, &sitem);
 }
 
 /*CACHE_INSERT(ctx->session_cache, sitem, snw_ice_session_t*);*/
 snw_ice_session_t*
-ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem) {
+snw_ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem) {
    return (snw_ice_session_t*)snw_cache_insert(ctx->session_cache, sitem);
 }
 
 /*CACHE_REMOVE(ctx->session_cache, sitem, snw_ice_session_t*);*/
 int 
-ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem) {
+snw_ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem) {
    return snw_cache_remove(ctx->session_cache, sitem);
 }
 

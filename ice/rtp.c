@@ -13,7 +13,8 @@ uint16_t g_rtp_range_max = 0;
 int g_max_nack_queue = DEFAULT_MAX_NACK_QUEUE;
 
 /* seq_info_t list functions */
-void ice_seq_append(seq_info_t **head, seq_info_t *new_seq) {
+void 
+snw_ice_seq_append(seq_info_t **head, seq_info_t *new_seq) {
    if(*head == NULL) {
       new_seq->prev = new_seq;
       new_seq->next = new_seq;
@@ -27,7 +28,8 @@ void ice_seq_append(seq_info_t **head, seq_info_t *new_seq) {
    }
 }
 
-seq_info_t *ice_seq_pop_head(seq_info_t **head) {
+seq_info_t *
+snw_ice_seq_pop_head(seq_info_t **head) {
    seq_info_t *pop_seq = *head;
    if(pop_seq) {
       seq_info_t *new_head = pop_seq->next;
@@ -42,7 +44,8 @@ seq_info_t *ice_seq_pop_head(seq_info_t **head) {
    return pop_seq;
 }
 
-void ice_seq_list_free(seq_info_t **head) {
+void 
+snw_ice_seq_list_free(seq_info_t **head) {
    if (!*head) return;
    seq_info_t *cur = *head;
    do {
@@ -53,7 +56,8 @@ void ice_seq_list_free(seq_info_t **head) {
    *head = NULL;
 }
 
-int ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len) {
+int 
+snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len) {
    /* Supports wrapping sequence (easier with int range) */
    int n = seqn;
    int nh = (1<<16) + n;
@@ -62,7 +66,8 @@ int ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len) {
    return (s <= n && n < e) || (s <= nh && nh < e);
 }
 
-void ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, char *buf, int len) {
+void 
+snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, char *buf, int len) {
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
 	   Json::Value root;

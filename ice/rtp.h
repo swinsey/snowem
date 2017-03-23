@@ -69,10 +69,19 @@ enum {
    SEQ_RECVED
 };
 
-void ice_seq_append(seq_info_t **head, seq_info_t *new_seq);
-seq_info_t *ice_seq_pop_head(seq_info_t **head);
-void ice_seq_list_free(seq_info_t **head);
-int ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
-void ice_handle_incoming_rtp(snw_ice_session_t *handle, int type, int video, char *buf, int len);
+void 
+snw_ice_seq_append(seq_info_t **head, seq_info_t *new_seq);
+
+seq_info_t *
+snw_ice_seq_pop_head(seq_info_t **head);
+
+void 
+snw_ice_seq_list_free(seq_info_t **head);
+
+int 
+snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
+
+void 
+snw_ice_handle_incoming_rtp(snw_ice_session_t *handle, int type, int video, char *buf, int len);
 
 #endif
