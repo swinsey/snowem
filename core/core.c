@@ -8,6 +8,7 @@
 
 #include "core.h"
 #include "mq.h"
+#include "module.h"
 #include "log.h"
 #include "ice.h"
 #include "websocket/websocket.h"
@@ -22,6 +23,7 @@ snw_create_context()
       return 0;
 
    memset(ctx, 0, sizeof(*ctx));
+   INIT_LIST_HEAD(&ctx->modules.list);
    return ctx; 
 }
 

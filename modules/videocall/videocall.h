@@ -15,6 +15,12 @@ extern "C" {
 /* module api */
 #define SNW_VIDEOCALL_CREATE 1
 
+typedef struct snw_videocall_context snw_videocall_context_t;
+struct snw_videocall_context {
+   
+};
+
+
 void
 module_init(void* ctx);
 

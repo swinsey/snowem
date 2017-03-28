@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <json/json.h>
@@ -19,6 +20,7 @@ using namespace mqf::base;
 
 int
 snw_conf_init(snw_context_t *ctx, const char *file) {
+   snw_module_t *module;
    CFileConfig &page = * new CFileConfig();
 
    printf("config file: %s\n",file);
@@ -37,17 +39,23 @@ snw_conf_init(snw_context_t *ctx, const char *file) {
    unsigned int module_num = module_list.size();
    for ( unsigned int i = 0; i < module_num; i++) {
       std::string module_path = "root\\" + module_list[i]; 
-      ctx->module = (snw_module_t*)malloc(sizeof(snw_module_t));
-      if (!ctx->module) 
-         return -1;
-      ctx->module->name = strdup(page[module_path + "\\name"].c_str());
-      ctx->module->type = from_str<uint32_t>(page[module_path + "\\type"]);
-      ctx->module->sofile = strdup(page[module_path + "\\sofile"].c_str());
-      //printf("module info, name=%s, type=%0x, sofile=%s\n", 
-      //       ctx->module->name,
-      //       ctx->module->type,
-      //       ctx->module->sofile);
+      module = (snw_module_t*)malloc(sizeof(snw_module_t));
+      if (!module) return -1;
+      INIT_LIST_HEAD(&module->list);
+      module->name = strdup(page[module_path + "\\name"].c_str());
+      module->type = from_str<uint32_t>(page[module_path + "\\type"]);
+      module->sofile = strdup(page[module_path + "\\sofile"].c_str());
+      list_add_tail(&module->list,&ctx->modules.list);
    }
+
+   /*{//DEBUG
+      struct list_head *p;
+      list_for_each(p,&ctx->modules.list) {
+         snw_module_t *m = list_entry(p,snw_module_t,list);
+         printf("module info, name=%s, type=%0x, sofile=%s\n", 
+             m->name, m->type, m->sofile);
+      }
+   }*/
 
    return 0;
 }
@@ -63,12 +71,17 @@ snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char 
 int
 snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
+   struct list_head *p;
    
    DEBUG(log, "module handling, type=%x", type);   
-
-   if (ctx->module->type == type) {
-      ctx->module->methods->handle_msg(ctx,conn,data,len);
-      //call snw_videocall_handle_msg
+   list_for_each(p,&ctx->modules.list) {
+      snw_module_t *m = list_entry(p,snw_module_t,list);
+      DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
+             m->name, m->type, m->sofile);
+      if (m->type == type) {
+         m->methods->handle_msg(m,conn,data,len);
+         //call snw_videocall_handle_msg
+      }
    }
 
    return 0;
@@ -241,10 +254,11 @@ snw_net_msg(int fd, short int event,void* data) {
       // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
       snw_shmmq_dequeue(ctx->snw_net2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
 
-      if (len == 0) return;
+      if (len == 0 || len >= MAX_BUFFER_SIZE) return;
 
       DEBUG(ctx->log,"dequeue msg from net, flowid=%u, len=%u, cnt=%d",
           flowid, len, cnt);
+      buffer[len] = 0; // null-terminated string
       snw_net_preprocess_msg(ctx,buffer,len,flowid);
 
 #ifdef USE_ADAPTIVE_CONTROL
@@ -349,6 +363,8 @@ int
 main(int argc, char** argv) {
    int pid;
    snw_context_t *ctx;
+
+   srand(time(NULL));
 
    ctx = snw_create_context();
    if (ctx == NULL)

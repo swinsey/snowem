@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 
 #include "module.h"
 #include "json/json.h"
@@ -30,7 +31,8 @@ snw_videocall_create(snw_context_t *ctx, snw_connection_t *conn, Json::Value &ro
 
 void
 snw_videocall_handle_msg(void *p, void *conn, char *data, int len) {
-   snw_context_t    *ctx = (snw_context_t*)p;
+   snw_module_t *module = (snw_module_t *)p;
+   snw_context_t    *ctx = (snw_context_t*)module->ctx;
    snw_connection_t *c = (snw_connection_t*)conn;
    snw_log_t *log = ctx->log;
    Json::Value root;

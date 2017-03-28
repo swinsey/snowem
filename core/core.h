@@ -14,6 +14,7 @@
 #include "cache.h"
 #include "mempool.h"
 #include "mq.h"
+#include "module.h"
 #include "types.h"
 #include "ice.h"
 
@@ -57,6 +58,7 @@ struct snw_context {
    snw_mempool_t *rcvvars_mp;
 
    snw_module_t  *module;
+   snw_module_t   modules;
 };
 
 snw_context_t*

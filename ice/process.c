@@ -1561,7 +1561,7 @@ snw_ice_start_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid
 
 void
 snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
-   snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
+   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    snw_log_t *log = ice_ctx->log;
    snw_ice_session_t *session;
    
@@ -2413,6 +2413,15 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
 }
 
 void
+snw_ice_fir_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
+   snw_log_t *log = 0;
+   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
+   log = ice_ctx->log;
+   DEBUG(log, "FIXME fir msg");
+   return;
+}
+
+void
 snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
    snw_log_t *log = ice_ctx->log;
    Json::Value root;
@@ -2456,6 +2465,9 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
          break;
       case SNW_ICE_CANDIDATE:
          snw_ice_candidate_msg(ice_ctx,root,flowid);
+         break;
+      case SNW_ICE_FIR:
+         snw_ice_fir_msg(ice_ctx,root,flowid);
          break;
 
       default:

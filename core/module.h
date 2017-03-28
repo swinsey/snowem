@@ -5,20 +5,21 @@
 extern "C" {
 #endif
 
-#include "core.h"
+#include "types.h"
+#include "linux_list.h"
 
-/* Built-in module type */
+/* Built-in module (msg) type */
 enum {
-   SNW_MIN = 1,
-   SNW_ICE = SNW_MIN,
+   SNW_MSGTYPE_MIN = 1,
+   SNW_ICE = SNW_MSGTYPE_MIN,
    SNW_RTP = 2,
    SNW_RTCP = 3,
 
    /* reserve range */
-   SNW_MAX = 255,
+   SNW_MSGTYPE_MAX = 255,
 };
 
-/* ICE api */
+/* ICE api methods */
 enum {
    SNW_ICE_MIN = 1,
    SNW_ICE_CREATE = SNW_ICE_MIN,
@@ -26,6 +27,7 @@ enum {
    SNW_ICE_STOP = 3,
    SNW_ICE_SDP = 4,
    SNW_ICE_CANDIDATE = 5,
+   SNW_ICE_FIR = 6,
 
    /* reserve range */
    SNW_ICE_MAX = 255,
@@ -44,10 +46,14 @@ struct snw_module_methods {
 };
 
 struct snw_module {
+   struct list_head      list;
    uint32_t              type; //module type
    uint32_t              version;
    char                 *name;
    char                 *sofile;
+   void                 *ctx;
+   void                 *data;
+
    snw_module_methods_t *methods;
 
    void               (*init)(void *ctx);

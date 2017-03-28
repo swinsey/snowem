@@ -97,8 +97,8 @@ int srtp_setup(char *server_pem, char *server_key) {
    return 0;
 }
 
-
-dtls_ctx_t *srtp_context_new(void *component, int role) {
+dtls_ctx_t *
+srtp_context_new(void *component, int role) {
    dtls_ctx_t *dtls = NULL;
 
    ICE_DEBUG2("create DTLS/SRTP, role=%d", role);

@@ -33,6 +33,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef int (*eqfn) (const void *, const void *);
 typedef int (*keyfn) (const void *);
 typedef int (*isemptyfn) (const void *);
@@ -93,5 +97,9 @@ snw_cache_status(float& fHashPercent,int& iHashTimeFree);
 void 
 snw_cache_itemcount();
 */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //_SNOW_CORE_CACHE_H_
