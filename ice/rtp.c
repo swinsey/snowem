@@ -7,11 +7,6 @@
 #include "rtp.h"
 #include "utils.h"
 
-/* RTP/RTCP port range */
-uint16_t g_rtp_range_min = 0;
-uint16_t g_rtp_range_max = 0;
-int g_max_nack_queue = DEFAULT_MAX_NACK_QUEUE;
-
 /* seq_info_t list functions */
 void 
 snw_ice_seq_append(seq_info_t **head, seq_info_t *new_seq) {

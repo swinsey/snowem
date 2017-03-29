@@ -2,11 +2,7 @@
 #define _SNOW_ICE_RTP_H
 
 #include <arpa/inet.h>
-#ifdef __MACH__
-#include <machine/endian.h>
-#else
 #include <endian.h>
-#endif
 #include <inttypes.h>
 #include <string.h>
 
@@ -49,9 +45,7 @@ typedef struct rtp_header_extension {
 #define SEQ_MISSING_WAIT 12000 /*  12ms */
 #define SEQ_NACKED_WAIT 155000 /* 155ms */
 
-extern uint16_t g_rtp_range_min;
-extern uint16_t g_rtp_range_max;
-extern int g_max_nack_queue;
+//extern int g_max_nack_queue;
 
 typedef struct seq_info seq_info_t;
 struct seq_info {

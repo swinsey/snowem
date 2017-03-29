@@ -5,6 +5,7 @@
 
 #include "cache.h"
 #include "connection.h"
+#include "ice_types.h"
 #include "mempool.h"
 #include "session.h"
 #include "types.h"
@@ -12,6 +13,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct snw_ice_handlers snw_ice_handlers_t;
+struct snw_ice_handlers {
+   struct list_head list;
+   uint32_t         api;
+   void           (*handler)(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid);
+};
+
+typedef struct snw_ice_api snw_ice_api_t;
+struct snw_ice_api {
+   struct list_head list;
+   uint32_t         api;
+   snw_ice_handlers handlers;
+   //void  (*handler)(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid);
+};
+
 
 struct snw_ice_context {
    void      *ctx;
@@ -28,16 +45,16 @@ struct snw_ice_context {
    /* caches, efficiency in search */
    snw_hashbase_t *session_cache;
 
-   /* mempools for fixed-size objects, fast in allocation */
+   /* mempools for fixed-size objects, fast in (de)allocation */
    snw_mempool_t  *stream_mempool;
    snw_mempool_t  *component_mempool;
+
+   snw_ice_api_t   api_handlers;
 };
 
 void 
 snw_ice_init(snw_context_t *ctx);
 
-//void
-//ice_srtp_handshake_done(ice_session_t *session, ice_component_t *component);
 
 #ifdef __cplusplus
 }

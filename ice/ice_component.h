@@ -16,35 +16,6 @@
 extern "C" {
 #endif
 
-typedef struct stats_item stats_item_t;
-struct stats_item {
-   uint64_t bytes; /* Bytes sent or received */
-   int64_t when;   /* Time at which this happened */
-};
-  
-typedef struct ice_trickle ice_trickle_t;
-struct ice_trickle {
-   snw_ice_session_t *session;
-   int64_t received;
-   char *transaction;             /* Janus API transaction ID of the original trickle request */
-   json_t *candidate;
-};
-
-/* Media statistics */
-typedef struct ice_stats ice_stats_t;
-struct ice_stats {
-   uint32_t audio_packets;     /* Audio packets sent or received */
-   uint64_t audio_bytes;       /* Audio bytes sent or received */
-   int audio_notified_lastsec; /* Whether or not we notified about audio lastsec issues already */
-   uint32_t audio_nacks;       /* Number of audio NACKs sent or received */
-   uint32_t video_packets;     /* Video packets sent or received */
-   uint64_t video_bytes;       /* Video bytes sent or received */
-   int video_notified_lastsec; /* Whether or not we notified about video lastsec issues already */
-   uint32_t video_nacks;       /* Number of video NACKs sent or received */
-   uint32_t data_packets;      /* Data packets sent or received */
-   uint64_t data_bytes;        /* Data bytes sent or received */
-};
-
 #define LAST_SEQS_MAX_LEN 160
 struct ice_component {
    snw_ice_stream_t *stream;
@@ -63,12 +34,6 @@ struct ice_component {
    uint32_t nack_sent_recent_cnt;     /* Number of NACKs sent since last log message */
    seq_info_t *last_seqs_audio;       /* List of recently received audio sequence numbers (as a support to NACK generation) */
    seq_info_t *last_seqs_video;       /* List of recently received video sequence numbers (as a support to NACK generation) */
-
-   uint64_t last_slowlink_time;       /* Last time the slow_link callback (of the plugin) was called */
-   uint64_t sl_nack_period_ts;        /* Start time of recent NACKs (for slow_link) */
-   uint32_t sl_nack_recent_cnt;       /* Count of recent NACKs (for slow_link) */
-   //ice_stats_t in_stats;          /* Stats for incoming data (audio/video/data) */
-   //ice_stats_t out_stats;         /* Stats for outgoing data (audio/video/data) */
 
    int64_t fir_latest;   
    int     fir_seq;

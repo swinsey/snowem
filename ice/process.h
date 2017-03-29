@@ -18,6 +18,10 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
 void 
 ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint32_t component_id);
 
+void
+ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component);
+
+
 #ifdef __cplusplus
 }
 #endif
