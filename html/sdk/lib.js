@@ -40,6 +40,7 @@
         this.SNW_ICE_STOP = 3;
         this.SNW_ICE_SDP = 4;
         this.SNW_ICE_CANDIDATE = 5;
+        this.SNW_ICE_FIR = 6;
 
         //SNW_VIDEOCALL SUBCMD
         this.SNW_VIDEOCALL_CREATE = 1;
@@ -417,19 +418,21 @@ PeerCall.wsClient = wsClient;
    var globals = PeerCall.Globals();
    function PeerAgent(){
       this.peerId = 0; 
-      this.channelId = 0; 
+      this.name = "";
+      this.roomId = 0; 
       this.localStream = {};
       this.remoteStream = {};
       this.localVideoEl = null;
       this.remoteVideoEl = null;
       this.pc = null;
       this.state = "disconnected";
+      this.is_publisher = 0;
    }
 
    PeerAgent.prototype.init = function(config) {
       console.log("init peer agent, id=" + config.peerId);
       this.peerId = config.peerId;
-      this.channelId = config.channelId;
+      this.roomId = config.roomId;
       this.localStream = config.localStream;
       this.remoteStream = config.remoteStream;
       this.localVideoElm = config.localVideoElm;
@@ -567,8 +570,9 @@ PeerCall.wsClient = wsClient;
          agent.start_stream(stream);
          agent.localStream = stream;
          agent.localVideoElm.srcObject = stream;
-         agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_START, 'publish': 1,
-                      'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': 1443712566});
+         agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_START, 
+                     'publish': agent.is_publisher, 'name': agent.name,
+                     'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': agent.roomId});
          //onready();
          //subscribe();
       }, function(info) {
@@ -579,6 +583,18 @@ PeerCall.wsClient = wsClient;
    } 
 
    PeerAgent.prototype.publish = function(config) {
+      console.log("publish config info, config="+JSON.stringify(config));
+      this.is_publisher = 1; 
+      this.name = config.name;
+      this.roomId = this.peerId;//XXX: roomid is the same as peerid!
+      getusermedia(this);
+   }
+
+   PeerAgent.prototype.subscribe = function(config) {
+      console.log("subscribe config info, config="+JSON.stringify(config));
+      this.is_publisher = 0; 
+      this.name = config.name;
+      this.roomId = config.roomid
       getusermedia(this);
    }
 
@@ -653,7 +669,7 @@ PeerCall.wsClient = wsClient;
          var agent = new PeerCall.PeerAgent();
          var config = {
             peerId : 0,
-            channelId : 28093368,
+            roomId : 28093368,
             localStream : {},
             remoteStream : {},
             localVideoElm : document.getElementById('localVideo'),
@@ -692,13 +708,13 @@ PeerCall.wsClient = wsClient;
                   'uuid': PeerCall.Utils.uuid()});
    }
 
-   PeerCall.publish = function(agent) {
+   /*PeerCall.publish = function(agent) {
       console.log("agent=" + agent);
       //getusermedia(agent);
    }
 
    PeerCall.subscribe = function(config) {
-   }
+   }*/
    /* ----------------  end of PeerCall API --------------------------------------*/
 
    // sdk initiatlized

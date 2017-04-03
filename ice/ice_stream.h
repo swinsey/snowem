@@ -23,16 +23,16 @@ struct snw_ice_stream {
    uint32_t audio_ssrc_peer;
    uint32_t video_ssrc_peer;
 
-   int payload_type;              /* rtp payload type */
-   int dtls_role;                 /* dtls role */
+   int payload_type;                /* rtp payload type */
+   int dtls_role;                   /* dtls role */
    //char *rhashing;                /* hashing algorhitm for dtls */
    //char *rfingerprint;            /* hashed fingerprint in SDP */
    //char *ruser;                   /* ice username */
    //char *rpass;                   /* ice password */
-   char rhashing[16];                /* hashing algorhitm for dtls */
-   char rfingerprint[256];            /* hashed fingerprint in SDP */
-   char ruser[32];                   /* ice username */
-   char rpass[64];                   /* ice password */
+   char rhashing[16];               /* hashing algorhitm for dtls */
+   char rfingerprint[256];          /* hashed fingerprint in SDP */
+   char ruser[32];                  /* ice username */
+   char rpass[64];                  /* ice password */
 
    ice_component_t components;      /* list of components */
    ice_component_t *rtp_component;  /* rtp component */

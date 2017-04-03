@@ -122,7 +122,7 @@
    PeerCall.init = function(config, callback) {
       console.log("api_key: " + config.api_key);
       console.log("version: " + config.version);
-      loadScript('https://local.peercall.vn/sdk/lib.js', callback);
+      loadScript('https://sdk.peercall.vn/sdk/lib.js', callback);
    }
    window.PeerCall = PeerCall;
    

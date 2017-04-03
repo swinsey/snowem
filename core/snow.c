@@ -100,15 +100,13 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
       ERROR(log,"error json format, s=%s",data);
       return -1;
    }
+
    DEBUG(log, "get msg, data=%s", data);
    try {
       msgtype = root["msgtype"].asUInt();
       switch(msgtype) {
          case SNW_ICE:
             snw_ice_handler(ctx,conn,msgtype,data,len);
-            break;
-         case SNW_RTP: 
-         case SNW_RTCP: 
             break;
 
          default:

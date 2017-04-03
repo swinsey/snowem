@@ -234,7 +234,7 @@ function handle_sdp(sdp) {
       room.startStream = function() {
          console.log("start stream");
          navigator.mediaDevices.getUserMedia({
-            audio: false,
+            audio: true,
             //video: true
             video: {
               mandatory:{

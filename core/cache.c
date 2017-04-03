@@ -208,6 +208,9 @@ snw_cache_search(snw_hashbase_t *base, void *sitem)
 
    table = (char*)base->hb_cache;
 
+   if (base->hb_isemptyfn(sitem))
+      return 0;
+   
    for ( i=0; i < base->hb_time; i++ ) { 
       value = base->hb_keyfn(sitem) % base->hb_base[i];
       item = table + i*base->hb_len*base->hb_objsize
@@ -216,7 +219,7 @@ snw_cache_search(snw_hashbase_t *base, void *sitem)
          return item;
    }   
    
-   return NULL;
+   return 0;
 }
 
 void*

@@ -21,6 +21,8 @@ ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint
 void
 ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component);
 
+void 
+send_rtp_pkt(snw_ice_session_t *session, rtp_packet_t *pkt);
 
 #ifdef __cplusplus
 }

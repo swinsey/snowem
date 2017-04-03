@@ -182,7 +182,7 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
 
    try {
       root["id"] = flowid;
-      root["sessionid"] = flowid;
+      root["sessionid"] = flowid; //FIXME: create 'real' sessionid
       root["rc"] = 0;
       output = writer.write(root);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
@@ -199,44 +199,24 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
 }
 
 int
-snw_ice_generate_sdp(snw_ice_session_t *session) {
-   snw_log_t *log = session->ice_ctx->log;
-   ice_sdp_attr_t sdp_attr;
-   //sdp_parser_t *sdp_parser = NULL;
-   char *sdp_merged;
-   //char *sdp;
+verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const char *jsep_sdp) {
+   snw_log_t *log = 0;
 
-   if (session == NULL)
-      return -1;
+   if (!session) return -1;
+   log = session->ice_ctx->log;
 
-   //sdp = session->sdp;
-   DEBUG(log, "sdp info, sdp=%s",session->sdp);
-   /*sdp_parser = ice_sdp_get_parser(sdp);
-   if (!sdp_parser) {
-      return -3;
-   }
-   sdp_parser_free(sdp_parser);*/
-   snw_ice_get_sdp_attr(session->ice_ctx,session->sdp,&sdp_attr);
-
-   sdp_merged = snw_ice_sdp_merge(session, session->sdp);
-   if (sdp_merged == NULL) {
-      //free(sdp_stripped);
-      return -4;
-   }
-
-   /* FIXME Any disabled m-line? */
-   if (strstr(sdp_merged, "m=audio 0")) {
-      if(!IS_FLAG(session, WEBRTC_BUNDLE) || !sdp_attr.video) {
+   if (strstr(jsep_sdp, "m=audio 0")) {
+      if(!IS_FLAG(session, WEBRTC_BUNDLE) || !video) {
          snw_ice_stream_t *stream = snw_stream_find(&session->streams, session->audio_id);
          if (stream) {
-            //DEBUG("disable audio stream, sid=%u",stream->stream_id);
+            DEBUG(log, "disable audio stream, sid=%u",stream->stream_id);
             stream->disabled = 1;
          }
       }
    }
 
-   if (strstr(sdp_merged, "m=video 0")) {
-      if (!IS_FLAG(session, WEBRTC_BUNDLE) || !sdp_attr.audio) {
+   if (strstr(jsep_sdp, "m=video 0")) {
+      if (!IS_FLAG(session, WEBRTC_BUNDLE) || !audio) {
          snw_ice_stream_t *stream = NULL;
          if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
             stream = snw_stream_find(&session->streams, session->video_id);
@@ -245,12 +225,34 @@ snw_ice_generate_sdp(snw_ice_session_t *session) {
             stream = snw_stream_find(&session->streams, id);
          }
          if (stream) {
-            //DEBUG("disable video stream, sid=%u",stream->stream_id);
+            DEBUG(log, "disable video stream, sid=%u",stream->stream_id);
             stream->disabled = 1;
          }
       }
    }
 
+   return 0;
+}
+
+
+int
+snw_ice_generate_sdp(snw_ice_session_t *session) {
+   snw_log_t *log = session->ice_ctx->log;
+   ice_sdp_attr_t sdp_attr;
+   char *sdp_merged;
+
+   if (!session)
+      return -1;
+
+   DEBUG(log, "sdp info, sdp=%s",session->sdp);
+   snw_ice_get_sdp_attr(session->ice_ctx,session->sdp,&sdp_attr);
+
+   sdp_merged = snw_ice_sdp_merge(session, session->sdp);
+   if (!sdp_merged) {
+      return -2;
+   }
+
+   verify_disabled_streams(session,sdp_attr.audio, sdp_attr.video, sdp_merged);
    session->local_sdp = sdp_merged;
    //DEBUG("generated sdp, local_sdp=%s",sdp_merged);
 
@@ -266,8 +268,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    std::string output;
    Json::FastWriter writer;
 
-   if (!session)
-      return;
+   if (!session) return;
 
    session->cdone++;
    DEBUG(log, "gathering done, user_data=%p, stream=%d, cdone=%u, streams_num=%u",
@@ -288,13 +289,6 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
 
       //send sdp into to client.
       DEBUG(log, "Sending local sdp, sdp=%s",session->local_sdp);
-      /*if (IS_FLAG(session,ICE_REPLAY)) {
-         root["cmd"] = SGN_REPLAY;
-         root["subcmd"] = SGN_REPLAY_SDP;
-      } else { //ICE_SENDER,ICE_RECEIVER
-         root["cmd"] = SGN_VIDEO;
-         root["subcmd"] = SGN_VIDEO_SDP;
-      }*/
       root["msgtype"] = SNW_ICE;
       root["api"] = SNW_ICE_SDP;
       root["sdp"]["type"] = "offer";
@@ -1444,8 +1438,9 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
 
    DEBUG(log, "Checking media stream, offer=%u, audio=%u, video=%u, streams_num=%u, flags=%u",
          offer,sdp_attr.audio,sdp_attr.video,session->streams_num, IS_FLAG(session, WEBRTC_BUNDLE));
-
-   if (sdp_attr.audio) {
+   
+   if (IS_FLAG(session, WEBRTC_AUDIO)) { 
+   //if (sdp_attr.audio) {
       ret = snw_ice_create_media_stream(session,0);
       if (ret < 0) {
          ERROR(log, "ret=%d", ret);
@@ -1497,7 +1492,6 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
        "PeerCall Replay", audio_mline, video_mline);
 
    session->sdp = strdup(sdp);
-   //handle_sdp(session,sdp);
    ret = snw_ice_session_setup(ice_ctx, session, 0, (char *)sdp);
    if (ret < 0) {
       ICE_ERROR2("Error setting ICE locally, ret=%d",ret);
@@ -1514,25 +1508,25 @@ snw_ice_start_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid
    snw_log_t *log = ice_ctx->log;
    snw_ice_session_t *session;
    int is_new = 0;
+   uint32_t roomid;
    
-   /*
    try {
-      Json::FastWriter writer;
+      /*Json::FastWriter writer;
       std::string output;
       root["id"] = flowid;
       root["sessionid"] = flowid;
       root["rc"] = 0;
       output = writer.write(root);
       DEBUG(log,"ice start, flowid=%u, len=%u, root=%s", 
-                flowid, output.size(), output.c_str());
-
+                flowid, output.size(), output.c_str());*/
+      roomid = root["roomid"].asUInt();
    } catch (...) {
-      ERROR(log, "json format error, data=%s", output.c_str());
+      //ERROR(log, "json format error, data=%s", output.c_str());
       return;
-   }*/
+   }
 
    session = (snw_ice_session_t*)snw_ice_session_get(ice_ctx,flowid,&is_new);
-   if (session == NULL) {
+   if (!session) {
       ERROR(log,"failed to malloc, flowid=%u",flowid);
       return;
    }
@@ -1542,16 +1536,23 @@ snw_ice_start_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid
       return;
    }
 
-   DEBUG(log,"init new session, flowid=%u",session->flowid);
+   DEBUG(log,"init new session, roomid=%u, flowid=%u", roomid, session->flowid);
    //session->flowid = flowid;
+   session->roomid = roomid;
    session->controlling = 0;
    session->base = ctx->ev_base;
    session->ready = 0;
    session->flags = 0;
-   if ( is_publisher ) {
+   if (is_publisher) {
       SET_FLAG(session,ICE_PUBLISHER);
    } else {
+      snw_ice_session_t *s = 0;
       SET_FLAG(session,ICE_SUBSCRIBER);
+      s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,roomid);
+      if (s) {
+         DEBUG(log, "forward session, flowid=%u, forwardid=%u", session->flowid, s->forwardid);
+         s->forwardid = session->flowid;
+      }
    }
    INIT_LIST_HEAD(&session->streams.list);
  
@@ -1561,7 +1562,6 @@ snw_ice_start_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid
 
 void
 snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
-   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    snw_log_t *log = ice_ctx->log;
    snw_ice_session_t *session;
    
@@ -1937,43 +1937,6 @@ ice_merge_components(snw_ice_session_t *session) {
       ice_component_free(&session->video_stream->components, session->video_stream->rtcp_component);
       session->video_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
-   }
-
-   return 0;
-}
-int
-verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const char *jsep_sdp) {
-   snw_log_t *log = 0;
-
-   if (!session) return -1;
-   log = session->ice_ctx->log;
-
-   /* FIXME Any disabled m-line? */
-   if (strstr(jsep_sdp, "m=audio 0")) {
-      if(!IS_FLAG(session, WEBRTC_BUNDLE) || !video) {
-         DEBUG(log, "Marking audio stream as disabled");
-         snw_ice_stream_t *stream = snw_stream_find(&session->streams, session->audio_id);
-         if (stream) {
-            DEBUG(log, "disable audio stream, sid=%u",stream->stream_id);
-            stream->disabled = 1;
-         }
-      }
-   }
-
-   if (strstr(jsep_sdp, "m=video 0")) {
-      if (!IS_FLAG(session, WEBRTC_BUNDLE) || !audio) {
-         snw_ice_stream_t *stream = NULL;
-         if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
-            stream = snw_stream_find(&session->streams, session->video_id);
-         } else {
-            uint32_t id = session->audio_id > 0 ? session->audio_id : session->video_id;
-            stream = snw_stream_find(&session->streams, id);
-         }
-         if (stream) {
-            DEBUG(log, "disable video stream, sid=%u",stream->stream_id);
-            stream->disabled = 1;
-         }
-      }
    }
 
    return 0;

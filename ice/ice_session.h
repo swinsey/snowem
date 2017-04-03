@@ -10,6 +10,7 @@
 struct snw_ice_session {
    uint32_t flowid;
    uint32_t roomid;
+   uint32_t forwardid;
 
    snw_ice_context_t *ice_ctx;
    struct event_base *base;
@@ -33,8 +34,8 @@ struct snw_ice_session {
    snw_ice_stream_t *video_stream;   /* Video stream */
 
    char *rtp_profile;                /* RTP profile set by caller (so that we can match it) */
-   char *local_sdp;                  /* SDP generated locally (just for debugging purposes) */
-   char *remote_sdp;                 /* SDP received by the peer (just for debugging purposes) */
+   char *local_sdp;                  /* SDP generated locally */
+   char *remote_sdp;                 /* SDP received by the peer */
 
    int64_t created;                  /* created time */
    int64_t curtime;                  /* current time */

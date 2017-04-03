@@ -63,16 +63,22 @@ snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len) {
 
 void 
 snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, char *buf, int len) {
+   snw_ice_context_t *ice_ctx = 0;
+   snw_log_t *log = 0;
+
+   if (!session) return;
+   ice_ctx = session->ice_ctx;
+   log = ice_ctx->log;
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
-	   Json::Value root;
+	   /*Json::Value root;
    	Json::FastWriter writer;
    	std::string output;
    	std::string sData;
    	//sData.append(decrypted_frame, frame_len);
       sData.append(buf, len);
-   	root["cmd"] = SGN_INTERNAL;
-   	root["subcmd"] = SGN_INTERNAL_PEER_DATA;
+   	root["msgtype"] = SNW_CORE;
+   	root["api"] = SNW_CORE_RTP;
    	if (video)
    		root["media_type"] = "v";
    	else
@@ -80,12 +86,28 @@ snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, cha
 
       root["pkg_type"] = type;
    	root["data"] = sData;
-   	output = writer.write(root);
+   	output = writer.write(root);*/
+      snw_ice_session_t *s = 0;
+      rtp_header *header = (rtp_header *)buf;
+      uint16_t seq = ntohs(header->seq_number);
+      DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
+         session->flowid, video, header->type, VP8_PT, seq,len);
+      rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
+      pkt->data = (char*)malloc(len);
+      memcpy(pkt->data, buf, len);
+      pkt->length = len;
+      pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
+      pkt->control = (type == 0) ? 0: 1; //rtcp or rtp
+      pkt->encrypted = 0;
 
-      //rtp_header *header = (rtp_header *)buf;
-      //uint16_t seq = ntohs(header->seq_number);
-      //DEBUG("enqueue to mcd, flowid: %u, media_type: %u, pkg_type: %u, seq: %u, length=%u", 
-      //   session->flowid, video, type, seq,len);
+      DEBUG(log, "flowid=%u -> forwardid=%u", session->flowid, session->forwardid);
+      s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,session->forwardid);
+      if (s) {
+         DEBUG(log, "forward, flowid=%u -> forwardid=%u", session->flowid, session->forwardid);
+         send_rtp_pkt(s,pkt);
+      } else {
+         //FIXME: free pkt
+      }
 
       /*FIXME: uncomment the below line*/
    	//enqueue_msg_to_mcd(output.c_str(),output.size(), session->flowid);

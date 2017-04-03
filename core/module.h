@@ -12,14 +12,14 @@ extern "C" {
 enum {
    SNW_MSGTYPE_MIN = 1,
    SNW_ICE = SNW_MSGTYPE_MIN,
-   SNW_RTP = 2,
-   SNW_RTCP = 3,
+   SNW_CORE = 2,
+   SNW_EVENT = 3,
 
    /* reserve range */
    SNW_MSGTYPE_MAX = 255,
 };
 
-/* ICE api methods */
+/* ICE api code */
 enum {
    SNW_ICE_MIN = 1,
    SNW_ICE_CREATE = SNW_ICE_MIN,
@@ -29,8 +29,18 @@ enum {
    SNW_ICE_CANDIDATE = 5,
    SNW_ICE_FIR = 6,
 
-   /* reserve range */
+   /* reserved range */
    SNW_ICE_MAX = 255,
+};
+
+/* CORE api code */
+enum {
+   SNW_CORE_MIN = 1,
+   SNW_CORE_RTP = SNW_CORE_MIN,
+   SNW_CORE_RTCP = 2,
+
+   /* reserved range */
+   SNW_CORE_MAX = 255,
 };
 
 typedef struct snw_module_callbacks snw_module_callbacks_t;
