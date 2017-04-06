@@ -197,6 +197,39 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
    return;
 }
 
+void
+ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) {
+   snw_ice_context_t *ice_ctx = 0;
+   snw_log_t *log = 0;
+
+   if (!session || !component)
+      return;
+   ice_ctx = session->ice_ctx;
+   log = ice_ctx->log;
+
+   DEBUG(log, "srtp handshake is completed, cid=%u, sid=%u",
+         component->component_id, component->stream_id);
+
+   struct list_head *n,*p;
+   list_for_each(n,&session->streams.list) {
+      snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
+      if (s->disabled)
+         continue;
+      list_for_each(p,&s->components.list) {
+         ice_component_t *c = list_entry(p,ice_component_t,list);
+         DEBUG(log, "checking component, sid=%u, cid=%u",s->stream_id, c->component_id);
+         if (!c->dtls || !c->dtls->srtp_valid) {
+            DEBUG(log, "component not ready, sid=%u, cid=%u",s->stream_id, c->component_id);
+            return;
+         }    
+      }    
+   }
+
+   SET_FLAG(session, WEBRTC_READY);
+   ice_rtp_established(session);
+   return;
+}
+
 int
 srtp_dtls_setup(dtls_ctx_t *dtls) {
    ice_component_t *component = NULL;
@@ -324,8 +357,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          }
 done:
          if (dtls->srtp_valid) {
-            //FIXME: uncomment
-            //ice_srtp_handshake_done(session, component);
+            ice_srtp_handshake_done(session, component);
          } else {
             srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
          }

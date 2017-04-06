@@ -31,6 +31,7 @@ snw_flowset_init(uint32_t num) {
    /* init flow set */
    flowset->totalnum = num;
    flowset->usednum = 0;
+   flowset->baseidx = random()%1000000;
    INIT_LIST_HEAD(&flowset->freelist);
    INIT_LIST_HEAD(&flowset->usedlist);
    for (i = 1; i < num; i++) {
@@ -92,7 +93,7 @@ snw_flowset_setobj(snw_flowset_t *s, uint32_t id, void *obj) {
    if (id >= s->totalnum)
       return;
  
-   flow = s->data + id; 
+   flow = s->data + id;
    flow->obj = obj;
    return;
 }
@@ -107,7 +108,7 @@ snw_flowset_getobj(snw_flowset_t *s, uint32_t id) {
    if (id >= s->totalnum)
       return 0;
  
-   flow = s->data + id; 
+   flow = s->data + id;
    return flow->obj;
 }
 

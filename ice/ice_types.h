@@ -13,6 +13,14 @@ typedef struct snw_ice_stream snw_ice_stream_t;
 typedef struct ice_component ice_component_t;
 typedef struct snw_ice_context snw_ice_context_t;
 
+#define ICE_SESSION_SHM_KEY   0x091001
+#define ICE_SESSION_HASHTIME  10
+#define ICE_SESSION_HASHLEN   100
+
+#define ICE_CHANNEL_SHM_KEY   0x091002
+#define ICE_CHANNEL_HASHTIME  10
+#define ICE_CHANNEL_HASHLEN   100
+
 #define ENABLE_SNW_DEBUG
 #define PRINT_CANDIDATE(c_)\
 {\

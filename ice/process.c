@@ -5,6 +5,7 @@
 
 #include "module.h"
 #include "mq.h"
+#include "ice_channel.h"
 #include "ice_session.h"
 #include "json/json.h"
 #include "sdp.h"
@@ -177,19 +178,30 @@ void
 snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    snw_log_t *log = ice_ctx->log;
+   snw_ice_channel_t *channel = 0;
    Json::FastWriter writer;
    std::string output;
+   int is_new = 0;
+
+   channel = (snw_ice_channel_t*)snw_ice_channel_get(ice_ctx,flowid,&is_new);
 
    try {
+      if (!channel || !is_new) {
+         root["rc"] = -1;
+         output = writer.write(root);
+         snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
+         return;
+      }
+
       root["id"] = flowid;
-      root["sessionid"] = flowid; //FIXME: create 'real' sessionid
+      root["channelid"] = flowid; //FIXME: create 'real' sessionid
       root["rc"] = 0;
       output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
 
       DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
                 ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
 
+      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    } catch (...) {
       ERROR(log, "json format error, data=%s", output.c_str());
       return;
@@ -1503,7 +1515,7 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
 
 //video_start_handler
 void
-snw_ice_start_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid, uint32_t is_publisher) {
+snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid, uint32_t is_publisher) {
    snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    snw_log_t *log = ice_ctx->log;
    snw_ice_session_t *session;
@@ -2376,6 +2388,26 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
 }
 
 void
+snw_ice_publish_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
+   snw_log_t *log = 0;
+   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
+   log = ice_ctx->log;
+   DEBUG(log, "FIXME publish msg");
+
+   return;
+}
+
+void
+snw_ice_play_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
+   snw_log_t *log = 0;
+   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
+   log = ice_ctx->log;
+   DEBUG(log, "FIXME play msg");
+
+   return;
+}
+
+void
 snw_ice_fir_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_log_t *log = 0;
    //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
@@ -2417,8 +2449,8 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       case SNW_ICE_CREATE:
          snw_ice_create_msg(ice_ctx,root,flowid);
          break;
-      case SNW_ICE_START:
-         snw_ice_start_msg(ice_ctx,root,flowid,is_publisher);
+      case SNW_ICE_CONNECT:
+         snw_ice_connect_msg(ice_ctx,root,flowid,is_publisher);
          break;
       case SNW_ICE_STOP:
          snw_ice_stop_msg(ice_ctx,root,flowid);
@@ -2428,6 +2460,12 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
          break;
       case SNW_ICE_CANDIDATE:
          snw_ice_candidate_msg(ice_ctx,root,flowid);
+         break;
+      case SNW_ICE_PUBLISH:
+         snw_ice_publish_msg(ice_ctx,root,flowid);
+         break;
+      case SNW_ICE_PLAY:
+         snw_ice_play_msg(ice_ctx,root,flowid);
          break;
       case SNW_ICE_FIR:
          snw_ice_fir_msg(ice_ctx,root,flowid);
@@ -2441,81 +2479,4 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
    return;
 }
 
-void
-ice_rtp_established(snw_ice_session_t *session) {
-   snw_context_t *ctx = 0;
-   snw_ice_context_t *ice_ctx = 0;
-   snw_log_t *log = 0;
-   Json::Value root;
-   Json::FastWriter writer;
-   std::string output;
-
-   if (!session) return;
-   ice_ctx = session->ice_ctx;
-   log = ice_ctx->log;
-   ctx = (snw_context_t*)ice_ctx->ctx;
-
-
-   DEBUG(log, "ice_rtp_established, flowid=%u", session->flowid);
-
-   if ( IS_FLAG(session,ICE_SUBSCRIBER) ) {
-      DEBUG(log, "send fir req");
-      root["cmd"] = SNW_ICE;
-      root["subcmd"] = SNW_ICE_FIR;
-      root["flowid"] = session->flowid;
-
-      output = writer.write(root);
-      //enqueue_msg_to_mcd(output.c_str(),output.size(),session->flowid);
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
-   } else if IS_FLAG(session,ICE_PUBLISHER) {
-      // start recording a stream.
-      /*char filename[256];
-      time_t nowtime = time(NULL);
-      DEBUG(log, "FIXME: start recording a stream");
-      sprintf(filename, "%d_%ld_audio", session->roomid, nowtime);
-      session->a_recorder = recorder_create("/home/tuyettt/record_video", 0, filename);
-      sprintf(filename, "%d_%ld_video", session->roomid, nowtime);
-      session->v_recorder = recorder_create("/home/tuyettt/record_video", 1, filename);*/
-   } else if IS_FLAG(session,ICE_REPLAY) {
-      // start replaying a stream.
-      /*DEBUG("FIXME: start replaying a stream");
-      record_start(session);*/
-   }
-
-
-   return;
-}
-
-void
-ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) {
-   snw_ice_context_t *ice_ctx = 0;
-   snw_log_t *log = 0;
-
-   if (!session || !component)
-      return;
-   ice_ctx = session->ice_ctx;
-   log = ice_ctx->log;
-
-   DEBUG(log, "srtp handshake is completed, cid=%u, sid=%u",
-         component->component_id, component->stream_id);
-
-   struct list_head *n,*p;
-   list_for_each(n,&session->streams.list) {
-      snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
-      if (s->disabled)
-         continue;
-      list_for_each(p,&s->components.list) {
-         ice_component_t *c = list_entry(p,ice_component_t,list);
-         DEBUG(log, "checking component, sid=%u, cid=%u",s->stream_id, c->component_id);
-         if (!c->dtls || !c->dtls->srtp_valid) {
-            DEBUG(log, "component not ready, sid=%u, cid=%u",s->stream_id, c->component_id);
-            return;
-         }    
-      }    
-   }
-
-   SET_FLAG(session, WEBRTC_READY);
-   ice_rtp_established(session);
-   return;
-}
 

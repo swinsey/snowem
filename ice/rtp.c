@@ -87,7 +87,8 @@ snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, cha
       root["pkg_type"] = type;
    	root["data"] = sData;
    	output = writer.write(root);*/
-      snw_ice_session_t *s = 0;
+
+      /*snw_ice_session_t *s = 0;
       rtp_header *header = (rtp_header *)buf;
       uint16_t seq = ntohs(header->seq_number);
       DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
@@ -107,7 +108,11 @@ snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int type, int video, cha
          send_rtp_pkt(s,pkt);
       } else {
          //FIXME: free pkt
-      }
+         if (pkt && pkt->data ) free(pkt->data);
+         pkt->data = NULL;
+         if (pkt) free(pkt);
+         pkt = NULL;
+      }*/
 
       /*FIXME: uncomment the below line*/
    	//enqueue_msg_to_mcd(output.c_str(),output.size(), session->flowid);

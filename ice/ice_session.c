@@ -40,11 +40,12 @@ ice_session_setempty(const void *arg)
 
 int
 snw_ice_session_init(snw_ice_context_t *ctx) {
-   ctx->session_cache = (snw_hashbase_t *)malloc(sizeof(snw_hashbase_t *));
+   ctx->session_cache = (snw_hashbase_t *)malloc(sizeof(snw_hashbase_t));
    if (ctx->session_cache == 0)
       return -1;
-   snw_cache_init(ctx->session_cache, 0x091001, 10, 100, sizeof(snw_ice_session_t),1,
-                    ice_session_eq, ice_session_key, ice_session_isempty, ice_session_setempty);
+   snw_cache_init(ctx->session_cache, ICE_SESSION_SHM_KEY, ICE_SESSION_HASHTIME, 
+         ICE_SESSION_HASHLEN, sizeof(snw_ice_session_t),1, ice_session_eq, 
+         ice_session_key, ice_session_isempty, ice_session_setempty);
 
    return 0;
 }

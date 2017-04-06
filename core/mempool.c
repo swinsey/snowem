@@ -79,9 +79,11 @@ snw_mempool_create(size_t chunk_size, size_t total_size, int is_hugepage)
       }
    } else {
 #endif
+      //printf("posix_memalign get mem, p=%p(%p), size=%ld, pagesize=%d\n", 
+      //       &mp->mp_startptr,mp, total_size, getpagesize());
       res = posix_memalign((void **)&mp->mp_startptr, getpagesize(), total_size);
       if (res != 0) {
-         //printf("posix_memalign failed, size=%ld\n", total_size);
+         printf("posix_memalign failed, size=%ld\n", total_size);
          assert(0);
          if (mp) free(mp);
          return (NULL);

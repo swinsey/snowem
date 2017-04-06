@@ -44,6 +44,7 @@ struct snw_ice_context {
 
    /* caches, efficiency in search */
    snw_hashbase_t *session_cache;
+   snw_hashbase_t *channel_cache;
 
    /* mempools for fixed-size objects, fast in (de)allocation */
    snw_mempool_t  *stream_mempool;
@@ -55,6 +56,8 @@ struct snw_ice_context {
 void 
 snw_ice_init(snw_context_t *ctx);
 
+void
+ice_rtp_established(snw_ice_session_t *session);
 
 #ifdef __cplusplus
 }

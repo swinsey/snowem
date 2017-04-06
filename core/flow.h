@@ -22,6 +22,7 @@ struct snw_flowset {
    struct list_head  usedlist;
    uint32_t          totalnum;
    uint32_t          usednum;
+   uint32_t          baseidx;
 
    snw_flow_t       *data;
 };

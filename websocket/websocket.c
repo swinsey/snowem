@@ -190,7 +190,8 @@ snw_websocket_send_msg(snw_websocket_context_t *ws_ctx, char *buf, int len, uint
       return -3;
    }
 
-   ERROR(ctx->log, "send msg, conn=%p, flowid=%u, num=%u", conn, flow, ws_ctx->flowset->totalnum);
+   ERROR(ctx->log, "send msg, conn=%p, flowid=%u, num=%u, msg=%s", 
+          conn, flow, ws_ctx->flowset->totalnum,buf);
    evwsconn_send_message(conn, EVWS_DATA_TEXT, (const unsigned char*)buf, len);
 
    return 0;

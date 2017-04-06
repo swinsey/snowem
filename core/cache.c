@@ -47,7 +47,7 @@ snw_cache_init_base(snw_hashbase_t *base)
    uint32_t i, j, k;
    uint32_t flag;
 
-   if ( base == NULL )
+   if (base == NULL)
       return;
 
    base->hb_base = (uint32_t*)malloc(sizeof(uint32_t)*(base->hb_time));
@@ -137,7 +137,7 @@ snw_cache_init(snw_hashbase_t *base, uint32_t key,
    uint32_t iKey;
    int32_t ret;
 
-   if ( base == NULL ) {
+   if (!base) {
       printf("hash base is null, key=%d, objsize=%d\n", key, objsize);
       return -1;
    }
@@ -153,11 +153,11 @@ snw_cache_init(snw_hashbase_t *base, uint32_t key,
 
    iSize = objsize * hashtime * hashlen;
    iKey = key + base->hb_pid;
+   //printf("cache init, key=%x, size=%u\n",iKey, iSize);
    ret = snw_cache_getshm(base, iKey, iSize, create);
 
-   if ((0 != ret) || (NULL == base->hb_cache))
-   {
-      printf("InvertedCache init fail,key=%u,size=%u,ret=%d\n",iKey,iSize,ret);
+   if ((0 != ret) || (NULL == base->hb_cache)) {
+      printf("cache init fail,key=%u,size=%u,ret=%d\n",iKey,iSize,ret);
       return -2;
    }
 

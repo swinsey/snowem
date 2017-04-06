@@ -27,20 +27,24 @@
         this.SGN_USER_TYPE_AGENT = 2;
         this.SGN_USER_TYPE_ADMIN = 3;
 
-        //SNW_CMD
+        // MSG TYPE
         this.SNW_ICE = 1;
-        this.SNW_RTP = 2;
-        this.SNW_RTCP = 3;
-        this.SNW_RSTP = 4;
+        this.SNW_CORE = 2;
+        this.SNW_EVENT = 3;
         this.SNW_VIDEOCALL = 5653571; //'VDC'
 
-        //SNW_ICE SUBCMD
+        // ICE API
         this.SNW_ICE_CREATE = 1;
-        this.SNW_ICE_START = 2;
+        this.SNW_ICE_CONNECT = 2;
         this.SNW_ICE_STOP = 3;
         this.SNW_ICE_SDP = 4;
         this.SNW_ICE_CANDIDATE = 5;
-        this.SNW_ICE_FIR = 6;
+        this.SNW_ICE_PUBLISH = 6;
+        this.SNW_ICE_PLAY = 7;
+        this.SNW_ICE_FIR = 8;
+
+        // EVENT API
+        this.SNW_EVENT_ICE_CONNECTED = 1;
 
         //SNW_VIDEOCALL SUBCMD
         this.SNW_VIDEOCALL_CREATE = 1;
@@ -433,6 +437,7 @@ PeerCall.wsClient = wsClient;
       console.log("init peer agent, id=" + config.peerId);
       this.peerId = config.peerId;
       this.roomId = config.roomId;
+      this.channelId = 0;
       this.localStream = config.localStream;
       this.remoteStream = config.remoteStream;
       this.localVideoElm = config.localVideoElm;
@@ -488,6 +493,7 @@ PeerCall.wsClient = wsClient;
          if (msg.msgtype == globals.SNW_ICE ) {
             if (msg.api == globals.SNW_ICE_CREATE) {
                this.peerId = msg.id;
+               this.channelId = msg.channelid;
                PeerCall.broadcast('onCreate',this);
                return;
             }
@@ -503,6 +509,15 @@ PeerCall.wsClient = wsClient;
             this.on_remote_sdp(msg.sdp);
             return;
          }
+         return;
+      }
+      if (msg.msgtype == globals.SNW_EVENT) {
+         if (msg.api == globals.SNW_EVENT_ICE_CONNECTED) {
+            this.state = 'connected';
+            PeerCall.broadcast('onIceConnected',this);
+            return;
+         }
+         return;
       }
 
       /*if (msg.cmd == globals.SGN_VIDEO ) {
@@ -570,8 +585,8 @@ PeerCall.wsClient = wsClient;
          agent.start_stream(stream);
          agent.localStream = stream;
          agent.localVideoElm.srcObject = stream;
-         agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_START, 
-                     'publish': agent.is_publisher, 'name': agent.name,
+         agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CONNECT, 
+                     'channelid': agent.channelId, 'publish': agent.is_publisher, 'name': agent.name,
                      'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': agent.roomId});
          //onready();
          //subscribe();
@@ -582,7 +597,7 @@ PeerCall.wsClient = wsClient;
       });
    } 
 
-   PeerAgent.prototype.publish = function(config) {
+   PeerAgent.prototype.connect = function(config) {
       console.log("publish config info, config="+JSON.stringify(config));
       this.is_publisher = 1; 
       this.name = config.name;
@@ -590,12 +605,19 @@ PeerCall.wsClient = wsClient;
       getusermedia(this);
    }
 
-   PeerAgent.prototype.subscribe = function(config) {
-      console.log("subscribe config info, config="+JSON.stringify(config));
-      this.is_publisher = 0; 
-      this.name = config.name;
-      this.roomId = config.roomid
-      getusermedia(this);
+   PeerAgent.prototype.publish = function(config) {
+      console.log("publishing, config="+JSON.stringify(config));
+      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PUBLISH, 
+                 'channelid': this.channelId, 'id': this.peerId, 'roomid': this.roomId});
+   }
+   PeerAgent.prototype.play = function(config) {
+      console.log("playing, config="+JSON.stringify(config));
+      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PUBLISH, 
+                 'channelid': this.channelId, 'id': this.peerId, 'roomid': this.roomId});
+      //this.is_publisher = 0; 
+      //this.name = config.name;
+      //this.roomId = config.roomid
+      //getusermedia(this);
    }
 
    PeerCall.PeerAgent = PeerAgent;
@@ -632,6 +654,7 @@ PeerCall.wsClient = wsClient;
    PeerCall.broadcast = function(eventName,msg) {
       console.log("broadcast, event=" + eventName + ", msg=" + JSON.stringify(msg));
       if (!listeners[eventName]) {
+         console.log("no handler for event, name=" + JSON.stringify(eventName));
          return; 
       }
       for (var i = 0; i < listeners[eventName].length; i++) {
@@ -702,7 +725,7 @@ PeerCall.wsClient = wsClient;
    // @config: {channel_id: channel_id, }
    PeerCall.create = function(config) {
       var agent = getPeerAgent();
-      console.log("agent=" + agent);
+      console.log("creating agent=" + JSON.stringify(agent));
       agent.send({'msgtype':globals.SNW_ICE,
                   'api':globals.SNW_ICE_CREATE, 
                   'uuid': PeerCall.Utils.uuid()});

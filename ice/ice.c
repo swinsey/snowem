@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "ice.h"
+#include "ice_channel.h"
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "json/json.h"
@@ -162,12 +163,12 @@ void
 snw_ice_init(snw_context_t *ctx) {
    static snw_ice_api_t apis[] = {
       {.list = {0,0}, .api = SNW_ICE_CREATE},
-      {.list = {0,0}, .api = SNW_ICE_START},
+      {.list = {0,0}, .api = SNW_ICE_CONNECT},
       {.list = {0,0}, .api = SNW_ICE_STOP}
    };
    static snw_ice_handlers_t handlers[] = {
       {.list = {0,0}, .api = SNW_ICE_CREATE, .handler = test_api1},
-      {.list = {0,0}, .api = SNW_ICE_START, .handler = test_api2},
+      {.list = {0,0}, .api = SNW_ICE_CONNECT, .handler = test_api2},
       {.list = {0,0}, .api = SNW_ICE_STOP, .handler = test_api3}
    };
    struct list_head *p = 0;
@@ -188,8 +189,10 @@ snw_ice_init(snw_context_t *ctx) {
 
    snw_ice_sdp_init(ice_ctx);
    snw_ice_session_init(ice_ctx);
+   snw_ice_channel_init(ice_ctx);
    snw_stream_mempool_init(ice_ctx);
    snw_component_mempool_init(ice_ctx);
+
    ice_ctx->rtcpmux_enabled = 0; 
    ice_ctx->ice_lite_enabled = 1; 
    ice_ctx->ipv6_enabled = 0; 
@@ -226,6 +229,59 @@ snw_ice_init(snw_context_t *ctx) {
    event_base_dispatch(ctx->ev_base);
    return;
 }
+
+void
+ice_rtp_established(snw_ice_session_t *session) {
+   snw_context_t *ctx = 0;
+   snw_ice_context_t *ice_ctx = 0;
+   snw_log_t *log = 0;
+   Json::Value root,notify;
+   Json::FastWriter writer;
+   std::string output;
+
+   if (!session) return;
+   ice_ctx = session->ice_ctx;
+   log = ice_ctx->log;
+   ctx = (snw_context_t*)ice_ctx->ctx;
+
+
+   DEBUG(log, "ice_rtp_established, flowid=%u", session->flowid);
+
+   if ( IS_FLAG(session,ICE_SUBSCRIBER) ) {
+      DEBUG(log, "send fir req");
+      root["cmd"] = SNW_ICE;
+      root["subcmd"] = SNW_ICE_FIR;
+      root["flowid"] = session->flowid;
+
+      output = writer.write(root);
+      //enqueue_msg_to_mcd(output.c_str(),output.size(),session->flowid);
+      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
+   } else if IS_FLAG(session,ICE_PUBLISHER) {
+      // start recording a stream.
+      /*char filename[256];
+      time_t nowtime = time(NULL);
+      DEBUG(log, "FIXME: start recording a stream");
+      sprintf(filename, "%d_%ld_audio", session->roomid, nowtime);
+      session->a_recorder = recorder_create("/home/tuyettt/record_video", 0, filename);
+      sprintf(filename, "%d_%ld_video", session->roomid, nowtime);
+      session->v_recorder = recorder_create("/home/tuyettt/record_video", 1, filename);*/
+   } else if IS_FLAG(session,ICE_REPLAY) {
+      // start replaying a stream.
+      /*DEBUG("FIXME: start replaying a stream");
+      record_start(session);*/
+   }
+
+   notify["msgtype"] = SNW_EVENT;
+   notify["api"] = SNW_EVENT_ICE_CONNECTED;
+   notify["flowid"] = session->flowid;
+   notify["channelid"] = session->channelid;
+   output = writer.write(notify);
+   snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
+
+
+   return;
+}
+
 
 
 

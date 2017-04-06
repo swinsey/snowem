@@ -78,13 +78,17 @@
            var roomid = 0;
 
            PeerCall.listen('onCreate', function(agent) {
-              console.log("agent: " + JSON.stringify(agent));
+              console.log("onCreate: agent=" + JSON.stringify(agent));
               document.getElementById("yourId").innerHTML = agent.peerId;
+              agent.connect({name: "demo"});
+           });
+
+           PeerCall.listen('onIceConnected', function(agent) {
+              console.log("ice connected: agent=" + JSON.stringify(agent));
               if (is_publisher) {
-                 agent.publish({name: "demo"});
+                 agent.publish({'name': "demo", 'roomid': roomid});
               } else {
-                 console.log("subscribe roomid=" + roomid);
-                 agent.subscribe({'name': "demo", 'roomid': roomid});
+                 agent.play({'name': "demo", 'roomid': roomid});
               }
            });
 

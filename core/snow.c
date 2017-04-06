@@ -223,6 +223,7 @@ snw_ice_msg(int fd, short int event,void* data) {
 
       DEBUG(ctx->log,"dequeue msg from ice, flowid=%u, len=%u, cnt=%d",
           flowid, len, cnt);
+      buffer[len] = 0;
       snw_process_msg_from_ice(ctx,buffer,len,flowid);
 
 #ifdef USE_ADAPTIVE_CONTROL

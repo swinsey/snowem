@@ -139,7 +139,8 @@ snw_net_dispatch_msg(int fd, short int event,void* data) {
                     ctx->snw_core2net_mq->_fd, ret, len, flowid);
      if ( (len == 0 && ret == 0) || (ret < 0) )
         return;
-
+     
+     buf[len] = 0;
      snw_websocket_send_msg(ws_ctx,buf,len,flowid);
    }
 
