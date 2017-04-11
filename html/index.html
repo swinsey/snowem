@@ -86,9 +86,9 @@
            PeerCall.listen('onIceConnected', function(agent) {
               console.log("ice connected: agent=" + JSON.stringify(agent));
               if (is_publisher) {
-                 agent.publish({'name': "demo", 'roomid': roomid});
+                 agent.publish({'name': "demo", 'channelid': roomid});
               } else {
-                 agent.play({'name': "demo", 'roomid': roomid});
+                 agent.play({'name': "demo", 'channelid': roomid});
               }
            });
 

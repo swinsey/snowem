@@ -612,8 +612,8 @@ PeerCall.wsClient = wsClient;
    }
    PeerAgent.prototype.play = function(config) {
       console.log("playing, config="+JSON.stringify(config));
-      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PUBLISH, 
-                 'channelid': this.channelId, 'id': this.peerId, 'roomid': this.roomId});
+      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PLAY, 
+                 'channelid': config.channelid, 'id': this.peerId, 'roomid': this.roomId});
       //this.is_publisher = 0; 
       //this.name = config.name;
       //this.roomId = config.roomid

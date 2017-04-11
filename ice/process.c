@@ -192,7 +192,7 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
          snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
          return;
       }
-
+      channel->ownerid = flowid;
       root["id"] = flowid;
       root["channelid"] = flowid; //FIXME: create 'real' sessionid
       root["rc"] = 0;
@@ -1515,12 +1515,13 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
 
 //video_start_handler
 void
-snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid, uint32_t is_publisher) {
+snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    snw_log_t *log = ice_ctx->log;
    snw_ice_session_t *session;
+   snw_ice_channel_t *channel;
    int is_new = 0;
-   uint32_t roomid;
+   uint32_t channelid;
    
    try {
       /*Json::FastWriter writer;
@@ -1531,7 +1532,7 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
       output = writer.write(root);
       DEBUG(log,"ice start, flowid=%u, len=%u, root=%s", 
                 flowid, output.size(), output.c_str());*/
-      roomid = root["roomid"].asUInt();
+      channelid = root["channelid"].asUInt();
    } catch (...) {
       //ERROR(log, "json format error, data=%s", output.c_str());
       return;
@@ -1548,14 +1549,14 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
       return;
    }
 
-   DEBUG(log,"init new session, roomid=%u, flowid=%u", roomid, session->flowid);
+   DEBUG(log,"init new session, channelid=%u, flowid=%u", channelid, session->flowid);
    //session->flowid = flowid;
-   session->roomid = roomid;
+   session->channelid = channelid;
    session->controlling = 0;
    session->base = ctx->ev_base;
    session->ready = 0;
    session->flags = 0;
-   if (is_publisher) {
+   /*if (is_publisher) {
       SET_FLAG(session,ICE_PUBLISHER);
    } else {
       snw_ice_session_t *s = 0;
@@ -1565,8 +1566,15 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
          DEBUG(log, "forward session, flowid=%u, forwardid=%u", session->flowid, s->forwardid);
          s->forwardid = session->flowid;
       }
-   }
+   }*/
    INIT_LIST_HEAD(&session->streams.list);
+   DEBUG(log,"search channel, flowi=%u, channelid=%u",flowid,channelid);
+   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
+   if (!channel) {
+      ERROR(log,"channel not found, flowid=%u, channleid=%u",flowid,channelid);
+      return;
+   }
+   session->channel = channel;
  
    snw_ice_offer_sdp(ice_ctx,session,flowid,0);
    return;
@@ -2390,27 +2398,53 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
 void
 snw_ice_publish_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_log_t *log = 0;
-   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
-   log = ice_ctx->log;
-   DEBUG(log, "FIXME publish msg");
+   snw_ice_session_t *session = 0;
 
+   if (!ice_ctx) return;
+   log = ice_ctx->log;
+
+   // get session
+   session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
+   if (!session) return;
+   
+   // update session
+   DEBUG(log, "channel is published, flowid=%u, channelid=%u", 
+         flowid, session->channelid);
+   SET_FLAG(session,ICE_PUBLISHER);
+
+   // start broadcasting session
+   snw_print_channel_info(ice_ctx,session->channel); 
+   
    return;
 }
 
 void
 snw_ice_play_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_log_t *log = 0;
-   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
-   log = ice_ctx->log;
-   DEBUG(log, "FIXME play msg");
+   snw_ice_session_t *session = 0;
+   uint32_t channelid = 0;
 
+   if (!ice_ctx) return;
+   log = ice_ctx->log;
+
+   session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
+   if (!session) return;
+   SET_FLAG(session,ICE_SUBSCRIBER);
+   
+   try {
+      channelid = root["channelid"].asUInt();
+   } catch (...) {
+      ERROR(log, "json format error");
+   }
+   snw_channel_add_subscriber(ice_ctx, channelid, flowid);
+
+  
    return;
 }
 
 void
 snw_ice_fir_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_log_t *log = 0;
-   //snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
    log = ice_ctx->log;
    DEBUG(log, "FIXME fir msg");
    return;
@@ -2423,7 +2457,7 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
    Json::Reader reader;
    Json::FastWriter writer;
    std::string output;
-   uint32_t msgtype = 0, api = 0, is_publisher = 0;
+   uint32_t msgtype = 0, api = 0;
    int ret;
 
    ret = reader.parse(data,data+len,root,0);
@@ -2440,7 +2474,6 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
          return;
       }
       api = root["api"].asUInt();
-      is_publisher = root["publish"].asUInt();
    } catch (...) {
       ERROR(log, "json format error, data=%s", data);
    }
@@ -2450,7 +2483,7 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
          snw_ice_create_msg(ice_ctx,root,flowid);
          break;
       case SNW_ICE_CONNECT:
-         snw_ice_connect_msg(ice_ctx,root,flowid,is_publisher);
+         snw_ice_connect_msg(ice_ctx,root,flowid);
          break;
       case SNW_ICE_STOP:
          snw_ice_stop_msg(ice_ctx,root,flowid);

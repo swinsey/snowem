@@ -31,6 +31,12 @@ snw_ice_channel_insert(snw_ice_context_t *ctx, snw_ice_channel_t *sitem);
 int 
 snw_ice_channel_remove(snw_ice_context_t *ctx, snw_ice_channel_t *sitem);
 
+void
+snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c);
+
+void
+snw_channel_add_subscriber(snw_ice_context_t *ctx, uint32_t channelid, uint32_t flowid);
+
 
 #ifdef __cplusplus
 }

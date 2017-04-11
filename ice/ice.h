@@ -53,8 +53,11 @@ struct snw_ice_context {
    snw_ice_api_t   api_handlers;
 };
 
-void 
-snw_ice_init(snw_context_t *ctx);
+//void 
+//snw_ice_init(snw_context_t *ctx);
+
+void
+snw_ice_setup(snw_context_t *ctx);
 
 void
 ice_rtp_established(snw_ice_session_t *session);

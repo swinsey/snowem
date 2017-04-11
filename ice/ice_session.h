@@ -4,12 +4,12 @@
 #include <stdint.h>
 
 #include "cicero/agent.h"
+#include "ice_channel.h"
 #include "ice_stream.h"
 #include "ice_types.h"
 
 struct snw_ice_session {
    uint32_t flowid;
-   uint32_t roomid;
    uint32_t channelid;
    uint32_t forwardid;
 
@@ -49,6 +49,7 @@ struct snw_ice_session {
 
    //recorder_t* a_recorder;
    //recorder_t* v_recorder;
+   snw_ice_channel_t  *channel;
 };
 
 

@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "cache.h"
+#include "log.h"
 #include "ice.h"
 #include "ice_channel.h"
 #include "ice_types.h"
@@ -58,11 +59,9 @@ snw_ice_channel_get(snw_ice_context_t *ctx, uint32_t id, int *is_new) {
    key.id = id;
    so = CACHE_GET(ctx->channel_cache, &key, is_new, snw_ice_channel_t*);
 
-   if (so == 0)
-      return 0;
+   if (so == 0) return 0;
 
-   if (!is_new)
-      return so;
+   if (!is_new) return so;
 
    // reset new channel
    memset(so, 0, sizeof(snw_ice_channel_t));
@@ -92,5 +91,48 @@ snw_ice_channel_remove(snw_ice_context_t *ctx, snw_ice_channel_t *sitem) {
 }
 
 
+void
+snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
+
+   if (!ctx) return;
+
+   DEBUG(ctx->log, "channel info, id=%u, ownerid=%u, players= %u %u %u %u %u", 
+         c->id, c->ownerid, c->players[0], c->players[1], c->players[2],
+         c->players[3], c->players[4]);
+
+   return;
+
+}
+
+void
+snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, uint32_t channelid, uint32_t flowid) {
+   snw_log_t *log = 0;
+   snw_ice_channel_t *channel = 0;
+   int found = 0;
+
+   if (!ice_ctx) return;
+   log = ice_ctx->log;
 
 
+   DEBUG(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
+   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
+   if (!channel) return;
+   snw_print_channel_info(ice_ctx,channel); 
+
+   for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
+      if (channel->players[i] == 0) {
+         found = 1;
+         channel->players[i] = flowid;
+         break;
+      }
+   }
+   snw_print_channel_info(ice_ctx,channel); 
+
+   if (!found) {
+      ERROR(log, "channel full, flowid=%u, channelid=%u", flowid, channelid);
+      snw_print_channel_info(ice_ctx,channel); 
+      return;
+   }
+
+   return;
+}
