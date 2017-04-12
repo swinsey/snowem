@@ -30,7 +30,7 @@ snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       return;
    }
 
-   DEBUG(log, "get ice msg, data=%s", data);
+   DEBUG(log, "[new handler] get ice msg, data=%s", data);
    try {
       msgtype = root["msgtype"].asUInt();
       if (msgtype != SNW_ICE) {
@@ -160,6 +160,19 @@ test_api3(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid)
 
 
 void 
+snw_ice_log_cb(int severity, const char *msg, void *data) {
+   snw_ice_context_t *ice_ctx = (snw_ice_context_t *)data;
+   snw_log_t *log = 0;
+
+   if (!ice_ctx) return;
+   log = ice_ctx->log;
+
+   //snw_log_write_pure(log,SNW_DEBUG,"%s",msg);
+   DEBUG(log,"%s",msg);
+   return; 
+}
+
+void 
 snw_ice_init(snw_context_t *ctx) {
    static snw_ice_api_t apis[] = {
       {.list = {0,0}, .api = SNW_ICE_CREATE},
@@ -186,7 +199,8 @@ snw_ice_init(snw_context_t *ctx) {
    memset(ice_ctx,0,sizeof(snw_ice_context_t));
    ice_ctx->ctx = ctx;
    ice_ctx->log = ctx->log;
-
+   
+   ice_set_log_callback(snw_ice_log_cb,ice_ctx);
    snw_ice_sdp_init(ice_ctx);
    snw_ice_session_init(ice_ctx);
    snw_ice_channel_init(ice_ctx);

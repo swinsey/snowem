@@ -269,8 +269,8 @@ udp_bsd_socket_new(agent_t *agent, stream_t *stream, component_t *component,  ad
    sock->stream = stream;
    sock->component = component;
 
-   ICE_DEBUG("create udp socket, agent=%p,stream=%p,component=%p",
-         agent,stream,component);
+   ICE_DEBUG("create udp socket, fd=%u, agent=%p,stream=%p,component=%p",
+         fd, agent,stream,component);
 
    return sock;
 
@@ -339,11 +339,15 @@ socket_new(IceSocketType type) {
 void
 socket_free(socket_t *sock)
 {
-  if (sock) {
-    //sock->close (sock);
-    ICE_DEBUG("FIXME: free socket resources");
-    ICE_FREE(sock);
+  if (!sock) return;
+
+  if (sock->type == ICE_SOCKET_TYPE_UDP_BSD) {
+    event_del(sock->ev);
   }
+  close(sock->fd);
+  ICE_FREE(sock);
+
+  return;
 }
 
 int

@@ -35,8 +35,8 @@
                 </div>
              </div>
              <div class="float-btn-div">
-               <button id="startBtn" type="button" class="btn btn-secondary">Start</button>
-               <button id="viewBtn" type="button" class="btn btn-secondary">View</button>
+               <!--<button id="publishBtn" type="button" class="btn btn-secondary">Publish</button>
+               <button id="subscribeBtn" type="button" class="btn btn-secondary">Subscribe</button>-->
                <button id="stopBtn" type="button" class="btn btn-secondary">Stop</button>
              </div>
 
@@ -45,16 +45,24 @@
     </div> <!-- videobox -->
 </div> <!-- video-container -->
 </div>
+<div>
+  <button id="publishBtn" type="button" class="btn-o btn-primary">Publish</button>
+  <span id="yourId"></span>
+</div>
+<div>
+  <button id="subscribeBtn" type="button" class="btn-o btn-secondary">Subscribe</button>
+  <input type="text" id="subscribeRoomId" ng-model="Room.roomid">
+</div>
+
 
   <!-- Custom Scripts -->
-  <script type="text/javascript" src="js/opus.js"></script>
-  <script type="text/javascript" src="js/md5.js"></script>
-  <script type="text/javascript" src="js/adapter.js"></script> <!-- wrapper of webrtc api -->
-  <script type="text/javascript" src="js/global.js"></script>
-  <!--<script type="text/javascript" src="js/net.js"></script>-->
-  <script type="text/javascript" src="js/room.js"></script>
+  <script type="text/javascript" src="../js/opus.js"></script>
+  <script type="text/javascript" src="../js/md5.js"></script>
+  <script type="text/javascript" src="../js/adapter.js"></script> <!-- wrapper of webrtc api -->
+  <script type="text/javascript" src="../js/global.js"></script>
+  <script type="text/javascript" src="../js/room.js"></script>
   <script type="text/javascript" src="js/app.js"></script>
-	
+		
 </body>
 </html>
 

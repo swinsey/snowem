@@ -1393,7 +1393,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
 
    //ice_session_init(session);
    agent = (agent_t*)ice_agent_new(session->base,ICE_COMPATIBILITY_RFC5245,0);
-   if (agent == NULL)
+   if (!agent)
       return -1;
 
    DEBUG(log,"Creating ICE agent, session=%p, agent=%p",
@@ -1415,7 +1415,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
          ice_ctx->ice_lite_enabled, session->controlling);
 
    ret = snw_ice_add_local_addresses(session);
-   if (ret<0) {
+   if (ret < 0) {
       //FIXME: clean resources
       return -2;
    }
@@ -1452,7 +1452,6 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
          offer,sdp_attr.audio,sdp_attr.video,session->streams_num, IS_FLAG(session, WEBRTC_BUNDLE));
    
    if (IS_FLAG(session, WEBRTC_AUDIO)) { 
-   //if (sdp_attr.audio) {
       ret = snw_ice_create_media_stream(session,0);
       if (ret < 0) {
          ERROR(log, "ret=%d", ret);
@@ -1534,7 +1533,7 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
                 flowid, output.size(), output.c_str());*/
       channelid = root["channelid"].asUInt();
    } catch (...) {
-      //ERROR(log, "json format error, data=%s", output.c_str());
+      ERROR(log, "json format error");
       return;
    }
 
@@ -1580,64 +1579,53 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    return;
 }
 
-void
-snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
-   snw_log_t *log = ice_ctx->log;
-   snw_ice_session_t *session;
-   
-   session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
-   if (!session) {
-      WARN(log,"session not found, flowid=%u",flowid);
-      return;
-   }
-   WARN(log,"FIXME stop session, flowid=%u",flowid);
-
-   return;
-}
-
-
-
-void 
-ice_session_cleanup(snw_ice_session_t *session) {
+/*void
+snw_ice_component_cleanup(snw_ice_context_t *ice_ctx, ice_component_t *c) {
    snw_log_t *log = 0;
 
-   if (!session) return;
-   log = session->ice_ctx->log;
+   if (!ice_ctx || !c) return;
+   log = ice_ctx->log;
 
-   //FIXME: free streams
+   return;
+}*/
 
-   DEBUG(log, "FIXME: free agent");
-   if (session->agent != NULL) {
-      session->agent = NULL;
+/*void
+snw_ice_stream_cleanup(snw_ice_context_t *ice_ctx, snw_ice_stream_t *s) {
+   snw_log_t *log = 0;
+   struct list_head *n, *p;
+
+   if (!ice_ctx || !s) return;
+   log = ice_ctx->log;
+
+   list_for_each_safe(n,p,&s->components.list) {
+      ice_component_t *c = list_entry(n,ice_component_t,list);
+      DEBUG(log, "delete component, cid=%u(%p)", c->component_id, s);
+      list_del(&s->list);
+      snw_ice_component_cleanup(ice_ctx,c);
    }
 
-   free(session->rtp_profile);
-   session->rtp_profile = NULL;
-   free(session->local_sdp);
-   session->local_sdp = NULL;
-   free(session->remote_sdp);
-   session->remote_sdp = NULL;
 
-   if (session->audio_mid != NULL) {
-      free(session->audio_mid);
-      session->audio_mid = NULL;
-   }
+   return;
+}*/
 
-   if(session->video_mid != NULL) {
-      free(session->video_mid);
-      session->video_mid = NULL;
-   }
+void
+snw_component_sock_free(snw_ice_context_t *ice_ctx, ice_component_t *component) {
+   snw_log_t *log = 0;
+     
+   if (!component) return;
+   log = ice_ctx->log;
 
-   CLEAR_FLAG(session, WEBRTC_READY);
-   DEBUG(log, "FIXME: WebRTC resources freed, flowid=%u", session->flowid);
+
    return;
 }
 
-void ice_component_cleanup(ice_component_t *component) {
+void 
+ice_component_cleanup(snw_ice_context_t *ice_ctx, ice_component_t *component) {
+   snw_log_t *log = 0;
    struct list_head *pos, *n;
 
-   if (!component)
-      return;
+   if (!component) return;
+   log = ice_ctx->log;
 
    if (component->dtls != NULL) {
       //FIXME: clean srtp object
@@ -1651,38 +1639,44 @@ void ice_component_cleanup(ice_component_t *component) {
       free(p->data);
       free(p);
    }
-
-   snw_component_deallocate(component->stream->session->ice_ctx, component);
+   
+   DEBUG(log, "clean component, cid=%u", component->component_id);
+   //snw_component_sock_free(ice_ctx, component);
+   snw_component_deallocate(ice_ctx, component);
 
    return;
 }
 
-void ice_component_free(ice_component_t *components, ice_component_t *component) {
+void
+ice_component_free(snw_ice_context_t *ice_ctx, ice_component_t *components, 
+      ice_component_t *component) {
+   snw_log_t *log = 0;
    struct list_head *pos,*n;
    ice_component_t *c = NULL;
 
    if (!components || !component)
       return;
+   log = ice_ctx->log;
 
-   /*{//DEBUG
+   {//DEBUG
       struct list_head *n;
       list_for_each(n,&components->list) {
          ice_component_t *t = list_entry(n,ice_component_t,list);
-         //DEBUG("view component, cid=%u(%p)", t->component_id, t);
+         DEBUG(log, "view component, cid=%u(%p)", t->component_id, t);
       }
-   }*/
+   }
 
    list_for_each_safe(pos,n,&components->list) {
       ice_component_t *t = list_entry(pos,ice_component_t,list);
       if (t->component_id == component->component_id) {
-         //DEBUG("remove component, cid=%u",t->component_id);
+         DEBUG(log, "remove component, cid=%u",t->component_id);
          list_del(pos);
          c = t;
       }
    }
 
    if (c) {
-      ice_component_cleanup(c);
+      ice_component_cleanup(ice_ctx,c);
    } else {
       //ERROR("component not found, cid=%u", component->component_id);
    }
@@ -1785,20 +1779,23 @@ void ice_component_free(ice_component_t *components, ice_component_t *component)
 */
 }
 
-void ice_stream_cleanup(snw_ice_stream_t *stream) {
-   snw_ice_context_t *ice_ctx = 0;
+
+void 
+ice_stream_cleanup(snw_ice_context_t *ice_ctx, snw_ice_stream_t *stream) {
+   snw_log_t *log = 0;
 
    if (!stream)
       return;
-   ice_ctx = stream->session->ice_ctx;
+   log = ice_ctx->log;   
 
    //FIXME: delete components
+   DEBUG(log, "stream cleanup, sid=%u",stream->stream_id);
    if (stream->rtp_component != NULL) {
-      ice_component_free(&stream->components, stream->rtp_component);
+      ice_component_free(ice_ctx, &stream->components, stream->rtp_component);
    }
 
    if (stream->rtcp_component != NULL) {
-      ice_component_free(&stream->components, stream->rtcp_component);
+      ice_component_free(ice_ctx, &stream->components, stream->rtcp_component);
    }
 
    snw_stream_deallocate(ice_ctx,stream);
@@ -1807,24 +1804,22 @@ void ice_stream_cleanup(snw_ice_stream_t *stream) {
 }
 
 void 
-ice_stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream) {
+ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_stream_t *stream) {
    snw_log_t *log = 0;
    struct list_head *pos,*n;
    snw_ice_stream_t *d = NULL; 
-
          
    if (!streams || !stream)
       return;
-   log = stream->session->ice_ctx->log;
+   log = ice_ctx->log;
 
-   /*{//DEBUG
+   {//DEBUG
       struct list_head *n;
       list_for_each(n,&streams->list) {
-         ice_stream_t *s = list_entry(n,ice_stream_t,list);
-         DEBUG("view stream, sid=%u(%p)", s->stream_id, s);
+         snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
+         DEBUG(log,"view stream, sid=%u(%p)", s->stream_id, s);
       }
-   }*/
-
+   }
 
    list_for_each_safe(pos,n,&streams->list) {
       snw_ice_stream_t *s = list_entry(pos,snw_ice_stream_t,list);
@@ -1838,7 +1833,8 @@ ice_stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream) {
    }
 
    if (d) {
-      ice_stream_cleanup(d);
+      ERROR(log, "stream cleaned, sid=%u(%p)", stream->stream_id, stream);
+      ice_stream_cleanup(ice_ctx, d);
    } else {
       ERROR(log, "stream not found, sid=%u", stream->stream_id);
    }
@@ -1853,6 +1849,82 @@ ice_stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream) {
 
    return;
 }
+
+
+
+void 
+snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
+   snw_log_t *log = 0;
+   struct list_head *n, *p;
+
+   if (!session) return;
+   log = session->ice_ctx->log;
+
+
+   if (session->sdp)
+      free(session->sdp);
+
+   if (session->agent) {
+      ice_agent_free(session->agent);
+      session->agent = 0;
+   }
+
+   if (session->rtp_profile) {
+      free(session->rtp_profile);
+      session->rtp_profile = NULL;
+   }
+
+   if (session->local_sdp) {
+      free(session->local_sdp);
+      session->local_sdp = NULL;
+   }
+
+   if (session->remote_sdp) {
+      free(session->remote_sdp);
+      session->remote_sdp = NULL;
+   }
+
+   if (session->audio_mid != NULL) {
+      free(session->audio_mid);
+      session->audio_mid = NULL;
+   }
+
+   if(session->video_mid != NULL) {
+      free(session->video_mid);
+      session->video_mid = NULL;
+   }
+
+   //FIXME: free streams & components
+   list_for_each_safe(n,p,&session->streams.list) {
+      snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
+      DEBUG(log, "delete stream, sid=%u(%p)", s->stream_id, s);
+      list_del(&s->list);
+      //ice_stream_free(session->ice_ctx,&session->streams,s);
+      ice_stream_cleanup(session->ice_ctx,s);
+   }
+
+   CLEAR_FLAG(session, WEBRTC_READY);
+   DEBUG(log, "WebRTC resources freed, flowid=%u", session->flowid);
+   return;
+}
+
+void
+snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
+   snw_log_t *log = ice_ctx->log;
+   snw_ice_session_t *session;
+   
+   session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
+   if (!session) {
+      WARN(log,"session not found, flowid=%u",flowid);
+      return;
+   }
+
+   WARN(log,"FIXME stop session, flowid=%u",flowid);
+   snw_ice_session_free(ice_ctx,session);
+   return;
+}
+
+
 
 int
 snw_ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
@@ -1870,7 +1942,7 @@ snw_ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
          ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
          ice_agent_remove_stream(session->agent, session->video_stream->stream_id);
          DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->stream_id);
-         ice_stream_free(&session->streams, session->video_stream);
+         ice_stream_free(session->ice_ctx, &session->streams, session->video_stream);
       }
       session->video_stream = NULL;
       session->video_id = 0;
@@ -1891,16 +1963,16 @@ snw_ice_merge_components(snw_ice_session_t *session) {
    DEBUG(log, "removing unneccessary rtcp components");
    //FIXME: compare with pre_do_conncheck
 
-   if(session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
+   if (session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
       ice_agent_attach_recv(session->agent, session->audio_id, 2, NULL, NULL);
-      ice_component_free(&session->audio_stream->components, session->audio_stream->rtcp_component);
+      ice_component_free(session->ice_ctx, &session->audio_stream->components, session->audio_stream->rtcp_component);
       session->audio_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
    }
 
    if(session->video_stream && !list_empty(&session->video_stream->components.list)) {
       ice_agent_attach_recv(session->agent, session->video_id, 2, NULL, NULL);
-      ice_component_free(&session->video_stream->components, session->video_stream->rtcp_component);
+      ice_component_free(session->ice_ctx, &session->video_stream->components, session->video_stream->rtcp_component);
       session->video_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
    }
@@ -1924,7 +1996,7 @@ ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
          ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
          ice_agent_remove_stream(session->agent, session->video_stream->stream_id);
          DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->stream_id);
-         ice_stream_free(&session->streams, session->video_stream);
+         ice_stream_free(session->ice_ctx,&session->streams, session->video_stream);
       }
       session->video_stream = NULL;
       session->video_id = 0;
@@ -1947,14 +2019,16 @@ ice_merge_components(snw_ice_session_t *session) {
 
    if(session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
       ice_agent_attach_recv(session->agent, session->audio_id, 2, NULL, NULL);
-      ice_component_free(&session->audio_stream->components, session->audio_stream->rtcp_component);
+      ice_component_free(session->ice_ctx, &session->audio_stream->components, 
+            session->audio_stream->rtcp_component);
       session->audio_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
    }
 
    if(session->video_stream && !list_empty(&session->video_stream->components.list)) {
       ice_agent_attach_recv(session->agent, session->video_id, 2, NULL, NULL);
-      ice_component_free(&session->video_stream->components, session->video_stream->rtcp_component);
+      ice_component_free(session->ice_ctx, &session->video_stream->components, 
+           session->video_stream->rtcp_component);
       session->video_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
    }

@@ -76,8 +76,8 @@ enum {
 {  ice_log(ICE_LOG_ERROR,"[ICE_ERROR]" FUNCLINE fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
 
 
-typedef void (*ice_log_cb)(int severity, const char *msg);
-void ice_set_log_callback(ice_log_cb cb);
+typedef void (*ice_log_cb)(int severity, const char *msg, void *data);
+void ice_set_log_callback(ice_log_cb cb, void *data);
 void ice_log(int severity, const char* msg, ...);
 
 #ifdef __cplusplus

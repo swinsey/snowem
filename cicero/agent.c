@@ -164,6 +164,27 @@ ice_agent_new(struct event_base *base, IceCompatibility compat, int control_mode
    return agent;
 }
 
+void
+ice_agent_free(agent_t *agent) {
+   struct list_head *n,*p;
+   
+   discovery_free(agent);
+   refresh_free(agent);
+   conn_check_free(agent);
+   
+   list_for_each_safe(n,p,&agent->streams.list) {
+      stream_t *s = list_entry(n,stream_t,list);
+      list_del(&s->list);
+      ice_stream_close(s);
+   }
+
+   event_del(agent->keepalive_timer_ev);
+   agent->keepalive_timer_ev = 0;
+
+
+   return;
+}
+
 int
 ice_agent_add_stream(agent_t *agent, uint32_t n_components) {
    stream_t *stream = NULL;
@@ -222,7 +243,7 @@ ice_agent_attach_recv (agent_t *agent, uint32_t stream_id, uint32_t component_id
    component->io_data = data;
 
    /* Init pseudo_tcp if needed */
-   if ( agent->reliable && func ) {
+   if (agent->reliable && func) {
       /* TODO: init pseudo_tcp */
    }
    
@@ -766,10 +787,10 @@ priv_add_remote_candidate( agent_t *agent, uint32_t stream_id,
   candidate = component_find_remote_candidate(component, addr, transport);
   if (candidate) {
     {
-      char tmpbuf[INET6_ADDRSTRLEN];
+      char tmpbuf[INET6_ADDRSTRLEN] = {0};
       address_to_string (addr, tmpbuf);
       ICE_DEBUG("remote candidate exists, addr=%s:%u, sid=%u, cid=%u,"
-          " username=%s, pass=%s prio=%u", agent, tmpbuf,
+          " username=%s, pass=%s prio=%u", tmpbuf,
           address_get_port (addr), stream_id, component_id,
           username, password, priority);
     }
@@ -1338,15 +1359,15 @@ ice_agent_remove_stream(agent_t *agent, uint32_t stream_id)
         ICE_DEBUG("stream info, sid=%u",s->id);
      }
   }
+  ice_stream_close(stream);
+
   if ( !list_empty(&agent->streams.list) ) {
      /* FIXME: priv_remove_keepalive_timer */
      //priv_remove_keepalive_timer (agent);
   }
-  /* FIXME: stream_free */
-  //stream_free(stream);
 
-  /*agent->streams = g_slist_remove (agent->streams, stream);
-  stream_close (stream);
+
+  /*
   if (!agent->streams)
     priv_remove_keepalive_timer (agent);
   agent_queue_signal (agent, signals[SIGNAL_STREAMS_REMOVED],

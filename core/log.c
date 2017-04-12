@@ -199,4 +199,22 @@ void snw_log_write(snw_log_t *log, uint32_t level, const char* sourcefilename, i
     return;
 }
 
+void 
+snw_log_write_pure(snw_log_t *log, uint32_t level, const char* msg, ...) {
+    if (log == NULL)
+       return;
 
+    if (log->_fd == -1)
+       return;
+
+    if (level >= log->_level) {
+       static char dest[4*1024] = {0};
+       va_list argptr;
+       va_start(argptr, msg);
+       vsnprintf(dest, 4*1024, msg, argptr);
+       va_end(argptr);
+       dprintf(log->_fd, "%s\n", dest);
+    }
+
+    return;
+}

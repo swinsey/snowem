@@ -264,7 +264,7 @@ candidate_ice_priority (const candidate_t *candidate,
 void
 candidate_free(candidate_t *candidate)
 {
-  if ( candidate == NULL )
+  if (candidate == NULL)
      return;
 
   if (candidate->username)

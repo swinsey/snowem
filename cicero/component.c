@@ -43,8 +43,9 @@
  */
 
 
-#include "component.h"
 #include "agent.h"
+#include "component.h"
+#include "network.h"
 
 void
 incoming_check_free(incoming_check_t *icheck)
@@ -259,5 +260,29 @@ component_set_selected_remote_candidate(agent_t *agent,
   return local;
 }
 
+void
+ice_component_close(component_t *c) {
+  struct list_head *n,*p; 
+  socket_t *sock = 0;
+
+  // free local candidates  
+  list_for_each_safe(n,p,&c->local_candidates.list) {
+    candidate_t *c = list_entry(n,candidate_t,list);
+    list_del(&c->list);
+    candidate_free(c);
+  }
+
+  list_for_each_safe(n,p,&c->remote_candidates.list) {
+    candidate_t *c = list_entry(n,candidate_t,list);
+    list_del(&c->list);
+    candidate_free(c);
+  }
+  sock = (socket_t*)c->sock;
+  ICE_DEBUG("component close, fd=%d, sid=%u, cid=%u", sock->fd, c->stream->id, c->id);
+  socket_free(sock);
+
+
+  return;
+}
 
 

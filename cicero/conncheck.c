@@ -2966,5 +2966,10 @@ void conn_check_prune_stream(agent_t *agent, stream_t *stream)
   return;
 }
 
-
+void
+conn_check_free(agent_t *agent) 
+{
+   //FIXME: free conn check
+   return;
+}
 
