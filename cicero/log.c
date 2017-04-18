@@ -41,7 +41,7 @@
 
 int g_verbose = 1;
 int g_log_fd = -1;
-int g_log_level = ICE_LOG_ERROR;
+int g_log_level = ICE_LOG_WARN;
 ice_log_cb g_ice_log_cb = NULL;
 void *g_ice_log_data = NULL;
 
@@ -87,8 +87,8 @@ void
 ice_log(int severity, const char *fmt, ...) {
    char buffer[4*1024] = {0};
    va_list argptr;
-   
-   if (severity >= g_log_level || !g_ice_log_cb)
+
+   if ( g_log_level > severity || !g_ice_log_cb)
       return;
 
    va_start(argptr, fmt);

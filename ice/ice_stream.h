@@ -34,9 +34,9 @@ struct snw_ice_stream {
    char ruser[32];                  /* ice username */
    char rpass[64];                  /* ice password */
 
-   ice_component_t components;      /* list of components */
-   ice_component_t *rtp_component;  /* rtp component */
-   ice_component_t *rtcp_component; /* rtcp component */
+   snw_ice_component_t components;      /* list of components */
+   snw_ice_component_t *rtp_component;  /* rtp component */
+   snw_ice_component_t *rtcp_component; /* rtcp component */
 
    uint8_t cdone:1;
    uint8_t disabled:1;              /* a stream has been disabled or not (e.g., m=audio 0) */

@@ -11,6 +11,8 @@
 #include <string.h>
 #include <vector>
 
+#include "ice.h"
+
 /*! http://www.networksorcery.com/enp/protocol/rtcp.htm */
 typedef enum {
     RTCP_FIR = 192,
@@ -191,7 +193,7 @@ int
 snw_gen_rtcp_remb(char *packet, int len, uint64_t bitrate);
 
 int
-snw_gen_rtcp_fir(char *packet, int len, int *seqnr);
+snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seqnr);
 
 int
 snw_gen_rtcp_fir_legacy(char *packet, int len, int *seqnr);

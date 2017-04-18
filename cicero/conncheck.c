@@ -409,8 +409,8 @@ print_list(candidate_check_pair_t *pair) {
    ICE_DEBUG("list info");
    list_for_each(pos,&pair->list) {
       candidate_check_pair_t *p = list_entry(pos,candidate_check_pair_t,list);
-      ICE_DEBUG("pair info, priority=%lu,local=%s,remote=%s",
-            p->priority,p->local->foundation,p->remote->foundation);
+      ICE_ERROR("pair info, priority=%lu,foundation=%s:%s (%p)",
+            p->priority,p->local->foundation,p->remote->foundation, p->remote);
    }
    return;
 }
@@ -476,6 +476,8 @@ static void priv_add_new_check_pair (agent_t *agent, uint32_t stream_id, compone
     pair->sockptr = (socket_t*) remote->sockptr;
   else
     pair->sockptr = (socket_t*) local->sockptr;
+
+  ICE_ERROR("pair info, foundatation=%s:%s(%p)", local->foundation, remote->foundation, remote);
   snprintf(pair->foundation, ICE_CANDIDATE_PAIR_MAX_FOUNDATION, 
           "%s:%s", local->foundation, remote->foundation);
 
@@ -483,14 +485,17 @@ static void priv_add_new_check_pair (agent_t *agent, uint32_t stream_id, compone
   pair->state = initial_state;
   pair->nominated = use_candidate;
   pair->controlling = agent->controlling_mode;
-
-  ICE_DEBUG("creating new pair, agent=%p, pair=%p,state=%d", agent, pair, initial_state);
+  
+  print_candidate(local,"new pair");
+  print_candidate(remote,"new pair");
+  ICE_ERROR("creating new pair, pair=%p, prio=%lu, rfoundation=%s(%p), state=%d", 
+            pair, pair->priority, remote->foundation,remote, initial_state);
   list_add(&pair->list,&stream->connchecks.list);
   list_sort(NULL,&stream->connchecks.list,conn_check_compare); 
   ICE_DEBUG("conncheck info, size=%u", list_size(&stream->connchecks.list));
   //XXX: modify connchecks list inside list_for_each? check function 'conn_check_remote_candidates_set'
 
-  //print_list(&stream->connchecks);
+  print_list(&stream->connchecks);
   
   ICE_DEBUG("added a new conncheck, agent=%p, pair=%p, foundation=%s, nominated=%u, stream_id=%u", 
          agent, pair, pair->foundation, pair->nominated, stream_id);
@@ -530,8 +535,8 @@ static void priv_conn_check_add_for_candidate_pair_matched(agent_t *agent,
     uint32_t stream_id, component_t *component, candidate_t *local,
     candidate_t *remote, IceCheckState initial_state)
 {
-  ICE_DEBUG("Adding check pair, agent=%p, local=%s, ltranpsort=%u, remote=%s, rtransport=%u", 
-        agent, local->foundation, local->transport, remote->foundation, remote->transport);
+  ICE_ERROR("Adding check pair, agent=%p, local=%s, ltranpsort=%u, remote=%s(%p), rtransport=%u", 
+        agent, local->foundation, local->transport, remote->foundation, remote, remote->transport);
 
   priv_add_new_check_pair(agent, stream_id, component, local, remote, initial_state, 0);
 
@@ -559,8 +564,8 @@ conn_check_add_for_candidate_pair(agent_t *agent,
   if ( local == NULL || remote == NULL )
      return ICE_ERR;
 
-  ICE_DEBUG("Checking pair, agent=%p, local=%s, remote=%s", agent,
-      local->foundation, remote->foundation);
+  ICE_ERROR("Checking pair, agent=%p, local=%s, remote=%s(%p)", agent,
+      local->foundation, remote->foundation, remote);
 
   /* note: do not create pairs where the local candidate is
    *       a srv-reflexive (ICE 5.7.3. "Pruning the pairs" ID-9) */
@@ -580,6 +585,8 @@ conn_check_add_for_candidate_pair(agent_t *agent,
   /* note: match pairs only if transport and address family are the same */
   if (local->transport == conn_check_match_transport (remote->transport) &&
      local->addr.s.addr.sa_family == remote->addr.s.addr.sa_family) {
+    ICE_ERROR("Checking pair, agent=%p, local=%s, remote=%s(%p)", agent,
+              local->foundation, remote->foundation, remote);
     priv_conn_check_add_for_candidate_pair_matched(agent, stream_id, component,
         local, remote, ICE_CHECK_FROZEN);
     ret = ICE_OK;
@@ -613,7 +620,8 @@ conn_check_add_for_candidate(agent_t *agent, uint32_t stream_id,
       return ICE_ERR;
    }
 
-   ICE_DEBUG("candidate info, stream_id=%d",stream_id);
+   ICE_ERROR("remote candidate info, stream_id=%d, foundation=%s(%p)",
+             stream_id, remote->foundation, remote);
    
    list_for_each(pos,&component->local_candidates.list) {
       candidate_t *local = list_entry(pos,candidate_t,list);
@@ -642,6 +650,8 @@ conn_check_add_for_local_candidate(agent_t *agent,
   
   list_for_each(pos,&component->remote_candidates.list) {
     candidate_t *remote = list_entry(pos,candidate_t,list);
+    ICE_ERROR("remote candidate info, stream_id=%d, foundation=%s(%p)",
+             stream_id, remote->foundation, remote);
     ret = conn_check_add_for_candidate_pair(agent, stream_id, component, local, remote);
     ICE_DEBUG("check new pair, ret=%d",ret);
     if (ret == ICE_OK) {
@@ -839,12 +849,15 @@ priv_update_selected_pair(agent_t *agent, component_t *component, candidate_chec
    if ( agent == NULL || component == NULL )
       return ICE_ERR;
        
-   if (pair->priority > component->selected_pair.priority &&
-       component_find_pair(component, agent, pair->local->foundation,
-       pair->remote->foundation, &cpair) == ICE_OK) {
-
-      ICE_DEBUG("Agent %p : changing SELECTED PAIR for component %u: %s:%s (prio:%lu)", 
-                agent, component->id, pair->local->foundation, pair->remote->foundation, pair->priority);
+   if (pair->priority > component->selected_pair.priority 
+       && component_find_pair(component, agent, pair->local->foundation,
+       pair->remote->foundation, &cpair) == ICE_OK ) {
+      
+      print_candidate(cpair.local, "local update pair"); 
+      print_candidate(cpair.remote,"remote update pair"); 
+      ICE_ERROR("Agent %p : changing SELECTED PAIR for component %u: %s:%s ,prio:%lu>%lu, cpair=%lu)", 
+                agent, component->id, pair->local->foundation, pair->remote->foundation, 
+                pair->priority, component->selected_pair.priority, cpair.priority);
 
       component_update_selected_pair(component, &cpair);
       priv_conn_keepalive_tick_unlocked(agent);
@@ -988,8 +1001,11 @@ priv_mark_pair_nominated(agent_t *agent, stream_t *stream,
       /* XXX: hmm, how to figure out to which local candidate the 
        *      check was sent to? let's mark all matching pairs
        *      as nominated instead */
-      ICE_DEBUG("checking pair nominated, foundation=%s,remote=%p,remotecand=%p", 
-                pair->foundation, pair->remote, remotecand);
+      ICE_DEBUG("checking pair nominated, foundation=%s,remote=%p,remotecand=%p, prio=%lu", 
+                pair->foundation, pair->remote, remotecand, pair->priority);
+      //ICE_ERROR("remote cand info, foundation=%s(%p)", pair->remote->foundation, pair->remote);
+      print_candidate(pair->local, "local mark pair");
+      print_candidate(pair->remote, "remote mark pair");
       if (pair->remote == remotecand) {
          ICE_DEBUG("marking pair as nominated, agent=%p, pair=%p, foundation=%s, state=%u", 
                agent, pair, pair->foundation, pair->state);
@@ -1100,7 +1116,7 @@ priv_schedule_triggered_check(agent_t *agent, stream_t *stream, component_t *com
   }
 
   if (i) {
-    ICE_DEBUG("Agent %p : Adding a triggered check to conn.check list (local=%p).", agent, local);
+    ICE_ERROR("Agent %p : Adding a triggered check to conn.check list (local=%p).", agent, local);
     priv_add_new_check_pair(agent, stream->id, component, 
           local, remote_cand, ICE_CHECK_WAITING, use_candidate);
     return ICE_TRUE;
@@ -1142,8 +1158,8 @@ priv_preprocess_conn_check_pending_data(agent_t *agent, stream_t *stream,
       ICE_DEBUG("compare, local_socket=%p, sockptr=%p",icheck->local_socket,pair->sockptr);
       if (address_equal(&icheck->from, &pair->remote->addr) &&
           icheck->local_socket == pair->sockptr) {
-         ICE_DEBUG("Updating stored early-icheck , agent=%p, pair=%p, check=%p, sid=%u, cid=%u", 
-               agent, pair, icheck, stream->id, component->id);
+         ICE_ERROR("Updating stored early-icheck , agent=%p, pair=%p, check=%p, sid=%u, cid=%u, use_candidate=%u", 
+               agent, pair, icheck, stream->id, component->id, icheck->use_candidate);
          if (icheck->use_candidate) {
 	         priv_mark_pair_nominated(agent, stream, component, pair->remote);
          }
@@ -1306,15 +1322,18 @@ conn_check_remote_candidates_set(agent_t *agent)
                                  icheck->local_socket,
                                  local_candidate, remote_candidate);
                   if (candidate) {
-                     ICE_DEBUG("add conn check, local_candidate=%p, transport=%u",local_candidate,local_candidate->transport);
-                     if (local_candidate && local_candidate->transport == ICE_CANDIDATE_TRANSPORT_TCP_PASSIVE)
+                     if (local_candidate && local_candidate->transport == ICE_CANDIDATE_TRANSPORT_TCP_PASSIVE) {
+                        ICE_ERROR("add conn check, foundation=%s(%p)",candidate->foundation, candidate);
+                        print_candidate(candidate,"discovery remote");
                         priv_conn_check_add_for_candidate_pair_matched (agent, stream->id, component, 
                                  local_candidate, candidate, ICE_CHECK_DISCOVERED);
-                     else
+                     } else {
+                        ICE_ERROR("add conn check, foundation=%s(%p)",candidate->foundation, candidate);
                         conn_check_add_for_candidate (agent, stream->id, component, candidate);
+                     }
                      
-                     ICE_DEBUG("conncheck info, size=%u", list_size(&stream->connchecks.list));
-                     ICE_DEBUG("use_candidate=%u",icheck->use_candidate);
+                     ICE_ERROR("conncheck info, size=%u, use_candidate=%u", 
+                               list_size(&stream->connchecks.list), icheck->use_candidate);
                      if (icheck->use_candidate)
                         priv_mark_pair_nominated(agent, stream, component, candidate);
                      priv_schedule_triggered_check(agent, stream, component, 
@@ -2037,7 +2056,7 @@ priv_reply_to_conn_check(agent_t *agent, stream_t *stream, component_t *componen
   ICE_HEXDUMP(rbuf,(int)rbuf_len,"rsp");
 
   //g_assert (rcand == NULL || nice_address_equal(&rcand->addr, toaddr) == ICE_TRUE);
-  if ( rcand != NULL && address_equal(&rcand->addr, toaddr) != ICE_TRUE ) {
+  if (rcand != NULL && address_equal(&rcand->addr, toaddr) != ICE_TRUE) {
      ICE_ERROR("not reply to conncheck");
      return;
   }
@@ -2199,6 +2218,7 @@ priv_add_peer_reflexive_pair(agent_t *agent, uint32_t stream_id, uint32_t compon
   pair = ICE_MALLOC(candidate_check_pair_t);
   if ( pair == NULL )
      return NULL;
+  ICE_MEMZERO(pair,candidate_check_pair_t);
 
   stream = agent_find_stream(agent, stream_id);
   if ( stream == NULL )
@@ -2211,10 +2231,11 @@ priv_add_peer_reflexive_pair(agent_t *agent, uint32_t stream_id, uint32_t compon
   pair->remote = parent_pair->remote;
   pair->sockptr = (socket_t*)local_cand->sockptr;
   pair->state = ICE_CHECK_DISCOVERED;
-  ICE_DEBUG("Agent %p : pair %p state DISCOVERED", agent, pair);
+  ICE_ERROR("new reflexive peer pair, foundation=%s(%p)", pair->remote->foundation, pair->remote);
   snprintf (pair->foundation, ICE_CANDIDATE_PAIR_MAX_FOUNDATION, "%s:%s",
       local_cand->foundation, parent_pair->remote->foundation);
-  if (agent->controlling_mode == ICE_TRUE)
+  //if (agent->controlling_mode == ICE_TRUE)
+  if (agent->controlling_mode)
     pair->priority = candidate_pair_priority(pair->local->priority,
         pair->remote->priority);
   else
@@ -2222,7 +2243,7 @@ priv_add_peer_reflexive_pair(agent_t *agent, uint32_t stream_id, uint32_t compon
         pair->local->priority);
   pair->nominated = ICE_FALSE;
   pair->controlling = agent->controlling_mode;
-  ICE_DEBUG("Agent %p : added a new peer-discovered pair with foundation of '%s'.",  agent, pair->foundation);
+  ICE_ERROR("added a new peer-discovered pair, f=%s, prio=%lu", pair->foundation, pair->priority);
 
   //stream->conncheck_list = g_slist_insert_sorted (stream->conncheck_list, pair,
   //    (GCompareFunc)conn_check_compare);
@@ -2284,7 +2305,10 @@ priv_process_response_check_for_peer_reflexive(agent_t *agent, stream_t *stream,
     /* note: this is same as "adding to VALID LIST" in the spec
        text */
     p->state = ICE_CHECK_SUCCEEDED;
-    ICE_DEBUG("Agent %p : conncheck %p SUCCEEDED.", agent, p);
+    ICE_ERROR("Agent %p : conncheck %p SUCCEEDED.", agent, p);
+    ICE_ERROR("remote info, foundation=%s(%p)", p->remote->foundation, p->remote);
+    //print_candidate(p->local,"local succeeded");
+    //print_candidate(p->remote,"remote succeeded");
     priv_conn_check_unfreeze_related(agent, stream, p);
   }
   else {
@@ -2302,9 +2326,10 @@ priv_process_response_check_for_peer_reflexive(agent_t *agent, stream_t *stream,
     /* step: add a new discovered pair (see RFC 5245 7.1.3.2.2
 	       "Constructing a Valid Pair") */
     new_pair = priv_add_peer_reflexive_pair (agent, stream->id, component->id, cand, p);
-    ICE_DEBUG("Agent %p : conncheck %p FAILED, %p DISCOVERED.", agent, p, new_pair);
+    ICE_ERROR("Agent %p : conncheck %p FAILED, %p DISCOVERED.", agent, p, new_pair);
   }
 
+  ICE_ERROR("return pair, foundation=%s(%p)", new_pair->remote->foundation, new_pair->remote);
   return new_pair;
 }
 
@@ -2391,6 +2416,7 @@ priv_map_reply_to_conn_check_request(agent_t *agent, stream_t *stream, component
                 " conncheck %p SUCCEEDED, nominated=%u.", agent, p, p->nominated);
             priv_conn_check_unfreeze_related(agent, stream, p);
           } else {
+            ICE_ERROR("response check, foundation=%s(%p)",remote_candidate->foundation, remote_candidate);
             ok_pair = priv_process_response_check_for_peer_reflexive (agent,
                 stream, component, p, sockptr, &sockaddr.addr,
                 local_candidate, remote_candidate);
@@ -2402,8 +2428,8 @@ priv_map_reply_to_conn_check_request(agent_t *agent, stream_t *stream, component
 
           /* step: updating nominated flag (ICE 7.1.2.2.4 "Updating the
              Nominated Flag" (ID-19) */
-          ICE_DEBUG("pair info, p=%p,  nominated=%u", ok_pair, ok_pair->nominated);
           if (ok_pair->nominated == ICE_TRUE) {
+            ICE_ERROR("pair info, p=%p,  nominated=%u", ok_pair, ok_pair->nominated);
             priv_update_selected_pair(agent, component, ok_pair);
 
             /* Do not step down to CONNECTED if we're already at state READY*/
@@ -2548,6 +2574,9 @@ priv_map_reply_to_keepalive_conncheck (agent_t *agent,
   StunTransactionId response_id;
   stun_message_id (resp, response_id);
 
+  ICE_DEBUG("component info, state=%u(%u), sid=%u, cid=%u, agent=%p", 
+            component->state, ICE_COMPONENT_STATE_DISCONNECTED, 
+            component->stream->id, component->id, agent);
   if (component->selected_pair.keepalive.stun_message.buffer) {
       stun_message_id (&component->selected_pair.keepalive.stun_message,
           conncheck_id);
@@ -2851,18 +2880,23 @@ conn_check_handle_inbound_stun(agent_t *agent, stream_t *stream,
             agent_signal_initial_binding_request_received(agent, stream);
 
          if (!list_empty(&component->remote_candidates.list) && remote_candidate == NULL) {
-            ICE_DEBUG("Agent %p : No matching remote candidate for incoming check ->"
+            ICE_ERROR("Agent %p : No matching remote candidate for incoming check ->"
                   "peer-reflexive candidate.", agent);
             remote_candidate = discovery_learn_remote_peer_reflexive_candidate(
                      agent, stream, component, priority, from, nicesock, local_candidate,
                      remote_candidate2 ? remote_candidate2 : remote_candidate);
 
             if(remote_candidate) {
-                if (local_candidate && local_candidate->transport == ICE_CANDIDATE_TRANSPORT_TCP_PASSIVE)
+                if (local_candidate && local_candidate->transport == ICE_CANDIDATE_TRANSPORT_TCP_PASSIVE) {
+                   ICE_ERROR("add conn check, foundation=%s(%p)",remote_candidate->foundation, remote_candidate);
+                   print_candidate(remote_candidate,"discovery remote");
                    priv_conn_check_add_for_candidate_pair_matched (agent, stream->id, 
                           component, local_candidate, remote_candidate, ICE_CHECK_DISCOVERED);
-                else
+                } else {
+                   ICE_ERROR("add conn check, foundation=%s(%p)",remote_candidate->foundation, remote_candidate);
+                   print_candidate(remote_candidate,"discovery remote");
                    conn_check_add_for_candidate(agent, stream->id, component, remote_candidate);
+                }
             }
          }
 

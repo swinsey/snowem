@@ -72,8 +72,15 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int type, int video, char 
    ice_ctx = session->ice_ctx;
    log = ice_ctx->log;
 
+   DEBUG(log, "broadcast session, flowid=%u, players=%u %u %u %u %u", 
+         session->flowid,
+         session->channel->players[0],
+         session->channel->players[1],
+         session->channel->players[2],
+         session->channel->players[3],
+         session->channel->players[4]);
 
-   for(int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
+   for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
      
       if (session->channel->players[i] != 0) {
 

@@ -675,9 +675,15 @@ snw_gen_rtcp_remb(char *packet, int len, uint64_t bitrate) {
 	return 24;
 }
 
-int snw_gen_rtcp_fir(char *packet, int len, int *seqnr) {
+int snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seqnr) {
+   snw_log_t *log = 0;
+
+   if (!ice_ctx) return -1;
+   log = ice_ctx->log;
+
 	if(packet == NULL || len != 20 || seqnr == NULL)
 		return -1;
+
    memset(packet, 0, len);
 	rtcp_header *rtcp = (rtcp_header *)packet;
 	*seqnr = *seqnr + 1;
@@ -692,7 +698,7 @@ int snw_gen_rtcp_fir(char *packet, int len, int *seqnr) {
 	rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
 	rtcp_fir *fir = (rtcp_fir *)rtcpfb->fci;
 	fir->seqnr = htonl(*seqnr << 24);	/* FCI: Sequence number */
-	ICE_DEBUG2("[FIR] seqnr=%d (%d bytes)\n", *seqnr, 4*(ntohs(rtcp->length)+1));
+	WARN(log, "[FIR] seqnr=%d (%d bytes)", *seqnr, 4*(ntohs(rtcp->length)+1));
 	return 20;
 }
 

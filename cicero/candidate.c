@@ -325,7 +325,7 @@ candidate_copy(const candidate_t *candidate)
 }
 
 void
-print_candidate(candidate_t *c) 
+print_candidate(candidate_t *c, char *msg) 
 {
    char temp[INET6_ADDRSTRLEN] = {0};
    if ( c == NULL )
@@ -333,8 +333,8 @@ print_candidate(candidate_t *c)
 
    address_to_string(&c->addr,temp);
 
-   ICE_DEBUG("candidate info, addr=%s, port=%u foundation=%s, type=%u",
-         temp,address_get_port((const address_t*)&c->addr),c->foundation,c->type);
+   ICE_DEBUG("candidate info %s, addr=%s, port=%u foundation=%s, prio=%u, type=%u",
+         msg, temp,address_get_port((const address_t*)&c->addr),c->foundation,c->priority, c->type);
 
    return;
 }

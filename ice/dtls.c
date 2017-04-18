@@ -98,10 +98,14 @@ int srtp_setup(char *server_pem, char *server_key) {
 }
 
 dtls_ctx_t *
-srtp_context_new(void *component, int role) {
+srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
+   snw_log_t *log = 0;
    dtls_ctx_t *dtls = NULL;
 
-   ICE_DEBUG2("create DTLS/SRTP, role=%d", role);
+   if (!ice_ctx) return 0;
+   log = ice_ctx->log;
+
+   DEBUG(log, "create DTLS/SRTP, role=%d", role);
 
    dtls = (dtls_ctx_t*)malloc(sizeof(dtls_ctx_t));
    if (dtls == NULL) {
@@ -198,7 +202,7 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
 }
 
 void
-ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) {
+ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *component) {
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
 
@@ -216,7 +220,7 @@ ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) 
       if (s->disabled)
          continue;
       list_for_each(p,&s->components.list) {
-         ice_component_t *c = list_entry(p,ice_component_t,list);
+         snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
          DEBUG(log, "checking component, sid=%u, cid=%u",s->stream_id, c->component_id);
          if (!c->dtls || !c->dtls->srtp_valid) {
             DEBUG(log, "component not ready, sid=%u, cid=%u",s->stream_id, c->component_id);
@@ -232,7 +236,7 @@ ice_srtp_handshake_done(snw_ice_session_t *session, ice_component_t *component) 
 
 int
 srtp_dtls_setup(dtls_ctx_t *dtls) {
-   ice_component_t *component = NULL;
+   snw_ice_component_t *component = NULL;
    snw_ice_stream_t *stream = NULL;
    snw_ice_session_t *session = NULL;
 
@@ -240,7 +244,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
       return -1;
    }
 
-   component = (ice_component_t *)dtls->component;
+   component = (snw_ice_component_t *)dtls->component;
    if(component == NULL) {
       return -2;
    }
@@ -465,7 +469,7 @@ void srtp_callback(const SSL *ssl, int where, int ret) {
       return;
    }
 
-   ice_component_t *component = (ice_component_t*)dtls->component;
+   snw_ice_component_t *component = (snw_ice_component_t*)dtls->component;
    if (component == NULL) {
       ICE_ERROR2("no ice component, where=%d, ret=%d", where, ret);
       return;
@@ -496,7 +500,7 @@ int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
 
 int srtp_send_data(dtls_ctx_t *dtls) {
    snw_ice_session_t *session = NULL;
-   ice_component_t *component = NULL;
+   snw_ice_component_t *component = NULL;
    snw_ice_stream_t *stream = NULL;
    int pending = 0;
 
@@ -504,7 +508,7 @@ int srtp_send_data(dtls_ctx_t *dtls) {
       return -1;
    }
 
-   component = (ice_component_t *)dtls->component;
+   component = (snw_ice_component_t *)dtls->component;
    if (component == NULL) {
       return -2;
    }
@@ -727,4 +731,11 @@ long dtls_bio_filter_ctrl(BIO *bio, int cmd, long num, void *ptr) {
          ICE_DEBUG2("dtls_bio_filter_ctrl: %d", cmd);
    }
    return 0;
+}
+
+
+void
+srtp_destroy(dtls_ctx_t *dtls) {
+   //FIXME: impl
+   return;
 }

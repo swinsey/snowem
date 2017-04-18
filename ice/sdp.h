@@ -46,7 +46,7 @@ snw_ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate/*, 
 
 void 
 snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream, 
-      ice_component_t *component, candidate_t *candidate);
+      snw_ice_component_t *component, candidate_t *candidate);
 
 candidate_t*
 snw_ice_remote_candidate_new(char *type, char *transport);

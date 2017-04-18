@@ -30,6 +30,7 @@ add_executable(snowsvr ${sources})
 
 # Just for example add some compiler flags.
 target_compile_options(snowsvr PUBLIC -g -Wall)
+#add_definitions(-DBASE_FILE_NAME="$(<F)")
 
 # This allows to include files relative to the root of the src directory with a <> pair
 target_include_directories(snowsvr PUBLIC . jsoncpp core ice modules)

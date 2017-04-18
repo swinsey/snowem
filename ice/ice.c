@@ -167,8 +167,8 @@ snw_ice_log_cb(int severity, const char *msg, void *data) {
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
-   //snw_log_write_pure(log,SNW_DEBUG,"%s",msg);
-   DEBUG(log,"%s",msg);
+   snw_log_write_pure(log,SNW_ERROR,"%s",msg);
+   //DEBUG(log,"%s",msg);
    return; 
 }
 
@@ -258,18 +258,15 @@ ice_rtp_established(snw_ice_session_t *session) {
    log = ice_ctx->log;
    ctx = (snw_context_t*)ice_ctx->ctx;
 
-
-   DEBUG(log, "ice_rtp_established, flowid=%u", session->flowid);
-
+   WARN(log, "ice_rtp_established, flowid=%u", session->flowid);
    if ( IS_FLAG(session,ICE_SUBSCRIBER) ) {
       DEBUG(log, "send fir req");
-      root["cmd"] = SNW_ICE;
+      //FIXME: request fir 
+      /*root["cmd"] = SNW_ICE;
       root["subcmd"] = SNW_ICE_FIR;
       root["flowid"] = session->flowid;
-
       output = writer.write(root);
-      //enqueue_msg_to_mcd(output.c_str(),output.size(),session->flowid);
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
+      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);*/
    } else if IS_FLAG(session,ICE_PUBLISHER) {
       // start recording a stream.
       /*char filename[256];
@@ -292,14 +289,13 @@ ice_rtp_established(snw_ice_session_t *session) {
    output = writer.write(notify);
    snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
 
-
    return;
 }
 
 void
 snw_ice_init_log(snw_context_t *ctx) {
    /*TODO: get log file from config*/  
-   ctx->log = snw_log_init("./ice.log",0,0,0);
+   ctx->log = snw_log_init("./ice.log",SNW_WARN,0,0);
    if (ctx->log == 0) {
       exit(-1);   
    }

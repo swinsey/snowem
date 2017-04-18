@@ -67,13 +67,13 @@ enum {
 
 #endif*/
 
-#define FUNCLINE "%s:%u: "
+#define ICE_FUNCLINE "%s:%u"
 #define ICE_INFO(fmt, ...) \
-{  ice_log(ICE_LOG_INFO,"[ICE_INFO]" FUNCLINE fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
+{  ice_log(ICE_LOG_INFO, ICE_FUNCLINE "[ICE_INFO]: " fmt , __FUNCTION__,__LINE__, ##__VA_ARGS__); }
 #define ICE_DEBUG(fmt, ...) \
-{  ice_log(ICE_LOG_DEBUG,"[ICE_DEBUG]" FUNCLINE fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
+{  ice_log(ICE_LOG_DEBUG, ICE_FUNCLINE "[ICE_DEBUG]: " fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
 #define ICE_ERROR(fmt, ...) \
-{  ice_log(ICE_LOG_ERROR,"[ICE_ERROR]" FUNCLINE fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
+{  ice_log(ICE_LOG_ERROR, ICE_FUNCLINE "[ICE_ERROR]: " fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
 
 
 typedef void (*ice_log_cb)(int severity, const char *msg, void *data);

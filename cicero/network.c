@@ -146,7 +146,7 @@ socket_udp_read_cb(evutil_socket_t fd, short what, void *ctx)
    print_address(fromaddr);
 
    //FIXME: check order of udp packets or force no-udp-fragment?
-   if ( is_stun_message((uint8_t*)buf,recvlen,1) > 0 ) {
+   if (is_stun_message((uint8_t*)buf,recvlen,1) > 0) {
       ret = stun_recv_message(sock,fromaddr,buf,recvlen);
       if ( ret < 0 ) {
          ICE_ERROR("failed to recv stun msg");
@@ -157,7 +157,7 @@ socket_udp_read_cb(evutil_socket_t fd, short what, void *ctx)
       stream_t *s = (stream_t*)sock->stream;
       component_t *c = (component_t*)sock->component;
       if (c->io_callback) {
-         ICE_ERROR("call io callback, cid=%u",c->id);
+         //ICE_ERROR("call io callback, cid=%u",c->id);
          //ice_data_recv_cb
          c->io_callback(agent,s->id,c->id,buf,recvlen,c->io_data);
       } else {

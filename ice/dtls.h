@@ -6,6 +6,8 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include "ice.h"
+
 /* DTLS stuff */
 #define DTLS_CIPHERS "ALL:NULL:eNULL:aNULL"
 
@@ -63,7 +65,12 @@ int srtp_setup(char *server_pem, char *server_key);
 SSL_CTX *srtp_get_ssl_ctx(void);
 char *srtp_get_local_fingerprint(void);
 
-dtls_ctx_t *srtp_context_new(void *component, int role);
+dtls_ctx_t*
+srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role);
+
+void
+srtp_destroy(dtls_ctx_t *dtls);
+
 void srtp_do_handshake(dtls_ctx_t *dtls);
 int srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len);
 void srtp_context_free(dtls_ctx_t *dtls);

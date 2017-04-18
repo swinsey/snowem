@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 #define LAST_SEQS_MAX_LEN 160
-struct ice_component {
+struct snw_ice_component {
    snw_ice_stream_t *stream;
    uint32_t stream_id;
    uint32_t component_id;
@@ -47,17 +47,17 @@ struct ice_component {
 void
 snw_component_mempool_init(snw_ice_context_t *ctx);
 
-ice_component_t*
+snw_ice_component_t*
 snw_component_allocate(snw_ice_context_t *ctx);
 
 void
-snw_component_deallocate(snw_ice_context_t *ctx, ice_component_t* p);
+snw_component_deallocate(snw_ice_context_t *ctx, snw_ice_component_t* p);
 
-ice_component_t*
-snw_component_find(ice_component_t *head, uint32_t id);
+snw_ice_component_t*
+snw_component_find(snw_ice_component_t *head, uint32_t id);
 
 void
-snw_component_insert(ice_component_t *head, ice_component_t *item);
+snw_component_insert(snw_ice_component_t *head, snw_ice_component_t *item);
 
 #ifdef __cplusplus
 }
