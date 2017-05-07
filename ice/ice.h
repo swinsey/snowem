@@ -26,7 +26,6 @@ struct snw_ice_api {
    struct list_head list;
    uint32_t         api;
    snw_ice_handlers handlers;
-   //void  (*handler)(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid);
 };
 
 

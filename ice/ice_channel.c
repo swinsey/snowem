@@ -61,7 +61,7 @@ snw_ice_channel_get(snw_ice_context_t *ctx, uint32_t id, int *is_new) {
 
    if (so == 0) return 0;
 
-   if (!is_new) return so;
+   if (!(*is_new)) return so;
 
    // reset new channel
    memset(so, 0, sizeof(snw_ice_channel_t));

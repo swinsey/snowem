@@ -35,6 +35,8 @@ snw_conf_init(snw_context_t *ctx, const char *file) {
    ctx->wss_port = from_str<uint16_t>(page["root\\websocket\\bind_port"]);
    ctx->wss_ip = strdup(page["root\\websocket\\bind_ip"].c_str());
 
+   ctx->log_level = from_str<uint16_t>(page["root\\log\\log_level"]);
+
    const vector<string> &module_list = page.GetDomains("root\\modules");
    unsigned int module_num = module_list.size();
    for ( unsigned int i = 0; i < module_num; i++) {
@@ -118,7 +120,6 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
       ERROR(log, "json format error, data=%s", data);
    }
 
-
    return 0;
 }
 
@@ -186,9 +187,7 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
        len,
        len - sizeof(snw_event_t));
 
-
    snw_core_process_msg(ctx,&conn,buffer+sizeof(snw_event_t),len-sizeof(snw_event_t));
-
    return 0;
 }
 
@@ -275,14 +274,13 @@ snw_main_process(snw_context_t *ctx) {
    if (ctx == 0)
       return;
 
-
    ctx->ev_base = event_base_new();
    if (ctx->ev_base == 0) {
       exit(-2);
    }
 
    /*initialize main log*/
-   ctx->log = snw_log_init("./main.log",0,0,0);
+   ctx->log = snw_log_init("./main.log",ctx->log_level,0,0);
    if (ctx->log == 0) {
       exit(-1);   
    }

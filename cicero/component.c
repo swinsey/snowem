@@ -143,7 +143,7 @@ component_update_selected_pair (component_t *component, const candidate_pair_t *
   if ( component == NULL || pair == NULL )
      return;
 
-  ICE_ERROR("setting SELECTED PAIR for component, cid=%u, lfoundation=%s, rfoundation=%s ,prio:%lu", 
+  ICE_DEBUG("setting SELECTED PAIR for component, cid=%u, lfoundation=%s, rfoundation=%s ,prio:%lu", 
       component->id, pair->local->foundation,
       pair->remote->foundation, pair->priority);
 
@@ -165,8 +165,6 @@ component_update_selected_pair (component_t *component, const candidate_pair_t *
   component->selected_pair.remote = pair->remote;
   component->selected_pair.priority = pair->priority;
 
-  ICE_ERROR("SELECTED PAIR info, cid=%u, prio:%lu", 
-      component->id, component->selected_pair.priority);
   return;
 }
 
@@ -183,13 +181,9 @@ component_find_pair(component_t *cmp, agent_t *agent, const char *lfoundation,
   struct list_head *i;
   candidate_pair_t result = { 0, };
 
-  ICE_ERROR("find component pair, lfoundation=%s,rfoundation=%s",
-        lfoundation,rfoundation);
-
   list_for_each(i,&cmp->local_candidates.list) {
     candidate_t *candidate = list_entry(i,candidate_t,list);
     if (strncmp(candidate->foundation, lfoundation, ICE_CANDIDATE_MAX_FOUNDATION) == 0) {
-      ICE_ERROR("found local candidate, f=%s, prio=%u",candidate->foundation, candidate->priority);
       result.local = candidate;
       break;
     }
@@ -197,15 +191,7 @@ component_find_pair(component_t *cmp, agent_t *agent, const char *lfoundation,
 
   list_for_each(i,&cmp->remote_candidates.list) {
     candidate_t *candidate = list_entry(i,candidate_t,list);
-    //if (strncmp (candidate->foundation, rfoundation, ICE_CANDIDATE_MAX_FOUNDATION) == 0) {
-      ICE_ERROR("test found remote candidate, f=%s, prio=%u",candidate->foundation, candidate->priority);
-    //}
-  }
-
-  list_for_each(i,&cmp->remote_candidates.list) {
-    candidate_t *candidate = list_entry(i,candidate_t,list);
     if (strncmp (candidate->foundation, rfoundation, ICE_CANDIDATE_MAX_FOUNDATION) == 0) {
-      ICE_ERROR("found remote candidate, f=%s, prio=%u",candidate->foundation, candidate->priority);
       result.remote = candidate;
       break;
     }
@@ -244,7 +230,6 @@ component_set_selected_remote_candidate(agent_t *agent,
       continue;
 
     tmp_prio = agent_candidate_pair_priority (agent, tmp, candidate);
-    print_candidate(candidate,"component_set_selected_remote_candidate");
     ICE_DEBUG("computing priority, temp=%lu, prio=%lu",tmp_prio,priority);
     if (tmp_prio > priority) {
       priority = tmp_prio;

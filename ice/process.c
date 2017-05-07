@@ -183,12 +183,16 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
    std::string output;
    int is_new = 0;
 
+
+   //FIXME: mechanism of channel (de)allocation 
    channel = (snw_ice_channel_t*)snw_ice_channel_get(ice_ctx,flowid,&is_new);
 
    try {
       if (!channel || !is_new) {
          root["rc"] = -1;
          output = writer.write(root);
+         DEBUG(log,"failed to create ice channel, flowid=%u, is_new=%u, len=%u, res=%s", 
+               flowid, is_new, output.size(), output.c_str());
          snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
          return;
       }
@@ -199,7 +203,7 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
       output = writer.write(root);
 
       DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
-                ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
+            ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
 
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    } catch (...) {
@@ -452,8 +456,6 @@ snw_ice_cb_new_remote_candidate(agent_t *agent, uint32_t stream_id,
       candidate_t *c = list_entry(tmp,candidate_t,list);
       if(candidate == NULL) {
          if(!strcasecmp(c->foundation, foundation)) {
-            DEBUG(log, "found candidate");
-            print_candidate(c, "found cand");
             candidate = c;
             continue;
          }
@@ -855,7 +857,7 @@ snw_ice_rtp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, rt
          snw_ice_seq_append(last_seqs, seq_obj);
          last_seqs_len++;
          if ( seq_obj->state == SEQ_MISSING ) {
-            ERROR(log, "missing packet, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
+            WARN(log, "missing packet, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
                cur_seqn,new_seqn,last_seqs_len);
          }
       }
@@ -911,8 +913,8 @@ snw_ice_rtp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, rt
 
    if (component->nack_sent_recent_cnt &&
        now - component->nack_sent_log_ts > 5 * ICE_USEC_PER_SEC) {
-      DEBUG(log, "sent NACKs for %u missing packets\n",
-      component->nack_sent_recent_cnt);
+      ERROR(log, "sent NACKs for %u missing packets",
+            component->nack_sent_recent_cnt);
       component->nack_sent_recent_cnt = 0;
       component->nack_sent_log_ts = now;
    }
@@ -1393,8 +1395,6 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    agent = (agent_t*)ice_agent_new(session->base,ICE_COMPATIBILITY_RFC5245,0);
    if (!agent) return -1;
 
-   DEBUG(log,"Creating ICE agent, flowid=%u, agent=%p", session->flowid, agent);
-
    // set callbacks and handler for ice protocols
    ice_set_candidate_gathering_done_cb(agent, snw_ice_cb_candidate_gathering_done, session);
    ice_set_new_selected_pair_cb(agent, snw_ice_cb_new_selected_pair, session);
@@ -1407,7 +1407,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    session->streams_num = 0;
    session->controlling = 0;//ice_ctx->ice_lite_enabled;
 
-   WARN(log,"Creating ICE agent, flowid=%u, ice_lite=%u, controlling=%u",
+   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, controlling=%u",
          session->flowid, ice_ctx->ice_lite_enabled, session->controlling);
 
    ret = snw_ice_add_local_addresses(session);
@@ -1543,7 +1543,7 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    }
 
    if (!is_new) {
-      ERROR(log,"old session, flowid=%u",session->flowid);
+      ERROR(log,"old session, flowid=%u, ice_ctx=%p",session->flowid, session->ice_ctx);
       return;
    }
 
@@ -1808,8 +1808,6 @@ ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_s
    }
 
    if (d) {
-      ERROR(log, "stream cleaned, flowid=%u, sid=%u", 
-             stream->session->flowid, stream->stream_id);
       ice_stream_cleanup(ice_ctx, d);
    } else {
       ERROR(log, "stream not found, sid=%u", stream->stream_id);
@@ -1912,7 +1910,7 @@ snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid)
       return;
    }
 
-   WARN(log,"FIXME stop session, flowid=%u",flowid);
+   WARN(log,"stop session, flowid=%u",flowid);
    snw_ice_session_free(ice_ctx,session);
    return;
 }
@@ -2534,7 +2532,7 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       return;
    }
 
-   DEBUG(log, "get ice msg, data=%s", data);
+   DEBUG(log, "get ice msg, flowid=%u, data=%s", flowid, data);
    try {
       msgtype = root["msgtype"].asUInt();
       if (msgtype != SNW_ICE) {

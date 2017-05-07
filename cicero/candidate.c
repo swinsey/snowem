@@ -333,7 +333,7 @@ print_candidate(candidate_t *c, char *msg)
 
    address_to_string(&c->addr,temp);
 
-   ICE_DEBUG("candidate info %s, addr=%s, port=%u foundation=%s, prio=%u, type=%u",
+   ICE_ERROR("candidate info %s, addr=%s, port=%u foundation=%s, prio=%u, type=%u",
          msg, temp,address_get_port((const address_t*)&c->addr),c->foundation,c->priority, c->type);
 
    return;

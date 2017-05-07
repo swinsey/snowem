@@ -295,7 +295,7 @@ ice_rtp_established(snw_ice_session_t *session) {
 void
 snw_ice_init_log(snw_context_t *ctx) {
    /*TODO: get log file from config*/  
-   ctx->log = snw_log_init("./ice.log",SNW_WARN,0,0);
+   ctx->log = snw_log_init("./ice.log",ctx->log_level,0,0);
    if (ctx->log == 0) {
       exit(-1);   
    }

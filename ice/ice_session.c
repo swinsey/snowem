@@ -52,19 +52,28 @@ snw_ice_session_init(snw_ice_context_t *ctx) {
 
 snw_ice_session_t*
 snw_ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new) {
+   snw_log_t *log = 0;
    snw_ice_session_t key;
    snw_ice_session_t *so;
-   
+  
+   if (!ctx) return 0;
+   log = ctx->log;
+    
    key.flowid = flowid;
    so = CACHE_GET(ctx->session_cache, &key, is_new, snw_ice_session_t*);
 
    if (so == 0)
       return 0;
 
-   if (!is_new)
+   if (!(*is_new)) {
+      DEBUG(log,"get old session, flowid=%u, ice_ctx=%p", 
+            flowid, so->ice_ctx);
       return so;
+   }
 
    // reset new session
+   DEBUG(log,"get new session, flowid=%u, is_new=%u, ice_ctx=%p", 
+         flowid, is_new, so->ice_ctx);
    memset(so, 0, sizeof(snw_ice_session_t));
    so->flowid = flowid;
 

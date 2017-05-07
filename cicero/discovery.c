@@ -401,7 +401,6 @@ static void priv_assign_remote_foundation (agent_t *agent, candidate_t *candidat
     next_remote_id = priv_highest_remote_foundation (component);
     snprintf (candidate->foundation, ICE_CANDIDATE_MAX_FOUNDATION,
         "remote-%u", next_remote_id);
-    ICE_ERROR("assign remote foundation, foundation=%s(%p)",candidate->foundation, candidate);
   }
 }
 
@@ -503,7 +502,6 @@ candidate_t *discovery_learn_remote_peer_reflexive_candidate(
   /* note: candidate username and password are left NULL as stream 
      level ufrag/password are used */
 
-  ICE_ERROR("create peer reflexive candidate, foundation=%s(%p)",candidate->foundation, candidate);
   //component->remote_candidates = g_slist_append (component->remote_candidates, candidate);
   list_add(&candidate->list,&component->remote_candidates.list);
 
