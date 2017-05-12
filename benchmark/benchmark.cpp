@@ -1,5 +1,8 @@
+#include <sys/time.h>
+#include <cstdio>
 #include <event2/event.h>
 
+#include "dtls.h"
 #include "wsclient.h"
 
 static void write_to_file_cb(int severity, const char *msg)
@@ -31,6 +34,7 @@ struct bm_config_ {
    struct event_base *base;
    struct evdns_base *dns_base;
    SSL_CTX *ssl_ctx;
+   DTLSParams *dtls_params;
 };
 bm_config g_config;
 
@@ -55,6 +59,7 @@ int main(int argc, char** argv) {
    struct event_base *base = 0;
    struct evdns_base *dns_base = 0;
    SSL_CTX *ssl_ctx = 0;
+   int ret = -1;
 
    event_set_log_callback(write_to_file_cb);
    base = event_base_new();
@@ -80,6 +85,16 @@ int main(int argc, char** argv) {
    g_config.base = base;
    g_config.dns_base = dns_base;
    g_config.ssl_ctx = ssl_ctx;
+
+   g_config.dtls_params = (DTLSParams*)malloc(sizeof(DTLSParams));
+   if (!g_config.dtls_params)
+      return -2;
+   //memset(dtls_params,0,sizeof(DTLSParams));
+   ret = dtls_InitContextFromKeystore(g_config.dtls_params,"client");
+   if (ret<0)  {
+      DEBUG("failed to init dlts, ret=%d",ret);
+      return -3;
+   }
 
    struct event *ev;
    struct timeval one_sec;

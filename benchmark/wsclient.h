@@ -1,5 +1,8 @@
+#ifndef _BENCHMARK_WSCLIENT_H_
+#define _BENCHMARK_WSCLIENT_H_
+
 #include <unistd.h>
-#include <string>
+#include <string.h>
 #include <fstream>
 
 #include <event2/dns.h>
@@ -18,6 +21,7 @@
 #include "json/json.h"
 #include "wslay/wslay.h"
 #include "cicero/agent.h"
+#include "util.h"
 
 #define MAX_HTTP_HEADER_SIZE 8192
 
@@ -26,10 +30,6 @@
 #define ERR_WRITE   3
 
 class WsClient;
-
-#define DEBUG(fmt,...)\
-    { log_write(__FUNCTION__, __LINE__,fmt, ##__VA_ARGS__); }
-    //{ log_write(__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
 
 enum evws_data_type {
   EVWS_DATA_TEXT = 0,
@@ -102,6 +102,7 @@ public:
    //int ice__resp(Json::Value &root);
    
    int start_ice_process();
+   int send_offer(Json::Value &root);
 
 public:
    SSL_CTX *ssl_ctx;
@@ -112,10 +113,15 @@ public:
 
    int fd;
    SSL *ssl;
-   agent_t *agent;
    struct bufferevent *bev;
 
-   unsigned char alive : 1;
+   agent_t *agent;
+   candidate_t *cands;
+
+   uint8_t alive : 1;
+   uint8_t is_offerred : 1;
+   uint8_t ice_started : 1;
+   uint8_t reserved : 5;
 
    uint32_t id;
    uint32_t channelid;
@@ -132,3 +138,4 @@ public:
 };
 
 
+#endif // _BENCHMARK_WSCLIENT_H_

@@ -1,4 +1,9 @@
 #ifndef _BENCHMARK_UTIL_H
+#define _BENCHMARK_UTIL_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum ws_header {
   NOT_RELEVANT = 0,
@@ -21,5 +26,14 @@ struct http_wsparse_info {
   enum ws_header header;
 };
 
+#define DEBUG(fmt,...)\
+    { log_write(__FUNCTION__, __LINE__,fmt, ##__VA_ARGS__); }
+    //{ log_write(__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
+
+void log_write(const char* sourcefilename, int line, const char* msg, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _BENCHMARK_UTIL_H

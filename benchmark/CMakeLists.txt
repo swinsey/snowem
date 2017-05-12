@@ -13,7 +13,8 @@ add_subdirectory(wslay)
 
 #file(GLOB sources_include include/*.h)
 file(GLOB sources benchmark.cpp wsclient.cpp wsclient.h validation.c validation.h 
-                  util.h util.c ../jsoncpp/*.cpp ../jsoncpp/json/*.h)
+                  dtls.h dtls.c util.h util.c ../jsoncpp/*.cpp ../jsoncpp/json/*.h
+                  sdp.c sdp.h)
 #file(GLOB sources worked.c validation.c validation.h)
 
 add_executable(robot ${sources})
@@ -53,21 +54,35 @@ else ()
 endif ()
 target_include_directories(robot PUBLIC ${CMAKE_SOURCE_DIR}/include ../jsoncpp)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSRTP.cmake)
+if (${SRTP_FOUND})
+   target_include_directories(robot PUBLIC ${SRTP_INCLUDE_DIRS})
+   MESSAGE(STATUS SRTPDir ${SRTP_INCLUDE_DIRS})
+   MESSAGE(STATUS SRTPLib ${SRTP_LIBRARIES})
+else ()
+   MESSAGE(FATAL_ERROR SRTP not found)
+endif ()
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSofiaSipUa.cmake)
+if (${SOFIASIPUA_FOUND})
+   target_include_directories(robot PUBLIC ${SOFIASIPUA_INCLUDE_DIR})
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SOFIASIPUA_CPPFLAGS}")
+else (${SOFIASIPUA_FOUND})
+   MESSAGE(FATAL_ERROR SofiaSipUa Not Found)
+endif (${SOFIASIPUA_FOUND})
+
+
+
 
 find_package(Boost COMPONENTS system random regex thread chrono REQUIRED)
 
 target_link_libraries(robot PUBLIC
-  #websockets
   cicero
   wslay
-  #pthread
-  #${Boost_CHRONO_LIBRARY}
-  #${Boost_THREAD_LIBRARY}
-  #${Boost_SYSTEM_LIBRARY}
-  #${Boost_REGEX_LIBRARY}
-  #${Boost_RANDOM_LIBRARY}
   ${OPENSSL_LIBRARIES}
   ${NETTLE_LIBRARIES}
+  ${SRTP_LIBRARIES}
+  ${SOFIASIPUA_LIBRARIES}
   #${EVENT_LIBRARIES}
   #${EVENT_OPENSSL_LIBRARIES}
   ${CMAKE_SOURCE_DIR}/lib/libevent.a

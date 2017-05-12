@@ -6,18 +6,9 @@
 #include <nettle/sha.h>
 
 #include "json/json.h"
+#include "sdp.h"
 #include "util.h"
 #include "wsclient.h"
-
-void log_write(const char* sourcefilename, int line, const char* msg, ...) {
-    static char dest[4*1024] = {0};
-    va_list argptr;
-    va_start(argptr, msg);
-    vsnprintf(dest, 4*1024, msg, argptr);
-    va_end(argptr);
-    printf("%s:%d: %s\n", sourcefilename, line, dest);
-    return;
-}
 
 void ssl_readcb(struct bufferevent *bev, void *ptr)
 {
@@ -64,6 +55,10 @@ int WsClient::init(struct event_base *base, struct evdns_base *dns_base, SSL_CTX
    this->bev = 0;
    this->ssl = 0;
    this->dev_urand_.open("/dev/urandom", std::ios::out | std::ios::in );
+   this->alive = 0;
+   this->is_offerred = 0;
+   this->ice_started = 0;
+   this->cands = 0;
 
    this->ssl = SSL_new(ssl_ctx);
    if (!ssl) {
@@ -236,6 +231,8 @@ void evwsconn_send_message(WsClient *conn, enum evws_data_type data_type,
   evwsconn_do_write(conn);
 }
 
+
+
 static void pending_read(struct bufferevent *bev, void *ptr) {
    WsClient *client = (WsClient *)ptr;
    struct evbuffer* input = bufferevent_get_input(client->bev);
@@ -375,15 +372,6 @@ int WsClient::ice_stop_resp(Json::Value &root) {
    return 0;
 }
 
-int WsClient::ice_sdp_req() {
-   return 0;
-}
-
-int WsClient::ice_sdp_resp(Json::Value &root) {
-   DEBUG("ice sdp resp");
-   return 0;
-}
-
 int WsClient::ice_candidate_req() {
    return 0;
 }
@@ -406,40 +394,135 @@ void log_callback(int severity, const char* msg, void* data) {
    return;
 }
 
-
-static int
-print_local_data(agent_t *agent, uint32_t _stream_id, uint32_t component_id)
+void
+print_candidates(candidate_t *cands)
 {
   static const char *candidate_type_name[] = {"host", "srflx", "prflx", "relay"};
-  candidate_t *cands = NULL;
   struct list_head *pos;
-  int result = -1;
-  char *local_ufrag = NULL;
-  char *local_password = NULL;
   char ipaddr[INET6_ADDRSTRLEN];
 
-  if (ice_agent_get_local_credentials(agent, _stream_id,
-      &local_ufrag, &local_password) != ICE_OK)
-    goto end;
-
-  cands = ice_agent_get_local_candidates(agent, _stream_id, component_id);
-  if (cands == NULL)
-    goto end;
-
-  printf("%s %s", local_ufrag, local_password);
-
+  DEBUG("candidate info: ");
   list_for_each(pos,&cands->list) {
      candidate_t *c = list_entry(pos,candidate_t,list);
      address_to_string(&c->addr, ipaddr);
-     printf(" %s,%u,%s,%u,%s",
+     DEBUG(" --- foundation=%s, priority=%u, ipaddr=%s, port=%u, type=%s",
         c->foundation,
         c->priority,
         ipaddr,
         address_get_port(&c->addr),
         candidate_type_name[c->type]);
   }
-  printf("\n");
-  result = 0;
+
+  return;     
+}
+
+int WsClient::ice_sdp_req() {
+   return 0;
+}
+
+int WsClient::send_offer(Json::Value &root) {
+   Json::Value type, jsep, sdp;
+   Json::FastWriter writer;
+   sdp_parser_t *parser = 0;
+   const char *jsep_type, *jsep_sdp;
+   std::string output;
+
+
+   try {
+      jsep = root["sdp"];
+      if (!jsep.isNull()) {
+         type = jsep["type"];
+         jsep_type = type.asString().c_str();
+         DEBUG("get sdp type, type=%s",jsep_type);
+      } else {
+         output = writer.write(root);
+         DEBUG("failed to get sdp type, root=%s",output.c_str());
+         goto jsondone;
+      }
+
+      if (!strcasecmp(jsep_type, "answer")) {
+         // only handle answer
+         DEBUG( "not handling answer, type=%s", jsep_type);
+         goto jsondone;
+      } else if(!strcasecmp(jsep_type, "offer")) {
+         DEBUG("got sdp offer, offer=%s",jsep_type);
+      } else {
+         DEBUG("unknown message type, type=%s", jsep_type);
+         goto jsondone;
+      }
+      sdp = jsep["sdp"];
+      if (sdp.isNull() || !sdp.isString() ) {
+         DEBUG("sdp not found");
+         goto jsondone;
+      }
+
+      jsep_sdp = strdup(sdp.asString().c_str()); //FIXME: don't use strdup
+      DEBUG("Remote SDP, s=%s", jsep_sdp);
+
+      parser = sdp_get_parser(jsep_sdp);     
+      if (!parser) {
+         DEBUG("parser is null");
+         return 0;
+      }
+
+      DEBUG("generate and send answer");
+   } catch(...) {
+      DEBUG("error: generate and send offer");
+   }
+
+jsondone:
+   return 0;
+}
+
+int WsClient::ice_sdp_resp(Json::Value &root) {
+   //FIXME: check wether sdp is offer.
+   this->is_offerred = 1;
+   if (!this->ice_started) {
+      DEBUG("ice process starting ...");
+      start_ice_process();
+   } else {
+      print_candidates(this->cands);
+      send_offer(root);
+   }
+   return 0;
+}
+
+static void
+cb_candidate_gathering_done(agent_t *agent, uint32_t _stream_id, void* data) {
+   WsClient *client = (WsClient *)data; 
+   candidate_t *cands = NULL;
+   char *local_ufrag = NULL;
+   char *local_password = NULL;
+   uint32_t component_id = 1;
+
+   DEBUG("candidate gathering done, sid=%u",_stream_id);
+   if (ice_agent_get_local_credentials(agent, _stream_id,
+       &local_ufrag, &local_password) != ICE_OK)
+     goto end;
+
+   DEBUG("candidate info, ufrag=%s, pass=%s", local_ufrag, local_password);
+   cands = ice_agent_get_local_candidates(agent, _stream_id, component_id);
+   if (cands == NULL)
+      goto end;
+   
+   client->cands = cands;
+   print_candidates(cands);
+   /*list_for_each(pos,&cands->list) {
+      candidate_t *c = list_entry(pos,candidate_t,list);
+      address_to_string(&c->addr, ipaddr);
+      DEBUG(" --- foundation=%s, priority=%u, ipaddr=%s, port=%u, type=%s",
+        c->foundation,
+        c->priority,
+        ipaddr,
+        address_get_port(&c->addr),
+        candidate_type_name[c->type]);
+   }*/
+   
+   if (client->is_offerred) {
+      DEBUG("sending candidate");
+   }
+   
+   return;
 
 end:
    if (local_ufrag)
@@ -449,15 +532,8 @@ end:
    if (cands)
       candidate_free(cands);
       
-   return result;
-}
+   return;
 
-static void
-cb_candidate_gathering_done(agent_t *agent, uint32_t _stream_id,
-    void* data) {
-
-  DEBUG("SIGNAL candidate gathering done, sid=%u",_stream_id);
-  print_local_data(agent, _stream_id, 1);
 
   /*struct bufferevent *bev;
   bev = bufferevent_socket_new(agent->base, 0, BEV_OPT_CLOSE_ON_FREE);
@@ -531,9 +607,9 @@ int WsClient::start_ice_process() {
    }
 
    DEBUG("set up ice agent");
-   ice_set_candidate_gathering_done_cb(this->agent, cb_candidate_gathering_done, NULL);
-   ice_set_new_selected_pair_cb(this->agent, cb_new_selected_pair, NULL);
-   ice_set_component_state_changed_cb(this->agent, cb_component_state_changed, NULL);
+   ice_set_candidate_gathering_done_cb(this->agent, cb_candidate_gathering_done, this);
+   ice_set_new_selected_pair_cb(this->agent, cb_new_selected_pair, this);
+   ice_set_component_state_changed_cb(this->agent, cb_component_state_changed, this);
 
    this->stream_id = ice_agent_add_stream(agent, 1);
    if (stream_id <= 0) {
@@ -542,6 +618,7 @@ int WsClient::start_ice_process() {
    }
    ice_agent_attach_recv(this->agent, stream_id, 1, cb_nice_recv, NULL);
 
+   this->ice_started = 1;
    if (ice_agent_gather_candidates(agent, stream_id) != ICE_OK) {
       DEBUG("Failed to start candidate gathering");
       return -1;
