@@ -22,6 +22,7 @@
 #include "wslay/wslay.h"
 #include "cicero/agent.h"
 #include "util.h"
+#include "dtls.h"
 
 #define MAX_HTTP_HEADER_SIZE 8192
 
@@ -35,6 +36,22 @@ enum evws_data_type {
   EVWS_DATA_TEXT = 0,
   EVWS_DATA_BINARY = 1,
 };
+
+typedef struct bm_config_ bm_config;
+struct bm_config_ {
+   int total_client_num;
+   int started_client_num;
+   int stopped_client_num;
+   struct event *ev;
+   int n_calls;
+
+   struct event_base *base;
+   struct evdns_base *dns_base;
+   SSL_CTX *ssl_ctx;
+   DTLSParams *dtls_params;
+};
+extern bm_config g_config;
+
 
 /* Built-in module (msg) type */
 enum {
@@ -102,7 +119,8 @@ public:
    //int ice__resp(Json::Value &root);
    
    int start_ice_process();
-   int send_offer(Json::Value &root);
+   int send_answer(Json::Value &root);
+   int send_candidates();
 
 public:
    SSL_CTX *ssl_ctx;
@@ -121,7 +139,9 @@ public:
    uint8_t alive : 1;
    uint8_t is_offerred : 1;
    uint8_t ice_started : 1;
-   uint8_t reserved : 5;
+   uint8_t ice_gathering_done : 1;
+   uint8_t has_remote_credentials : 1;
+   uint8_t reserved : 4;
 
    uint32_t id;
    uint32_t channelid;
@@ -134,7 +154,9 @@ public:
    uint32_t   flowid;
 
    // ice agent
-   uint32_t stream_id;
+   uint32_t  stream_id;
+   char     *remote_user;
+   char     *remote_pwd;
 };
 
 

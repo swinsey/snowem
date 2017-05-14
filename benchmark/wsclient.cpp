@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <stdlib.h>
 
 #include <nettle/base64.h>
 #include <nettle/sha.h>
+#include <sofia-sip/sdp.h>
 
 #include "json/json.h"
 #include "sdp.h"
 #include "util.h"
 #include "wsclient.h"
+
+bm_config g_config;
 
 void ssl_readcb(struct bufferevent *bev, void *ptr)
 {
@@ -375,9 +379,101 @@ int WsClient::ice_stop_resp(Json::Value &root) {
 int WsClient::ice_candidate_req() {
    return 0;
 }
+candidate_t*
+ice_remote_candidate_new(char *type, char *transport) {
+   candidate_t* c = NULL;
+         
+   if(strcasecmp(transport, "udp")) {
+      printf("skipping unsupported transport, s=%s", transport);
+      return NULL;
+   }     
+            
+   if(!strcasecmp(type, "host")) {
+      c = candidate_new(ICE_CANDIDATE_TYPE_HOST);
+   } else if (!strcasecmp(type, "srflx")) {
+      c = candidate_new(ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE);
+   } else if(!strcasecmp(type, "prflx")) {
+      c = candidate_new(ICE_CANDIDATE_TYPE_PEER_REFLEXIVE);
+   } else if(!strcasecmp(type, "relay")) { 
+      //c = candidate_new(ICE_CANDIDATE_TYPE_RELAYED);
+      printf("relay candidate not supported, type:%s", type);
+   } else {
+      printf("Unknown remote candidate, type:%s", type);
+   }     
+
+   return c;
+}
 
 int WsClient::ice_candidate_resp(Json::Value &root) {
-   DEBUG("ice candidate resp");
+   const char *candidate;
+   Json::FastWriter writer;
+   std::string output;
+   char foundation[16], transport[4], type[6]; 
+   char ip[32], relip[32];
+   uint32_t component_id, priority, port, relport;
+   int ret = 0;
+
+   try {
+      candidate = root["candidate"]["candidate"].asString().c_str();
+      DEBUG("ice remote candidate, s=%s", candidate);
+      //output = writer.write(root);
+      //DEBUG("ice remote candidate, s=%s",output.c_str());
+   } catch(...) {
+      DEBUG("json error");
+   }
+
+   if (strstr(candidate, "candidate:") == candidate) {
+      candidate += strlen("candidate:");
+   }
+
+   ret = sscanf(candidate, "%15s %30u %3s %30u %31s %30u typ %5s %*s %31s %*s %30u",
+                           foundation, &component_id, transport, &priority,
+                           ip, &port, type, relip, &relport);
+
+   DEBUG("parsing result, ret=%u, cid:%d sid:%d, type:%s, transport=%s, refaddr=%s:%d, addr=%s:%d",
+          ret, component_id, 1/*stream->stream_id*/, type, transport, relip, relport, ip, port);
+
+   if (ret < 7) {
+      DEBUG("bad candidate");
+      return -2;
+   }
+ 
+   candidate_t head; 
+   candidate_t *c = 0;
+
+   INIT_LIST_HEAD(&head.list); 
+   c = ice_remote_candidate_new(type,transport);
+   if (c != NULL) {
+      c->component_id = 1;
+      c->stream_id = 1;
+      if (!strcasecmp(transport, "udp")) {
+         c->transport = ICE_CANDIDATE_TRANSPORT_UDP;
+      } else {
+         DEBUG("wrong transport, s=%s",transport);
+         candidate_free(c);
+         return -1;
+      }
+
+      strncpy(c->foundation, foundation, ICE_CANDIDATE_MAX_FOUNDATION);
+      c->priority = priority;
+      address_set_from_string(&c->addr, ip); 
+      address_set_port(&c->addr, port);
+      DEBUG("setting up remote credentials, user=%s, pwd=%s", 
+            this->remote_user, this->remote_pwd);
+      c->username = strdup(this->remote_user);
+      c->password = strdup(this->remote_pwd);
+      address_set_from_string(&c->base_addr, relip);
+      address_set_port(&c->base_addr, relport);
+
+      if (this->has_remote_credentials == 0) {
+         ice_agent_set_remote_credentials(this->agent,1,this->remote_user,this->remote_pwd);
+         this->has_remote_credentials = 1;
+      }
+
+      list_add(&c->list, &head.list);
+      ice_agent_set_remote_candidates(this->agent,1,1,&head);
+   }
+
    return 0;
 }
 
@@ -420,7 +516,184 @@ int WsClient::ice_sdp_req() {
    return 0;
 }
 
-int WsClient::send_offer(Json::Value &root) {
+#define OPUS_PT   111
+#define VP8_PT    100
+static char*
+generate_sdp_answer(int sendonly) {
+   static const char *sdp_template = 
+         "v=0\r\n" "o=- %lu %lu IN IP4 127.0.0.1\r\n"
+         "s=%s\r\n"
+         "t=0 0\r\n"
+         "a=group:BUNDLE audio video\r\n"
+         "a=msid-semantic:PeerCall Semantic\r\n"
+         "%s%s";
+   static  const char *audio_mline_template = 
+         "m=audio 9 RTP/SAVPF %d\r\n"
+         "c=IN IP4 0.0.0.0\r\n"
+         "a=rtcp:9 IN IP4 0.0.0.0\r\n"
+         "a=ice-ufrag:VJq2\r\n"
+         "a=ice-pwd:qpmMq1l7h4Y8N/lLpISXguX7\r\n"
+         "a=fingerprint:sha-256 %s\r\n"
+         "a=setup:active\r\n"
+         "a=mid:audio\r\n"
+         "a=%s\r\n"
+         "a=rtcp-mux\r\n"
+         "a=rtpmap:%d opus/48000/2\r\n"
+         "a=ssrc:%u cname:peercallagentaudio\r\n"
+         "a=ssrc:%u msid:peercallagent peercallagenta0\r\n"
+         "a=ssrc:%u mslabel:peercallagent\r\n"
+         "a=ssrc:%u label:peercallagenta0\r\n";
+
+   static  const char *video_mline_template = 
+         "m=video 9 RTP/SAVPF %d\r\n"
+         "c=IN IP4 0.0.0.0\r\n"
+         "a=rtcp:9 IN IP4 0.0.0.0\r\n"
+         "a=ice-ufrag:VJq2\r\n"
+         "a=ice-pwd:qpmMq1l7h4Y8N/lLpISXguX7\r\n"
+         "a=fingerprint:sha-256 %s\r\n"
+         "a=setup:active\r\n"
+         "a=mid:video\r\n"
+         "a=%s\r\n"
+         "a=rtcp-mux\r\n"
+         "a=rtpmap:%d VP8/90000\r\n"
+         "a=rtcp-fb:%d ccm fir\r\n"
+         "a=rtcp-fb:%d nack\r\n"
+         "a=rtcp-fb:%d nack pli\r\n"
+         "a=rtcp-fb:%d goog-remb\r\n"
+         "a=ssrc:%u cname:peercallagentvideo\r\n"
+         "a=ssrc:%u msid:peercallagent peercallagentv0\r\n"
+         "a=ssrc:%u mslabel:peercallagent\r\n"
+         "a=ssrc:%u label:peercallagentv0\r\n";
+         
+
+   static char sdp[2*1024], audio_mline[512], video_mline[1024];
+   int random_ssrc_a = random();
+   int random_ssrc_v = random();
+   int ret = 0;
+
+   DEBUG("sendonly=%u",sendonly);
+
+   memset(audio_mline,0,512);
+   snprintf(audio_mline, 512, audio_mline_template,
+            OPUS_PT, 
+            g_config.dtls_params->local_fingerprint,
+            sendonly ? "sendonly" : "sendrecv", 
+            OPUS_PT, 
+            random_ssrc_a,
+            random_ssrc_a,
+            random_ssrc_a,
+            random_ssrc_a);
+
+   memset(video_mline,0,1024);
+   snprintf(video_mline, 1024, video_mline_template,
+            VP8_PT, 
+            g_config.dtls_params->local_fingerprint,
+            sendonly ? "sendonly" : "sendrecv",
+            VP8_PT, 
+            VP8_PT, 
+            VP8_PT, 
+            VP8_PT, 
+            VP8_PT,
+            random_ssrc_v,
+            random_ssrc_v,
+            random_ssrc_v,
+            random_ssrc_v);
+
+   memset(sdp,0,2*1024);
+   snprintf(sdp, 2*1024, sdp_template,
+            /*v=0*/get_real_time(), get_real_time(),
+            /*s=*/"PeerCall Agent", 
+            audio_mline, 
+            video_mline);
+
+   //DEBUG("sdp anser, s=%s",sdp);
+   //session->sdp = strdup(sdp);
+   //ret = snw_ice_session_setup(ice_ctx, session, 0, (char *)sdp);
+   //if (ret < 0) {
+   //   DEBUG("Error setting ICE locally, ret=%d",ret);
+   //   return -4;
+   //}
+
+   return strdup(sdp);
+}
+
+int WsClient::send_candidates() {
+   Json::Value root,cand;
+   Json::FastWriter writer;
+   std::string output;
+   char buffer[100];
+   static const char *candidate_type_name[] = {"host", "srflx", "prflx", "relay"};
+   struct list_head *pos;
+   char ipaddr[INET6_ADDRSTRLEN];
+
+   DEBUG("send candidate");
+   list_for_each(pos,&cands->list) {
+     candidate_t *c = list_entry(pos,candidate_t,list);
+     //char address[ICE_ADDRESS_STRING_LEN];
+     //address_to_string(&(c->addr), (char *)&address);
+     address_to_string(&c->addr, ipaddr);
+     DEBUG(" --- foundation=%s, priority=%u, ipaddr=%s, port=%u, type=%s",
+        c->foundation,
+        c->priority,
+        ipaddr,
+        address_get_port(&c->addr),
+        candidate_type_name[c->type]);
+     if (!strcasecmp(c->foundation,"1")) {
+        memset(buffer,0,100);
+        snprintf(buffer, 100, "candidate:%s %d %s %d %s %d typ host generation 0",
+              c->foundation,
+              1,
+              "udp",
+              c->priority, 
+              ipaddr, 
+              address_get_port(&c->addr));
+        root["msgtype"] = SNW_ICE;
+        root["api"] = SNW_ICE_CANDIDATE;
+        root["roomid"] = 0;
+        root["callid"] = "callid";
+        cand["candidate"] = buffer;
+        cand["label"] = 0;
+        cand["type"] = "candidate";
+        cand["id"] = "audio";
+        root["candidate"] = cand;
+        output = writer.write(root);
+        DEBUG("audio candidate info, s=%s",output.c_str());
+        this->send_message(EVWS_DATA_TEXT,output.c_str(),output.size());
+     }
+
+     if (!strcasecmp(c->foundation,"2")) {
+        memset(buffer,0,100);
+        snprintf(buffer, 100, "candidate:%s %d %s %d %s %d typ host generation 0",
+              c->foundation,
+              1,
+              "udp",
+              c->priority, 
+              ipaddr, 
+              address_get_port(&c->addr));
+        root["msgtype"] = SNW_ICE;
+        root["api"] = SNW_ICE_CANDIDATE;
+        root["roomid"] = 0;
+        root["callid"] = "callid";
+        cand["candidate"] = buffer;
+        cand["label"] = 1;
+        cand["type"] = "candidate";
+        cand["id"] = "video";
+        root["candidate"] = cand;
+        output = writer.write(root);
+        DEBUG("video candidate info (not send), s=%s",output.c_str());
+        //this->send_message(EVWS_DATA_TEXT,output.c_str(),output.size());
+     }
+
+   }
+
+
+   //print_candidates(this->cands);
+
+
+   return 0;
+}
+
+int WsClient::send_answer(Json::Value &root) {
    Json::Value type, jsep, sdp;
    Json::FastWriter writer;
    sdp_parser_t *parser = 0;
@@ -457,7 +730,7 @@ int WsClient::send_offer(Json::Value &root) {
       }
 
       jsep_sdp = strdup(sdp.asString().c_str()); //FIXME: don't use strdup
-      DEBUG("Remote SDP, s=%s", jsep_sdp);
+      //DEBUG("Remote SDP, s=%s", jsep_sdp);
 
       parser = sdp_get_parser(jsep_sdp);     
       if (!parser) {
@@ -465,10 +738,47 @@ int WsClient::send_offer(Json::Value &root) {
          return 0;
       }
 
-      DEBUG("generate and send answer");
+      //get_remote_credentials(parser);
+      sdp_session_t *parsed_sdp = sdp_session(parser);
+      sdp_media_t *m = parsed_sdp->sdp_media;
+      while(m) {
+         sdp_attribute_t *a = m->m_attributes;
+         while(a) {
+            if (!strcasecmp(a->a_name,"ice-ufrag")) {
+               DEBUG("get remote user: name=%s, value=%s", a->a_name, a->a_value);
+               if (this->remote_user) free(this->remote_user);
+               this->remote_user = strdup(a->a_value);
+            }
+            if (!strcasecmp(a->a_name,"ice-pwd")) {
+               DEBUG("get remote pwd: name=%s, value=%s", a->a_name, a->a_value);
+               if (this->remote_pwd) free(this->remote_pwd);
+               this->remote_pwd = strdup(a->a_value);
+            }
+            a = a->a_next;
+         }
+         m = m->m_next;
+      }
+
+      char* sdp_answer = generate_sdp_answer(0);
+      //DEBUG("generate and send answer, s=%s",sdp_answer);//snw_ice_generate_sdp
+
+      Json::Value answer, json_sdp;
+      answer["msgtype"] = SNW_ICE;
+      answer["api"] = SNW_ICE_SDP;
+      answer["roomid"] = 1443712566;
+      json_sdp["sdp"] = sdp_answer;
+      json_sdp["type"] = "answer";
+      answer["sdp"] = json_sdp;
+      output = writer.write(answer);
+      DEBUG("generate and send answer, s=%s",output.c_str());//snw_ice_generate_sdp
+      this->send_message(EVWS_DATA_TEXT,output.c_str(),output.size());
+
+
    } catch(...) {
       DEBUG("error: generate and send offer");
    }
+
+   this->send_candidates();
 
 jsondone:
    return 0;
@@ -481,8 +791,7 @@ int WsClient::ice_sdp_resp(Json::Value &root) {
       DEBUG("ice process starting ...");
       start_ice_process();
    } else {
-      print_candidates(this->cands);
-      send_offer(root);
+      send_answer(root);
    }
    return 0;
 }
@@ -519,9 +828,9 @@ cb_candidate_gathering_done(agent_t *agent, uint32_t _stream_id, void* data) {
    }*/
    
    if (client->is_offerred) {
-      DEBUG("sending candidate");
+      DEBUG("FIXME: sending candidate");
    }
-   
+   client->ice_gathering_done = 1;   
    return;
 
 end:
@@ -623,6 +932,9 @@ int WsClient::start_ice_process() {
       DEBUG("Failed to start candidate gathering");
       return -1;
    }
+
+   //FIXME: set remote credentials 
+   this->has_remote_credentials = 0;
    return 0;
 }
 
@@ -633,7 +945,6 @@ void WsClient::message_cb(WsClient *conn, enum evws_data_type,
    uint32_t msgtype = 0;
    uint32_t api = 0;
    int ret = -1;
-
 
    DEBUG("message cb, data=%s\n", data);
 
@@ -649,6 +960,7 @@ void WsClient::message_cb(WsClient *conn, enum evws_data_type,
          DEBUG("wrong msgtype, msgtype=%u",msgtype);
          return;
       }
+
       switch(api) {
          case SNW_ICE_CREATE:
             ice_create_resp(root);

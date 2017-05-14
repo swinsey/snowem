@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <inttypes.h>
+
 enum ws_header {
   NOT_RELEVANT = 0,
   UPGRADE = 1,
@@ -31,6 +33,8 @@ struct http_wsparse_info {
     //{ log_write(__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
 
 void log_write(const char* sourcefilename, int line, const char* msg, ...);
+
+int64_t get_real_time(void);
 
 #ifdef __cplusplus
 }

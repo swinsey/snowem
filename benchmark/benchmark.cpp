@@ -23,21 +23,6 @@ static int verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
    return preverify_ok;
 }
 
-typedef struct bm_config_ bm_config;
-struct bm_config_ {
-   int total_client_num;
-   int started_client_num;
-   int stopped_client_num;
-   struct event *ev;
-   int n_calls;
-
-   struct event_base *base;
-   struct evdns_base *dns_base;
-   SSL_CTX *ssl_ctx;
-   DTLSParams *dtls_params;
-};
-bm_config g_config;
-
 void timer_callback(evutil_socket_t fd, short what, void *arg) {
    WsClient *client = new WsClient();
    bm_config *config= (bm_config *)arg;
@@ -55,6 +40,14 @@ void timer_callback(evutil_socket_t fd, short what, void *arg) {
    return;
 }
 
+void 
+ben_ice_log_cb(int severity, const char *msg, void *data) {
+
+   DEBUG("%s",msg);
+   return; 
+}
+
+
 int main(int argc, char** argv) {
    struct event_base *base = 0;
    struct evdns_base *dns_base = 0;
@@ -62,6 +55,8 @@ int main(int argc, char** argv) {
    int ret = -1;
 
    event_set_log_callback(write_to_file_cb);
+   ice_set_log_callback(ben_ice_log_cb,NULL);
+
    base = event_base_new();
    dns_base = evdns_base_new(base, 1);
    if (!base || !dns_base) {
