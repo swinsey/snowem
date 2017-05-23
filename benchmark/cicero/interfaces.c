@@ -139,6 +139,12 @@ ice_interfaces_get_local_ips (struct list_head *head, int include_loopback)
     ICE_DEBUG("Interface:  %s", ifa->ifa_name);
     ICE_DEBUG("IP Address: %s", addr_string);
 
+    //FIXME: dirty hack
+    if (!strcasecmp(addr_string,"49.213.76.93")) {
+       ICE_DEBUG("Ignoring IP Address: %s", addr_string);
+       continue;
+    }
+
     if ((ifa->ifa_flags & IFF_LOOPBACK) == IFF_LOOPBACK) {
       if (include_loopback) {
         //loopbacks = add_ip_to_list (loopbacks, addr_string, TRUE);

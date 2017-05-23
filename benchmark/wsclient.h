@@ -44,10 +44,12 @@ struct bm_config_ {
    int stopped_client_num;
    struct event *ev;
    int n_calls;
+   int channel_id;
 
    struct event_base *base;
    struct evdns_base *dns_base;
    SSL_CTX *ssl_ctx;
+   SSL_CTX *dtls_ssl_ctx;
    DTLSParams *dtls_params;
 };
 extern bm_config g_config;
@@ -90,6 +92,15 @@ enum {
    SNW_CORE_MAX = 255,
 };
 
+/* EVENT api code */
+enum {
+   SNW_EVENT_MIN = 1,
+   SNW_EVENT_ICE_CONNECTED = SNW_EVENT_MIN,
+
+   /* reserved range */
+   SNW_EVENT_MAX = 255,
+};
+
 class WsClient {
 public:
    int init(struct event_base *base, struct evdns_base *dns_base, SSL_CTX *ssl_ctx);
@@ -121,6 +132,7 @@ public:
    int start_ice_process();
    int send_answer(Json::Value &root);
    int send_candidates();
+   int play();
 
 public:
    SSL_CTX *ssl_ctx;
@@ -141,7 +153,8 @@ public:
    uint8_t ice_started : 1;
    uint8_t ice_gathering_done : 1;
    uint8_t has_remote_credentials : 1;
-   uint8_t reserved : 4;
+   uint8_t sent_candidates : 1;
+   uint8_t reserved : 3;
 
    uint32_t id;
    uint32_t channelid;
@@ -157,6 +170,9 @@ public:
    uint32_t  stream_id;
    char     *remote_user;
    char     *remote_pwd;
+
+   // dtls stuff
+   //dtls_ctx_t  *dtls_context;
 };
 
 

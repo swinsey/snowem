@@ -80,12 +80,14 @@ int main(int argc, char** argv) {
    g_config.base = base;
    g_config.dns_base = dns_base;
    g_config.ssl_ctx = ssl_ctx;
+   g_config.channel_id =  atoi(argv[3]);
+   printf("channel_id=%u\n",g_config.channel_id);
 
    g_config.dtls_params = (DTLSParams*)malloc(sizeof(DTLSParams));
    if (!g_config.dtls_params)
       return -2;
    //memset(dtls_params,0,sizeof(DTLSParams));
-   ret = dtls_InitContextFromKeystore(g_config.dtls_params,"client");
+   ret = init_dtls_srtp_ctx(g_config.dtls_params,"client");
    if (ret<0)  {
       DEBUG("failed to init dlts, ret=%d",ret);
       return -3;

@@ -347,18 +347,20 @@ size_t priv_create_username(agent_t *agent, stream_t *stream,
     uint32_t component_id, candidate_t *remote, candidate_t *local,
     uint8_t *dest, uint32_t dest_len, int inbound)
 {
-   ICE_DEBUG("FIXME: priv_create_username");
 
   char *local_username = NULL;
   char *remote_username = NULL;
 
 
+  //ICE_DEBUG("creating user name, username=%s", remote->username);
   if (remote && remote->username) {
     remote_username = remote->username;
+    ICE_DEBUG("remote username, username=%s, len=%u", remote->username, strlen(remote->username));
   }
 
   if (local && local->username) {
     local_username = local->username;
+    ICE_DEBUG("local username, username=%s, len=%u", local->username, strlen(local->username));
   }
 
   if (stream) {
@@ -534,6 +536,11 @@ static void priv_conn_check_add_for_candidate_pair_matched(agent_t *agent,
         agent, local->foundation, local->transport, remote->foundation, remote, remote->transport);
 
   priv_add_new_check_pair(agent, stream_id, component, local, remote, initial_state, 0);
+
+  //FIXME: if we do not change selected pair, just ignore when we are done.
+  if (component->state == ICE_COMPONENT_STATE_READY)
+     return;
+
   if (component->state == ICE_COMPONENT_STATE_CONNECTED ||
       component->state == ICE_COMPONENT_STATE_READY) {
      agent_signal_component_state_change (agent,
@@ -1919,6 +1926,7 @@ conncheck_stun_validater(StunAgent *agent,
       ICE_DEBUG("Comparing username/ufrag of len %d and %zu, equal=%d",
           username_len, ufrag_len, username_len >= ufrag_len ?
           memcmp (username, ufrag, ufrag_len) : 0);
+      ICE_DEBUG("username=%s, ufrag=%s", username, ufrag);
 
       if (ufrag_len > 0 && username_len >= ufrag_len &&
           memcmp(username, ufrag, ufrag_len) == 0) {
@@ -2787,12 +2795,13 @@ conn_check_handle_inbound_stun(agent_t *agent, stream_t *stream,
       } // compatibility
       rbuf_len = sizeof (rbuf);
 
+      ICE_DEBUG("ice conncheck, control=%u",control);
       res = stun_usage_ice_conncheck_create_reply(&component->stun_agent, &req,
               &msg, rbuf, &rbuf_len, &sockaddr.storage, sizeof (sockaddr),
               &control, agent->tie_breaker,
               agent_to_ice_compatibility (agent));
 
-      ICE_DEBUG("ice conncheck, result=%lu",res);
+      ICE_DEBUG("ice conncheck, control=%u, result=%lu",control, res);
 
       if ( agent->compatibility == ICE_COMPATIBILITY_MSN
           || agent->compatibility == ICE_COMPATIBILITY_OC2007) {

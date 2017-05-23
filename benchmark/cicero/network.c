@@ -128,6 +128,7 @@ socket_udp_read_cb(evutil_socket_t fd, short what, void *ctx)
       return;
    }   
 
+
    ICE_DEBUG("get udp socket, agent=%p,stream=%p,component=%p",
          sock->agent,sock->stream,sock->component);
    memset(&fromaddr, 0, sizeof(fromaddr));
@@ -146,6 +147,10 @@ socket_udp_read_cb(evutil_socket_t fd, short what, void *ctx)
       agent_t *agent = (agent_t*)sock->agent;
       stream_t *s = (stream_t*)sock->stream;
       component_t *c = (component_t*)sock->component;
+
+      ICE_DEBUG("got non-stun msg, len=%u", recvlen);
+      ICE_HEXDUMP(buf,recvlen,"dtls");
+
       if (c->io_callback) {
          //ice_data_recv_cb
          c->io_callback(agent,s->id,c->id,buf,recvlen,c->io_data);

@@ -2,10 +2,13 @@
 #include <stdlib.h>
 #include <iostream>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <nettle/base64.h>
 #include <nettle/sha.h>
 #include <sofia-sip/sdp.h>
+
+#include "cicero/network.h"
 
 #include "json/json.h"
 #include "sdp.h"
@@ -359,7 +362,7 @@ int WsClient::ice_connect_req() {
    msg = writer.write(root);
    this->send_message(EVWS_DATA_TEXT,msg.c_str(),msg.size());
 
-   start_ice_process(); 
+   //start_ice_process(); 
    return 0;
 }
 
@@ -413,7 +416,16 @@ int WsClient::ice_candidate_resp(Json::Value &root) {
    uint32_t component_id, priority, port, relport;
    int ret = 0;
 
+
+   if (!this->sent_candidates) {
+     this->sent_candidates = 1;
+     this->send_candidates();
+   }
+
+   agent_find_stream(this->agent,1);
    try {
+      if (!root["rc"].isNull())
+         return 0;
       candidate = root["candidate"]["candidate"].asString().c_str();
       DEBUG("ice remote candidate, s=%s", candidate);
       //output = writer.write(root);
@@ -474,6 +486,8 @@ int WsClient::ice_candidate_resp(Json::Value &root) {
       ice_agent_set_remote_candidates(this->agent,1,1,&head);
    }
 
+   
+
    return 0;
 }
 
@@ -531,8 +545,8 @@ generate_sdp_answer(int sendonly) {
          "m=audio 9 RTP/SAVPF %d\r\n"
          "c=IN IP4 0.0.0.0\r\n"
          "a=rtcp:9 IN IP4 0.0.0.0\r\n"
-         "a=ice-ufrag:VJq2\r\n"
-         "a=ice-pwd:qpmMq1l7h4Y8N/lLpISXguX7\r\n"
+         "a=ice-ufrag:RObomhjs7tw7kmzf\r\n"
+         "a=ice-pwd:jVvUZXC05jO8vi2aqzb7Lerv\r\n"
          "a=fingerprint:sha-256 %s\r\n"
          "a=setup:active\r\n"
          "a=mid:audio\r\n"
@@ -548,8 +562,8 @@ generate_sdp_answer(int sendonly) {
          "m=video 9 RTP/SAVPF %d\r\n"
          "c=IN IP4 0.0.0.0\r\n"
          "a=rtcp:9 IN IP4 0.0.0.0\r\n"
-         "a=ice-ufrag:VJq2\r\n"
-         "a=ice-pwd:qpmMq1l7h4Y8N/lLpISXguX7\r\n"
+         "a=ice-ufrag:RObomhjs7tw7kmzf\r\n"
+         "a=ice-pwd:jVvUZXC05jO8vi2aqzb7Lerv\r\n"
          "a=fingerprint:sha-256 %s\r\n"
          "a=setup:active\r\n"
          "a=mid:video\r\n"
@@ -623,11 +637,12 @@ int WsClient::send_candidates() {
    std::string output;
    char buffer[100];
    static const char *candidate_type_name[] = {"host", "srflx", "prflx", "relay"};
-   struct list_head *pos;
+   struct list_head *pos,*n;
    char ipaddr[INET6_ADDRSTRLEN];
 
    DEBUG("send candidate");
-   list_for_each(pos,&cands->list) {
+
+   list_for_each_safe(pos,n,&cands->list) {
      candidate_t *c = list_entry(pos,candidate_t,list);
      //char address[ICE_ADDRESS_STRING_LEN];
      //address_to_string(&(c->addr), (char *)&address);
@@ -660,6 +675,10 @@ int WsClient::send_candidates() {
         DEBUG("audio candidate info, s=%s",output.c_str());
         this->send_message(EVWS_DATA_TEXT,output.c_str(),output.size());
      }
+
+     /*if (!strcasecmp(c->foundation,"2")) {
+        list_del(&c->list);
+     }*/
 
      if (!strcasecmp(c->foundation,"2")) {
         memset(buffer,0,100);
@@ -754,6 +773,10 @@ int WsClient::send_answer(Json::Value &root) {
                if (this->remote_pwd) free(this->remote_pwd);
                this->remote_pwd = strdup(a->a_value);
             }
+            if (!strcasecmp(a->a_name,"fingerprint")) {
+               DEBUG("get remote fingerprint: name=%s, value=%s", a->a_name, a->a_value);
+               memcpy(g_config.dtls_params->remote_fingerprint, a->a_value + strlen("sha-256"), strlen(a->a_value) - strlen("sha-256"));
+            }
             a = a->a_next;
          }
          m = m->m_next;
@@ -778,7 +801,8 @@ int WsClient::send_answer(Json::Value &root) {
       DEBUG("error: generate and send offer");
    }
 
-   this->send_candidates();
+   //sleep(1);
+   //this->send_candidates();
 
 jsondone:
    return 0;
@@ -787,10 +811,15 @@ jsondone:
 int WsClient::ice_sdp_resp(Json::Value &root) {
    //FIXME: check wether sdp is offer.
    this->is_offerred = 1;
-   if (!this->ice_started) {
+   /*if (!this->ice_started) {
       DEBUG("ice process starting ...");
       start_ice_process();
    } else {
+      send_answer(root);
+   }*/
+
+   if (!this->ice_started)  {
+      start_ice_process();
       send_answer(root);
    }
    return 0;
@@ -861,6 +890,14 @@ cb_new_selected_pair(agent_t *agent, uint32_t _stream_id,
   DEBUG("SIGNAL: selected pair %s %s", lfoundation, rfoundation);
 }
 
+void 
+dtls_event_handler(int fd, short event, void *arg) {
+   dtls_ctx_t *dtls = (dtls_ctx_t *)arg;
+   DEBUG("get timeout");
+   srtp_do_handshake(dtls);
+   return;
+}
+
 static void
 cb_component_state_changed(agent_t *agent, uint32_t _stream_id,
     uint32_t component_id, uint32_t state,
@@ -868,6 +905,10 @@ cb_component_state_changed(agent_t *agent, uint32_t _stream_id,
 
   static const char *state_name[] = {"disconnected", "gathering", "connecting",
                                     "connected", "ready", "failed"};
+  int fd = -1;
+  //snw_ice_stream_t *stream = 0;
+  //snw_ice_component_t *component = 0;
+
   DEBUG("SIGNAL: state changed %d %d %s[%d]n",
       _stream_id, component_id, state_name[state], state);
 
@@ -884,10 +925,34 @@ cb_component_state_changed(agent_t *agent, uint32_t _stream_id,
           ipaddr, address_get_port(&local->addr));
       address_to_string(&remote->addr, ipaddr);
       DEBUG(" ---> [%s]:%d)", ipaddr, address_get_port(&remote->addr));
+      fd = ((socket_t*)(local->sockptr))->fd;
     }
 
+
+    WsClient *client = (WsClient*)data;
+
+    agent_find_stream(client->agent,1);
+
     // Listen to stdin and send data written to it
-    DEBUG("FIXME: Send lines to remote (Ctrl-D to quit):\n");
+    DEBUG("Start DTLS negotiation, fd=%d\n", fd);
+    srtp_context_new(g_config.dtls_params, 0, DTLS_ROLE_CLIENT);
+
+    g_config.dtls_params->dtls_ctx->component_id = component_id;
+    g_config.dtls_params->dtls_ctx->stream_id = _stream_id;
+    g_config.dtls_params->dtls_ctx->agent = client->agent;
+    g_config.dtls_params->dtls_ctx->wsclient = client; 
+
+    struct event *ev; 
+    struct timeval tv;
+    tv.tv_sec = 3;
+    tv.tv_usec = 0;    
+    ev = event_new(g_config.base, -1, EV_TIMEOUT, 
+         dtls_event_handler, g_config.dtls_params->dtls_ctx);
+    event_add(ev,&tv);
+
+    //srtp_do_handshake(g_config.dtls_params->dtls_ctx);
+
+    //SSL_do_handshake(g_config.dtls_params->dtls_ctx->ssl);
     //g_io_add_watch(io_stdin, G_IO_IN, stdin_send_data_cb, agent);
   } else if (state == ICE_COMPONENT_STATE_FAILED) {
      DEBUG("FIXME: component state failed");
@@ -900,15 +965,27 @@ static void
 cb_nice_recv(agent_t *agent, uint32_t _stream_id, uint32_t component_id,
     char *buf, uint32_t len, void *data)
 {
-  DEBUG("cb_nice_recv: %.*s", len, buf);
-  return;
+   int pt = 0;
+
+   DEBUG("got message: %u", len);
+   pt = ice_get_packet_type(buf,len);
+   if (pt == DTLS_PT) {
+      srtp_process_incoming_msg(g_config.dtls_params->dtls_ctx, buf, len);
+   } 
+   if (pt == RTP_PT) {
+      DEBUG("receive rtp packets");
+      
+   } else {
+      DEBUG("not handle for now");
+   }
+   return;
 }
 
 
 int WsClient::start_ice_process() {
    //int8_t controlling = 1;
    ice_set_log_callback(log_callback,0);
-   this->agent = ice_agent_new(this->base, ICE_COMPATIBILITY_RFC5245, 0);
+   this->agent = ice_agent_new(this->base, ICE_COMPATIBILITY_RFC5245, 1);
 
    if (agent == NULL) {
       DEBUG("Failed to create agent");
@@ -925,7 +1002,7 @@ int WsClient::start_ice_process() {
       DEBUG("Failed to add stream, stream_id=%u",this->stream_id);
       return -1;
    }
-   ice_agent_attach_recv(this->agent, stream_id, 1, cb_nice_recv, NULL);
+   ice_agent_attach_recv(this->agent, stream_id, 1, cb_nice_recv, this);
 
    this->ice_started = 1;
    if (ice_agent_gather_candidates(agent, stream_id) != ICE_OK) {
@@ -946,7 +1023,7 @@ void WsClient::message_cb(WsClient *conn, enum evws_data_type,
    uint32_t api = 0;
    int ret = -1;
 
-   DEBUG("message cb, data=%s\n", data);
+   DEBUG("message cb, len=%u, data=%s\n", len, data);
 
    try {
       ret = reader.parse(data,data+len,root,0);
@@ -975,7 +1052,7 @@ void WsClient::message_cb(WsClient *conn, enum evws_data_type,
             ice_candidate_resp(root);
             break;
          default:
-            DEBUG("unknow api, api=%u", api);
+            DEBUG("unknown api, api=%u", api);
             break;
       }
    } catch (...) {
@@ -1000,4 +1077,23 @@ void WsClient::get_random(uint8_t *buf, size_t len) {
 }
 
 
+int WsClient::play() {
+   Json::Value root;
+   Json::FastWriter writer;
+   std::string output;
+   DEBUG("playing, channel_id=%u", g_config.channel_id);
+
+      root["msgtype"] = SNW_ICE;
+      root["api"] = SNW_ICE_PLAY;
+      root["roomid"] = 1443712566;
+      root["channelid"] = g_config.channel_id;
+      root["id"] = this->id;
+      output = writer.write(root);
+      DEBUG("generate and send answer, s=%s",output.c_str());//snw_ice_generate_sdp
+      this->send_message(EVWS_DATA_TEXT,output.c_str(),output.size());
+
+
+
+   return 0;
+}
 

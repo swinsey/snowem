@@ -199,7 +199,7 @@ ice_agent_add_stream(agent_t *agent, uint32_t n_components) {
 
    /*. init components of stream, possibly create pseudo_tcp */
    stream->id = agent->next_stream_id++;
-   ICE_INFO("allocating stream, agent=%p, sid=%u(%p),n=%u", 
+   ICE_DEBUG("allocating stream, agent=%p, sid=%u(%p),n=%u", 
             agent, stream->id, stream, n_components);
    if (agent->reliable) {
       /* FIXME: create reliable stream 

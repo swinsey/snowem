@@ -13,7 +13,7 @@ add_subdirectory(wslay)
 
 #file(GLOB sources_include include/*.h)
 file(GLOB sources benchmark.cpp wsclient.cpp wsclient.h validation.c validation.h 
-                  dtls.h dtls.c util.h util.c ../jsoncpp/*.cpp ../jsoncpp/json/*.h
+                  dtls.h dtls.cpp util.h util.c ../jsoncpp/*.cpp ../jsoncpp/json/*.h
                   sdp.c sdp.h)
 #file(GLOB sources worked.c validation.c validation.h)
 
