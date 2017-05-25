@@ -145,7 +145,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    /* The write BIO needs our custom filter, or fragmentation won't work */
    dtls->filter_bio = BIO_new(BIO_ice_dtls_filter()); //call: dtls_bio_filter_ctrl
    if (!dtls->filter_bio) {
-      ICE_ERROR2("failed to create filter_BIO, err=%s", SRTP_ERR_STR);
+      ICE_ERROR("failed to create filter_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
       return NULL;
    }
@@ -157,10 +157,8 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    SSL_set_bio(dtls->ssl, dtls->read_bio, dtls->filter_bio);
    dtls->role = role;
    if (dtls->role == DTLS_ROLE_CLIENT) {
-      ICE_ERROR2("Setting state: connect, role=%u",dtls->role);
       SSL_set_connect_state(dtls->ssl);
    } else {
-      ICE_DEBUG2("Setting state: accept, role=%u",dtls->role);
       SSL_set_accept_state(dtls->ssl);
    }
 
@@ -191,11 +189,12 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
    if (dtls == NULL || dtls->ssl == NULL)
       return;
 
+   //FIXME: state not used?
    if (dtls->state == DTLS_STATE_CREATED)
       dtls->state = DTLS_STATE_TRYING;
 
+   //DEBUG("Start DTLS handshake");
    SSL_do_handshake(dtls->ssl);
-   ICE_DEBUG2("After doing DTLS handshake");
    srtp_send_data(dtls);
 
    return;
@@ -525,7 +524,7 @@ int srtp_send_data(dtls_ctx_t *dtls) {
 
    pending = BIO_ctrl_pending(dtls->filter_bio);
    while (pending > 0) {
-      char outgoing[pending];
+      char outgoing[pending]; //FIXME: change init of array?
       int out = BIO_read(dtls->write_bio, outgoing, sizeof(outgoing));
 
       ICE_DEBUG2("read data from the write_BIO, pending=%u, len=%u", pending, out);

@@ -122,12 +122,13 @@ socket_udp_read_cb(evutil_socket_t fd, short what, void *ctx)
    recvlen = recvfrom(fd, buf, MAX_BUF_SIZE, 0, (struct sockaddr*)&remaddr, &addrlen);
 
    ICE_DEBUG("Receive data, fd=%u, ip=%u, port=%u, recvlen: %ld", 
-        fd, remaddr.sin_addr.s_addr, remaddr.sin_port, recvlen);
+        fd, remaddr.sin_addr.s_addr, ntohs(remaddr.sin_port), recvlen);
    if (recvlen <= 0) {
       ICE_ERROR("could not receive data, ret=%ld",recvlen);
       return;
    }   
 
+   //ICE_HEXDUMP(buf,recvlen,"udp");
    ICE_DEBUG("get udp socket, agent=%p,stream=%p,component=%p",
          sock->agent,sock->stream,sock->component);
    memset(&fromaddr, 0, sizeof(fromaddr));

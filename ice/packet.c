@@ -51,9 +51,10 @@ int rtp_list_size(rtp_packet_t* head) {
    return cnt;
 }
 
+//FIXME: change number to CONSTANTS
 int ice_get_packet_type(char* buf, int len) {
    rtp_header *header = NULL;
-
+   
    if (!buf || len <= 0) {
       return UNKNOWN_PT;
    }

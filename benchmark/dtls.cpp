@@ -334,7 +334,7 @@ int srtp_send_data(dtls_ctx_t *dtls) {
       int out = BIO_read(dtls->write_bio, outgoing, sizeof(outgoing));
 
       DEBUG("read data from the write_BIO, pending=%u, len=%u", pending, out);
-      if(out > 1500) {
+      if (out > 1500) {
          /* FIXME need proper fragmentation */
          DEBUG("larger than the MTU, len=%u", out);
       }
@@ -342,7 +342,7 @@ int srtp_send_data(dtls_ctx_t *dtls) {
                                  dtls->component_id, outgoing, out);
 
       HEXDUMP(outgoing,out,"dtls");
-      if(bytes < out) {
+      if (bytes < out) {
          DEBUG("failed to send DTLS message, cid=%u, sid=%u, len=%d", 
                dtls->component_id, dtls->stream_id, bytes);
       } else {

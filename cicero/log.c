@@ -41,7 +41,7 @@
 
 int g_verbose = 1;
 int g_log_fd = -1;
-int g_log_level = ICE_LOG_WARN;
+int g_log_level = ICE_LOG_DEBUG;
 ice_log_cb g_ice_log_cb = NULL;
 void *g_ice_log_data = NULL;
 

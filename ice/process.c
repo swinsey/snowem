@@ -364,7 +364,10 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
       return;
    }
 
+   DEBUG(log, "Start DTLS handshake");
    srtp_do_handshake(component->dtls);
+
+
    DEBUG(log, "FIXME: Creating retransmission timer");
    //FIXME: timeout to call dtls_retry
 
@@ -1230,12 +1233,6 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
 
    session->curtime = now;
 
-   if (!component->dtls) {
-      WARN(log, "dtls not setup yet, flowid=%u, cid=%u, sid=%u", 
-           session->flowid, component_id, stream_id);
-      return;
-   }
-
    pt = ice_get_packet_type(buf,len);
    if (pt == UNKNOWN_PT) {
       ERROR(log, "unknown packet type, flowid=%u, len=%u", session->flowid, len);
@@ -1247,25 +1244,14 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
       return;
    }
 
-   // FIXME: rewrite this code
-   //if (component_id == 1 && (!IS_FLAG(session, WEBRTC_RTCPMUX) || pt == RTP_PT)) {
-   if (pt == RTP_PT) {
-      if (!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_in) {
-         WARN(log, "dtls not setup yet, flowid=%u", session->flowid);
-      } else {
+   if(!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_in) {
+      WARN(log, "dtls not setup yet, flowid=%u", session->flowid);
+   } else {
+      if (pt == RTP_PT) {
          ice_rtp_incoming_msg(session,stream,component,buf,len);
-      }
-      return;
-   }
-
-   //if ( component_id == 2 || ( component_id == 1 && pt == RTCP_PT && IS_FLAG(session, WEBRTC_RTCPMUX))) {
-   if (pt == RTCP_PT) {
-      if(!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_in) {
-         WARN(log, "dtls not setup yet, flowid=%u", session->flowid);
-      } else {
+      } else if (pt == RTCP_PT) {
          ice_rtcp_incoming_msg(session,stream,component,buf,len);
       }
-      return;
    }
 
    return;
@@ -2337,7 +2323,7 @@ int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
          c->password = strdup(stream->rpass);
          address_set_from_string(&c->base_addr, relip);
          address_set_port(&c->base_addr, relport);
-
+         /* FIXME: new candidate is not free when component->is_started = 0*/
          snw_ice_try_start_component(session,stream,component,c);
       }
    } else {
