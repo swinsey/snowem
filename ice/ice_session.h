@@ -33,22 +33,20 @@ struct snw_ice_session {
    char              *audio_mid;     /* Audio mid (media ID) */
    char              *video_mid;     /* Video mid (media ID) */
 
-   snw_ice_stream_t streams;
+   snw_ice_stream_t  streams;
    snw_ice_stream_t *audio_stream;   /* Audio stream */
    snw_ice_stream_t *video_stream;   /* Video stream */
 
-   char *rtp_profile;                /* RTP profile set by caller (so that we can match it) */
-   char *local_sdp;                  /* SDP generated locally */
-   char *remote_sdp;                 /* SDP received by the peer */
+   char             *local_sdp;
+   char             *remote_sdp;
 
-   //int64_t created;                  /* created time */
-   int64_t curtime;                  /* current time */
-   int64_t lasttime; 
+   int64_t           curtime;
+   int64_t           lasttime; 
 
-   char rhashing[16];                /* hashing algorhitm for dtls */
-   char rfingerprint[256];           /* hashed fingerprint in SDP */
-   char ruser[32];                   /* ice username */
-   char rpass[64];                   /* ice password */
+   char remote_hashing[16];
+   char remote_fingerprint[256];
+   char remote_user[32];
+   char remote_pass[64];
 
    //recorder_t* a_recorder;
    //recorder_t* v_recorder;

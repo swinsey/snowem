@@ -878,7 +878,8 @@ snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *
 int 
 snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *remote_sdp) {
    sdp_attribute_t *a = NULL;
-   const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
+   const char *remote_user = NULL, *remote_pass = NULL; 
+   const char *remote_hashing = NULL, *remote_fingerprint = NULL;
 
    a = remote_sdp->sdp_attributes;
    while (a) {
@@ -886,47 +887,49 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
          if (!strcasecmp(a->a_name, "fingerprint")) {
             ICE_DEBUG2("global credentials, value=%s", a->a_value);
             if (strcasestr(a->a_value, "sha-256 ") == a->a_value) {
-               rhashing = "sha-256";
-               rfingerprint = a->a_value + strlen("sha-256 ");
+               remote_hashing = "sha-256";
+               remote_fingerprint = a->a_value + strlen("sha-256 ");
             } else if (strcasestr(a->a_value, "sha-1 ") == a->a_value) {
-               rhashing = "sha-1";
-               rfingerprint = a->a_value + strlen("sha-1 ");
+               remote_hashing = "sha-1";
+               remote_fingerprint = a->a_value + strlen("sha-1 ");
             } else {
                ICE_DEBUG2("unknown algorithm, s=%s",a->a_name);
             }    
          } else if(!strcasecmp(a->a_name, "ice-ufrag")) {
-            ruser = a->a_value;
+            remote_user = a->a_value;
          } else if(!strcasecmp(a->a_name, "ice-pwd")) {
-            rpass = a->a_value;
+            remote_pass = a->a_value;
          }
       }
       a = a->a_next;
    }
 
-   if (!ruser || !rpass || !rhashing || !rfingerprint) {
+   if (!remote_user || !remote_pass || !remote_hashing || !remote_fingerprint) {
       ICE_ERROR2("global credentials not found");
       return -1;
    }
 
-   memcpy(session->ruser,ruser,strlen(ruser));
-   memcpy(session->rpass,rpass,strlen(rpass));
-   memcpy(session->rhashing,rhashing,strlen(rhashing));
-   memcpy(session->rfingerprint,rfingerprint,strlen(rfingerprint));
+   memcpy(session->remote_user,remote_user,strlen(remote_user));
+   memcpy(session->remote_pass,remote_pass,strlen(remote_pass));
+   memcpy(session->remote_hashing,remote_hashing,strlen(remote_hashing));
+   memcpy(session->remote_fingerprint,remote_fingerprint,strlen(remote_fingerprint));
 
    ICE_DEBUG2("global credentials, ruser=%s, rpass=%s, rhashing=%s, rfingerprint=%s",
-         session->ruser, session->rpass, session->rhashing, session->rfingerprint);
+         session->remote_user, session->remote_pass, 
+         session->remote_hashing, session->remote_fingerprint);
 
    return 0;
 }
 
 int 
 snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_session_t *remote_sdp) {
+   snw_log_t *log = 0;
    sdp_attribute_t *a = NULL;
    sdp_media_t *m = NULL;
    const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
 
-   if (stream == NULL) 
-      return -1;
+   if (!stream) return -1;
+   log = session->ice_ctx->log;
 
    m = remote_sdp->sdp_media;
    a = m->m_attributes;
@@ -934,13 +937,13 @@ snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *
       if(a->a_name) {
          if(!strcasecmp(a->a_name, "mid")) {
             if(m->m_type == sdp_media_audio && m->m_port > 0) {
-               ICE_DEBUG2("Audio mid: %s", a->a_value);
+               DEBUG(log, "Audio mid: %s", a->a_value);
                session->audio_mid = strdup(a->a_value);
             } else if(m->m_type == sdp_media_video && m->m_port > 0) {
-               ICE_DEBUG2("Video mid: %s", a->a_value);
+               DEBUG(log, "Video mid: %s", a->a_value);
                session->video_mid = strdup(a->a_value);
             } else if(m->m_type == sdp_media_application) {
-               //FIXME
+               /* TODO: support data channel */
             }
          } 
          else if(!strcasecmp(a->a_name, "fingerprint")) {
@@ -1041,9 +1044,6 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
    m = remote_sdp->sdp_media;
    while (m) {
       if (m->m_type == sdp_media_audio) {
-         if (session->rtp_profile == NULL && m->m_proto_name != NULL)
-            session->rtp_profile = strdup(m->m_proto_name);
-
          if (m->m_port > 0) {
             audio++;
             if(audio > 1) {
@@ -1055,9 +1055,6 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
             CLEAR_FLAG(session, WEBRTC_AUDIO);
          }
       } else if(m->m_type == sdp_media_video) {
-         if (session->rtp_profile == NULL && m->m_proto_name != NULL)
-            session->rtp_profile = strdup(m->m_proto_name);
-         
          if (m->m_port > 0) {
             video++;
             if (video > 1) {
@@ -1077,7 +1074,7 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
          /* TODO: support data channel */
 
       } else {
-         ICE_DEBUG2("Skipping disabled/unsupported media line");
+         WARN(log,"unsupported media line, s=%d",m->m_type);
          m = m->m_next;
          continue;
       }

@@ -1850,8 +1850,6 @@ ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_s
    return;
 }
 
-
-
 void 
 snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    snw_log_t *log = 0;
@@ -1864,11 +1862,6 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    if (session->agent) {
       ice_agent_free(session->agent);
       session->agent = 0;
-   }
-
-   if (session->rtp_profile) {
-      free(session->rtp_profile);
-      session->rtp_profile = NULL;
    }
 
    if (session->local_sdp) {
@@ -2248,6 +2241,7 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
       }*/
 
       if (!IS_FLAG(session, WEBRTC_READY)) {
+         session->remote_sdp = strdup(jsep_sdp);
          snw_ice_sdp_handle_answer(session, jsep_sdp);//sdp_parser);
 
          DEBUG(log, "setting webrtc flags, bundle=%u,rtcpmux=%u,trickle=%u",
@@ -2281,7 +2275,6 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
          ERROR(log, "state error, flags=%u",session->flags);
          goto jsondone;
       }
-      session->remote_sdp = strdup(jsep_sdp);
 
       root["rc"] = 0;
       output = writer.write(root);
