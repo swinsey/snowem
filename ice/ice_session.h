@@ -28,20 +28,16 @@ struct snw_ice_session {
    int                streams_num;
    int                control_mode;
 
-   uint32_t           audio_id;      /* audio ID */
-   uint32_t           video_id;      /* video ID */
-   char              *audio_mid;     /* Audio mid (media ID) */
-   char              *video_mid;     /* Video mid (media ID) */
+   snw_ice_stream_t   streams;
+   snw_ice_stream_t  *audio_stream;
+   snw_ice_stream_t  *video_stream;
+   snw_ice_stream_t  *data_stream; /* TODO: support data channel */
 
-   snw_ice_stream_t  streams;
-   snw_ice_stream_t *audio_stream;   /* Audio stream */
-   snw_ice_stream_t *video_stream;   /* Video stream */
+   char              *local_sdp;
+   char              *remote_sdp;
 
-   char             *local_sdp;
-   char             *remote_sdp;
-
-   int64_t           curtime;
-   int64_t           lasttime; 
+   int64_t            curtime;
+   int64_t            lasttime; 
 
    char remote_hashing[16];
    char remote_fingerprint[256];

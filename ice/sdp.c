@@ -171,11 +171,11 @@ snw_ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp
    int video = (strstr(sdpstr, "m=video") != NULL);
    strncat(sdp, "a=group:BUNDLE", ICE_BUFSIZE);
    if (audio) {
-      snprintf(buffer, 512, " %s", session->audio_mid ? session->audio_mid : "audio");
+      snprintf(buffer, 512, " %s", "audio");
       strncat(sdp, buffer, ICE_BUFSIZE);
    }
    if (video) {
-      snprintf(buffer, 512, " %s", session->video_mid ? session->video_mid : "video");
+      snprintf(buffer, 512, " %s", "video");
       strncat(sdp, buffer, ICE_BUFSIZE);
    }
    strncat(sdp, "\r\n", ICE_BUFSIZE);
@@ -259,16 +259,18 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
    log = session->ice_ctx->log;
 
    if (video) {
-      uint32_t id = session->video_id;
+      uint32_t id = session->video_stream->stream_id;
 
       DEBUG(log, "add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
 
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-          id = session->audio_id > 0 ? session->audio_id : session->video_id;
+          id = session->audio_stream->stream_id > 0 ? 
+                   session->audio_stream->stream_id : 
+                   session->video_stream->stream_id;
 
       stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = snw_stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
    }
 
    if (!stream) return;
@@ -339,16 +341,18 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
       return;
 
    if ( video ) {
-      uint32_t id = session->video_id;
+      uint32_t id = session->video_stream->stream_id;
 
       ICE_DEBUG2("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
 
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-          id = session->audio_id > 0 ? session->audio_id : session->video_id;
+          id = session->audio_stream->stream_id > 0 ? 
+                   session->audio_stream->stream_id : 
+                   session->video_stream->stream_id;
 
       stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = snw_stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
    }
 
    if ( stream == NULL )
@@ -484,12 +488,14 @@ snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video
       return;
 
    if (video) {
-      uint32_t id = session->video_id;
+      uint32_t id = session->video_stream->stream_id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-          id = session->audio_id > 0 ? session->audio_id : session->video_id;
+          id = session->audio_stream->stream_id > 0 ? 
+                    session->audio_stream->stream_id : 
+                    session->video_stream->stream_id;
       stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = snw_stream_find(&session->streams, session->audio_id);
+      stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
    }
 
    if ( stream == NULL )
@@ -551,10 +557,10 @@ snw_ice_sdp_add_mline(snw_ice_session_t *session, sdp_media_t *m, int inactive, 
    /* a=mid:(audio|video) */
    switch (m->m_type) {
       case sdp_media_audio:
-         snprintf(buffer, 512, "a=mid:%s\r\n", session->audio_mid ? session->audio_mid : "audio");
+         snprintf(buffer, 512, "a=mid:%s\r\n", "audio");
          break;
       case sdp_media_video:
-         snprintf(buffer, 512, "a=mid:%s\r\n", session->video_mid ? session->video_mid : "video");
+         snprintf(buffer, 512, "a=mid:%s\r\n", "video");
          break;
       default:
          break;
@@ -613,17 +619,19 @@ snw_ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
       while (m) {
          if (m->m_type == sdp_media_audio && m->m_port > 0) {
             audio++;
-            if(audio > 1 || !session->audio_id) {
-               ICE_ERROR2("skipping audio, audio=%u, id=%u", audio, session->audio_id);
+            if(audio > 1 || !session->audio_stream->stream_id) {
+               ICE_ERROR2("skipping audio, audio=%u, id=%u", audio, session->audio_stream->stream_id);
                snw_ice_sdp_add_mline(session,m,1,0,sdp);
             } else {
                snw_ice_sdp_add_mline(session,m,0,0,sdp);
             }
          } else if (m->m_type == sdp_media_video && m->m_port > 0) {
             video++;
-            uint32_t id = session->video_id;
+            uint32_t id = session->video_stream->stream_id;
             if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-                id = session->audio_id > 0 ? session->audio_id : session->video_id;
+                id = session->audio_stream->stream_id > 0 ? 
+                          session->audio_stream->stream_id : 
+                          session->video_stream->stream_id;
 
             if (video > 1 || !id) {
                ICE_ERROR2("skipping video line, video=%u, id=%u", video, id);
@@ -809,27 +817,26 @@ snw_sdp_stream_update_ssrc(snw_ice_stream_t *stream, const char *ssrc_attr, int 
 
 int
 snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_media_t *m) {
+   snw_log_t *log = 0;
    sdp_attribute_t *a;
    const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
    
-   if ( stream == NULL || m == NULL )
+   if (stream == NULL || m == NULL)
       return -1;
+   log = session->ice_ctx->log;
 
    a = m->m_attributes;
    while(a) {
       if(a->a_name) {
          if(!strcasecmp(a->a_name, "mid")) {
             if(m->m_type == sdp_media_audio && m->m_port > 0) {
-               ICE_DEBUG2("Audio mid: %s", a->a_value);
-               session->audio_mid = strdup(a->a_value);
+               //DEBUG(log, "Audio mid: %s", a->a_value);
             } else if(m->m_type == sdp_media_video && m->m_port > 0) {
-               ICE_DEBUG2("Video mid: %s", a->a_value);
-               session->video_mid = strdup(a->a_value);
+               //DEBUG(log, "Video mid: %s", a->a_value);
             } else if(m->m_type == sdp_media_application) {
-               ICE_ERROR2("data channel not supported, mid=%s", a->a_value);
+               //
             }
          } else if(!strcasecmp(a->a_name, "fingerprint")) {
-            ICE_DEBUG2("Fingerprint (local) : %s", a->a_value);
             if(strcasestr(a->a_value, "sha-256 ") == a->a_value) {
                rhashing = "sha-256";
                rfingerprint = a->a_value + strlen("sha-256 ");
@@ -840,16 +847,13 @@ snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *
                //FIXME
             }
          } else if(!strcasecmp(a->a_name, "setup")) {
-            ICE_DEBUG2("DTLS setup (local):  %s", a->a_value);
             if(!strcasecmp(a->a_value, "actpass") || !strcasecmp(a->a_value, "passive"))
                stream->dtls_role = DTLS_ROLE_CLIENT;
             else if(!strcasecmp(a->a_value, "active"))
                stream->dtls_role = DTLS_ROLE_SERVER;
          } else if(!strcasecmp(a->a_name, "ice-ufrag")) {
-            ICE_DEBUG2("ICE ufrag (local):   %s", a->a_value);
             ruser = a->a_value;
          } else if(!strcasecmp(a->a_name, "ice-pwd")) {
-            ICE_DEBUG2("ICE pwd (local):     %s", a->a_value);
             rpass = a->a_value;
          }
       }
@@ -865,12 +869,12 @@ snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *
    memcpy(stream->ruser,ruser,strlen(ruser));
    memcpy(stream->rpass,rpass,strlen(rpass));
 
-   ICE_DEBUG2("stream info, stream=%p",stream);
-   ICE_DEBUG2("stream info, rhash=%s",stream->rhashing);
-   ICE_DEBUG2("stream info, rfingerprint=%s, len=%u",
+   DEBUG(log, "stream info, stream=%p",stream);
+   DEBUG(log, "stream info, rhash=%s",stream->rhashing);
+   DEBUG(log, "stream info, rfingerprint=%s, len=%u",
          stream->rfingerprint, strlen(stream->rfingerprint));
-   ICE_DEBUG2("stream info, ruser=%s",stream->ruser);
-   ICE_DEBUG2("stream info, rpass=%s",stream->rpass);
+   DEBUG(log, "stream info, ruser=%s",stream->ruser);
+   DEBUG(log, "stream info, rpass=%s",stream->rpass);
 
    return 0;
 }
@@ -917,72 +921,6 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
    ICE_DEBUG2("global credentials, ruser=%s, rpass=%s, rhashing=%s, rfingerprint=%s",
          session->remote_user, session->remote_pass, 
          session->remote_hashing, session->remote_fingerprint);
-
-   return 0;
-}
-
-int 
-snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *stream, sdp_session_t *remote_sdp) {
-   snw_log_t *log = 0;
-   sdp_attribute_t *a = NULL;
-   sdp_media_t *m = NULL;
-   const char *ruser = NULL, *rpass = NULL, *rhashing = NULL, *rfingerprint = NULL;
-
-   if (!stream) return -1;
-   log = session->ice_ctx->log;
-
-   m = remote_sdp->sdp_media;
-   a = m->m_attributes;
-   while(a) {
-      if(a->a_name) {
-         if(!strcasecmp(a->a_name, "mid")) {
-            if(m->m_type == sdp_media_audio && m->m_port > 0) {
-               DEBUG(log, "Audio mid: %s", a->a_value);
-               session->audio_mid = strdup(a->a_value);
-            } else if(m->m_type == sdp_media_video && m->m_port > 0) {
-               DEBUG(log, "Video mid: %s", a->a_value);
-               session->video_mid = strdup(a->a_value);
-            } else if(m->m_type == sdp_media_application) {
-               /* TODO: support data channel */
-            }
-         } 
-         else if(!strcasecmp(a->a_name, "fingerprint")) {
-            if(strcasestr(a->a_value, "sha-256 ") == a->a_value) {
-               rhashing = "sha-256";
-               rfingerprint = a->a_value + strlen("sha-256 ");
-            } else if(strcasestr(a->a_value, "sha-1 ") == a->a_value) {
-               rhashing = "sha-1";
-               rfingerprint = a->a_value + strlen("sha-1 ");
-            } else {
-               ICE_DEBUG2("unknown algorithm, a=%s",a->a_name);
-            }
-         } else if(!strcasecmp(a->a_name, "setup")) {
-            if(!strcasecmp(a->a_value, "actpass") || !strcasecmp(a->a_value, "passive"))
-               stream->dtls_role = DTLS_ROLE_CLIENT;
-            else if(!strcasecmp(a->a_value, "active"))
-               stream->dtls_role = DTLS_ROLE_SERVER;
-
-         } else if(!strcasecmp(a->a_name, "ice-ufrag")) {
-            ruser = a->a_value;
-         } else if(!strcasecmp(a->a_name, "ice-pwd")) {
-            rpass = a->a_value;
-         }
-      }
-      a = a->a_next;
-   }
-
-   if (!ruser || !rpass || !rfingerprint || !rhashing) {
-      return -2;
-   }
-   memcpy(stream->rhashing,rhashing,strlen(rhashing));
-   memcpy(stream->rfingerprint,rfingerprint,strlen(rfingerprint));
-   memcpy(stream->ruser,ruser,strlen(ruser));
-   memcpy(stream->rpass,rpass,strlen(rpass));
-
-   ICE_DEBUG2("stream info, rhashing=%s",stream->rhashing);
-   ICE_DEBUG2("stream info, rfingerprint=%s, len=%u",stream->rfingerprint, strlen(stream->rfingerprint));
-   ICE_DEBUG2("stream info, ruser=%s",stream->ruser);
-   ICE_DEBUG2("stream info, rpass=%s",stream->rpass);
 
    return 0;
 }
@@ -1050,7 +988,7 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
                m = m->m_next;
                continue;
             }
-            stream = snw_stream_find(&session->streams, session->audio_id);
+            stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
          } else {
             CLEAR_FLAG(session, WEBRTC_AUDIO);
          }
@@ -1062,9 +1000,11 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
                continue;
             }
             if(!IS_FLAG(session, WEBRTC_BUNDLE)) {
-               stream = snw_stream_find(&session->streams, session->video_id);
+               stream = snw_stream_find(&session->streams, session->video_stream->stream_id);
             } else {
-               uint32_t id = session->audio_id > 0 ? session->audio_id : session->video_id;
+               uint32_t id = session->audio_stream->stream_id > 0 ? 
+                                session->audio_stream->stream_id : 
+                                session->video_stream->stream_id;
                stream = snw_stream_find(&session->streams, id);
             }
          } else {

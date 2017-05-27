@@ -293,8 +293,11 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
             dtls->state = DTLS_STATE_FAILED;
             goto done;
          }
-         if(dtls->state == DTLS_STATE_CONNECTED) {
-            if(component->stream_id == session->audio_id || component->stream_id == session->video_id) {
+         if (dtls->state == DTLS_STATE_CONNECTED) {
+            //FIX: 28-05 jackiedinh
+            //if(component->stream_id == session->audio_id || component->stream_id == session->video_id) {
+            if (component->stream_id == session->audio_stream->stream_id 
+                || component->stream_id == session->video_stream->stream_id) {
                // Complete with SRTP setup
                unsigned char material[SRTP_MASTER_LENGTH*2];
                unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
