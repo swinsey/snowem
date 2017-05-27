@@ -286,9 +286,9 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
 
    if (!session) return;
 
-   session->cdone++;
+   session->streams_gathering_done++;
    DEBUG(log, "gathering done, user_data=%p, stream=%d, cdone=%u, streams_num=%u",
-          user_data, stream_id, session->cdone, session->streams_num);
+          user_data, stream_id, session->streams_gathering_done, session->streams_num);
 
    snw_ice_stream_t *stream = snw_stream_find(&session->streams, stream_id);
    if (!stream) {
@@ -297,7 +297,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    }
    stream->cdone = 1;
 
-   if (session->cdone == session->streams_num) {
+   if (session->streams_gathering_done == session->streams_num) {
       int ret = snw_ice_generate_sdp(session);
       if (ret < 0 || !session->local_sdp) {
          ERROR(log, "failed to generate sdp, ret=%d, local_sdp=%s",ret,session->local_sdp);
@@ -407,7 +407,8 @@ snw_ice_cb_component_state_changed(agent_t *agent,
    }
    component->state = state;
    if ((state == ICE_COMPONENT_STATE_CONNECTED || state == ICE_COMPONENT_STATE_READY)) {
-      session->ready = 1;
+      //session->ready = 1;
+      SET_FLAG(session,WEBRTC_READY);
    }
 
    if(state == ICE_COMPONENT_STATE_FAILED) {
@@ -618,7 +619,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       goto done;
    }
 
-   if(!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_out) {
+   if(!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
       goto done;
    }
 
@@ -692,7 +693,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       goto done;
    }
 
-   if(!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_out) {
+   if(!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
       goto done;
    }
 
@@ -1222,20 +1223,19 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    int pt = 0;
 
    component = (snw_ice_component_t *)data;
-   if (!component) return;
+   if (!component || !component->stream 
+       || !component->stream->session) 
+      return;
 
    stream = component->stream;
-   if (!stream) return;
-
    session = stream->session;
-   if (!session) return;
    log = session->ice_ctx->log;
-
    session->curtime = now;
 
    pt = ice_get_packet_type(buf,len);
    if (pt == UNKNOWN_PT) {
-      ERROR(log, "unknown packet type, flowid=%u, len=%u", session->flowid, len);
+      ERROR(log, "unknown packet type, flowid=%u, len=%u", 
+                 session->flowid, len);
       return;
    }
 
@@ -1244,7 +1244,8 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
       return;
    }
 
-   if(!component->dtls || !component->dtls->srtp_valid || !component->dtls->srtp_in) {
+   if (!component->dtls || !component->dtls->is_valid 
+       || !component->dtls->srtp_in) {
       WARN(log, "dtls not setup yet, flowid=%u", session->flowid);
    } else {
       if (pt == RTP_PT) {
@@ -1381,7 +1382,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    agent = (agent_t*)ice_agent_new(session->base,ICE_COMPATIBILITY_RFC5245,0);
    if (!agent) return -1;
 
-   // set callbacks and handler for ice protocols
+   // set callbacks and handlers for ice protocols
    ice_set_candidate_gathering_done_cb(agent, snw_ice_cb_candidate_gathering_done, session);
    ice_set_new_selected_pair_cb(agent, snw_ice_cb_new_selected_pair, session);
    ice_set_component_state_changed_cb(agent, snw_ice_cb_component_state_changed, session);
@@ -1389,12 +1390,12 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
 
    session->ice_ctx = ice_ctx;
    session->agent = agent;
-   session->cdone = 0;
+   session->streams_gathering_done = 0;
    session->streams_num = 0;
-   session->controlling = 0;//ice_ctx->ice_lite_enabled;
+   session->control_mode = ICE_CONTROLLED_MODE;
 
-   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, controlling=%u",
-         session->flowid, ice_ctx->ice_lite_enabled, session->controlling);
+   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, control_mode=%u",
+         session->flowid, ice_ctx->ice_lite_enabled, session->control_mode);
 
    ret = snw_ice_add_local_addresses(session);
    if (ret < 0) {
@@ -1535,9 +1536,9 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
 
    DEBUG(log,"init new session, channelid=%u, flowid=%u", channelid, session->flowid);
    session->channelid = channelid;
-   session->controlling = 0;
+   session->control_mode = ICE_CONTROLLED_MODE;
    session->base = ctx->ev_base;
-   session->ready = 0;
+   //session->ready = 0;
    session->flags = 0;
    INIT_LIST_HEAD(&session->streams.list);
    DEBUG(log,"search channel, flowi=%u, channelid=%u",flowid,channelid);

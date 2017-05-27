@@ -165,17 +165,6 @@ inline string c2s(const char c)
 	return string()+c;
 }
 
-/**
- * binary->string
- * @param b binary指针
- * @param len binary长度
- * @param block 显示格式<br>
- *                      =0格式为"00 01 02 ..." <br>
- *                      >0格式为(以8为例)"0000h: 00 01 02 03 04 05 06 07 08  09 0a 0b 0c 0d 0e 0f" <br>
- *                                                               "0010h: 10 11 12 13 14 15 16 17 18  19 1a 1b 1c 1d 1e 1f" <br>
- * @return string 得到的格式串
- * @see #s2b
- */
 string b2s(const char *b,size_t len,const unsigned block = 8);
 
 inline string t2s(const time_t t,const string& format="%Y-%m-%d %H:%M:%S")
@@ -187,23 +176,11 @@ inline string t2s(const time_t t,const string& format="%Y-%m-%d %H:%M:%S")
 	return string(sTmp);
 }
 
-/**
- * now->string
- * @param format 显示格式,参见date指令格式
- * @return string 得到的格式串
- * @see #t2s
- */
 inline string now(const string& format="%Y-%m-%d %H:%M:%S")
 {
 	return t2s(time(0),format);
 }
 
-
-/**
- * string转unsigned
- * @throw comm_error string格式不是unsigned
- * @see #u2s
- */
 inline unsigned s2u(const string &s) throw (comm_error)
 {
 	if(s.length()==0) {
@@ -218,11 +195,6 @@ inline unsigned s2u(const string &s) throw (comm_error)
 	return strtoul(s.c_str(),NULL,10);
 }
 
-
-/**
- * string转unsigned (格式不对时设为默认值)
- * @see #u2s
- */
 inline unsigned s2u(const string &s,unsigned defaultvalue)
 {
 	if(s.length()==0) {
@@ -237,11 +209,6 @@ inline unsigned s2u(const string &s,unsigned defaultvalue)
 	return strtoul(s.c_str(),NULL,10);
 }
 
-/**
- * 16进制格式string转unsigned,支持的格式为0x+字符串或者直接为字符串
- * @throw comm_error string格式不是unsigned
- * @see #u2sx
- */
 inline unsigned sx2u(const string &s) throw (comm_error)
 {
 	size_t len = s.length();
@@ -263,10 +230,6 @@ inline unsigned sx2u(const string &s) throw (comm_error)
 	return strtoul(s.c_str()+idx,NULL,16);
 }
 
-/**
- * 16进制格式string转unsigned (格式不对时设为默认值)
- * @see #u2sx
- */
 inline unsigned sx2u(const string &s,unsigned defaultvalue)
 {
 	size_t len = s.length();
@@ -288,11 +251,6 @@ inline unsigned sx2u(const string &s,unsigned defaultvalue)
 	return strtoul(s.c_str()+idx,NULL,16);
 }
 
-/**
- * string转int
- * @throw comm_error string格式不是unsigned
- * @see #i2s
- */
 inline int s2i(const string &s) throw (comm_error)
 {
 	if(s.c_str()[0] == '-') {
@@ -305,10 +263,6 @@ inline int s2i(const string &s) throw (comm_error)
 	return 0;
 }
 
-/**
- * string转int (格式不对时设为默认值)
- * @see #i2s
- */
 inline int s2i(const string &s,int defaultvalue) 
 {
 	unsigned d = (defaultvalue < 0?-1*defaultvalue:defaultvalue);
@@ -322,32 +276,18 @@ inline int s2i(const string &s,int defaultvalue)
 	return 0;
 }
 
-/**
- * string转char (取string第一位)
- * @see #c2s
- */
 inline char s2c(const string &s)
 {
 	if(s.length()==0) return 0;
 	return s.c_str()[0];
 }
 
-/**
- * string转char (string为""时返回默认值)
- * @see #c2s
- */
 inline char s2c(const string &s,char defaultvalue)
 {
 	if(s.length()==0) return defaultvalue;
 	return s.c_str()[0];
 }
 
-/**
- * string转binary,支持的格式"00 01 ..."或"0001..."
- * @throw comm_error string格式不对
- * @return size_t binary大小
- * @see #b2s
- */
 inline size_t s2b(const string &s,char *b,size_t maxlen) throw (comm_error)
 {
 	if(maxlen==0) return 0;
@@ -368,24 +308,8 @@ inline size_t s2b(const string &s,char *b,size_t maxlen) throw (comm_error)
 	return i;
 }
 
-/**
- * string转time_t
- * @throw comm_error string格式不对
- * @return time_t 返回时间
- * @see #t2s
- */
 time_t s2t(const string &s,const string& format="%Y-%m-%d %H:%M:%S") throw (comm_error);
 
-// in: s - src string
-// out: s - string after trim
-// return : head
-/**
- * 根据split去掉string的头,类似GetToken<br>
- * 如string s = "ab cd ef", trim(s)返回ab，s则变为"cd ed"
- * @param s 源字符串
- * @param split 分隔符
- * @return 头
- */
 string trim_head(string& s,const string& split=" \t");
 
 }}

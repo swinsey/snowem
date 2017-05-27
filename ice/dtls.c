@@ -115,7 +115,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    memset(dtls,0,sizeof(dtls_ctx_t));
 
    /* Create SSL context */
-   dtls->srtp_valid = 0;
+   dtls->is_valid = 0;
    dtls->ssl = SSL_new(srtp_get_ssl_ctx());
    if (!dtls->ssl) {
       ICE_ERROR2("failed to create DTLS session, err=%s",
@@ -221,7 +221,7 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
       list_for_each(p,&s->components.list) {
          snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
          DEBUG(log, "checking component, sid=%u, cid=%u",s->stream_id, c->component_id);
-         if (!c->dtls || !c->dtls->srtp_valid) {
+         if (!c->dtls || !c->dtls->is_valid) {
             DEBUG(log, "component not ready, sid=%u, cid=%u",s->stream_id, c->component_id);
             return;
          }    
@@ -352,14 +352,14 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
                          component->component_id, stream->stream_id, ret);
                   goto done;
                }
-               dtls->srtp_valid = 1;
+               dtls->is_valid = 1;
                ICE_DEBUG2("Created outbound SRTP session for component %d in stream %d", 
                      component->component_id, stream->stream_id);
             }
             dtls->ready = 1;
          }
 done:
-         if (dtls->srtp_valid) {
+         if (dtls->is_valid) {
             ice_srtp_handshake_done(session, component);
          } else {
             srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
@@ -372,23 +372,28 @@ done:
 int
 srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    char data[1500];
+   snw_log_t *log = 0;
+   snw_ice_component_t *component = 0;
    int read = 0;
    int written = 0;
 
-   ICE_DEBUG2("dtls message, len=%u",len);
    if (!dtls || !dtls->ssl || !dtls->read_bio) {
       return -1;
    }
-   ICE_DEBUG2("srtp_send_data");
+   component = (snw_ice_component_t*)dtls->component;
+   log = component->stream->session->ice_ctx->log;
+   
+   DEBUG(log, "dtls message, len=%u",len);
+
    srtp_send_data(dtls);
    written = BIO_write(dtls->read_bio, buf, len);
    if (written != len) {
-      ICE_ERROR2("failed to write, written=%u, len=%u", written, len);
+      ERROR(log, "failed to write, written=%u, len=%u", written, len);
    } else {
-      ICE_DEBUG2("bio write, written=%u", written);
+      DEBUG(log, "bio write, written=%u", written);
    }
-   ICE_DEBUG2("srtp_send_data 1, written=%d",written);
-   srtp_send_data(dtls);
+   //DEBUG(log, "srtp_send_data 1, written=%d",written);
+   //srtp_send_data(dtls);
 
    /* Try to read data */
    memset(&data, 0, 1500);
@@ -398,25 +403,24 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
       if (err == SSL_ERROR_SSL) {
          char error[200];
          ERR_error_string_n(ERR_get_error(), error, 200);
-         ICE_ERROR2("Handshake error: read=%d, s=%s", read, error);
+         ERROR(log,"Handshake error: read=%d, s=%s", read, error);
          return -9;
       }
    }
-   ICE_DEBUG2("srtp_send_data 2, read=%d",read);
+   DEBUG(log, "srtp_send_data 2, read=%d",read);
    srtp_send_data(dtls);
 
    if (!SSL_is_init_finished(dtls->ssl)) {
-      /* Nothing else to do for now */
       return -8;
    }
 
    if (dtls->ready) {
-      ICE_DEBUG2("data available, read=%u",read);
+      DEBUG(log,"data available, read=%u",read);
       if(read > 0) {
-         ICE_DEBUG2("Data available but Data Channels support disabled...");
+         DEBUG(log,"Data available but Data Channels support disabled...");
       }
    } else {
-      ICE_DEBUG2("DTLS established");
+      DEBUG(log,"DTLS established");
       srtp_dtls_setup(dtls);
    }
 
@@ -438,7 +442,7 @@ void srtp_context_free(dtls_ctx_t *dtls) {
    dtls->read_bio = NULL;
    dtls->write_bio = NULL;
    dtls->filter_bio = NULL;
-   if(dtls->srtp_valid) {
+   if(dtls->is_valid) {
       if(dtls->srtp_in) {
          srtp_dealloc(dtls->srtp_in);
          dtls->srtp_in = NULL;

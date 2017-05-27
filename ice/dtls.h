@@ -55,7 +55,7 @@ struct dtls_ctx {
 
    int role;                    /* DTLS role */
    int state;                   /* DTLS state */
-   int srtp_valid;              
+   int is_valid;              
    int ready;                   
    int64_t dtls_connected;      /* Monotonic time of when the DTLS state has switched to connected */
    dtls_bio_filter bio_pending_state;

@@ -8,6 +8,11 @@
 #include "ice_stream.h"
 #include "ice_types.h"
 
+enum {
+   ICE_CONTROLLED_MODE = 0,
+   ICE_CONTROLLING_MODE = 1,
+};
+
 struct snw_ice_session {
    uint32_t flowid;
    uint32_t channelid;
@@ -17,29 +22,27 @@ struct snw_ice_session {
    snw_ice_context_t *ice_ctx;
    struct event_base *base;
    agent_t           *agent;
+   uint32_t           flags;
 
-   uint32_t status;
-   uint32_t flags;                   /* WebRTC-related flags */
-   uint32_t ready;
-   
-   char *sdp;                        /* Hold temporary local sdp */
-   int cdone;                        /* Number of gathered candidates */
-   int controlling;                  /* ICE role (controlling or controlled) */
-   uint32_t audio_id;                /* audio ID */
-   uint32_t video_id;                /* video ID */
-   char *audio_mid;                  /* Audio mid (media ID) */
-   char *video_mid;                  /* Video mid (media ID) */
-   int streams_num;                  /* Number of streams */
+   int                streams_gathering_done;
+   int                streams_num;
+   int                control_mode;
+
+   uint32_t           audio_id;      /* audio ID */
+   uint32_t           video_id;      /* video ID */
+   char              *audio_mid;     /* Audio mid (media ID) */
+   char              *video_mid;     /* Video mid (media ID) */
 
    snw_ice_stream_t streams;
    snw_ice_stream_t *audio_stream;   /* Audio stream */
    snw_ice_stream_t *video_stream;   /* Video stream */
 
    char *rtp_profile;                /* RTP profile set by caller (so that we can match it) */
+   //char              *sdp;           /* Hold temporary local sdp */
    char *local_sdp;                  /* SDP generated locally */
    char *remote_sdp;                 /* SDP received by the peer */
 
-   int64_t created;                  /* created time */
+   //int64_t created;                  /* created time */
    int64_t curtime;                  /* current time */
    int64_t lasttime; 
 
