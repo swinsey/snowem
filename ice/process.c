@@ -13,6 +13,42 @@
 #include "process.h"
 #include "utils.h"
 
+/* FIXME: standardize sdp */
+static int
+snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx, 
+      char *sdp, uint32_t len, int sendonly) {
+   static const char *sdp_template = 
+         "v=0\r\no=- %lu %lu IN IP4 127.0.0.1\r\ns=%s\r\nt=0 0\r\n%s%s";
+   static  const char *audio_mline_template = 
+         "m=audio 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d opus/48000/2\r\n";
+   static  const char *video_mline_template = 
+         "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
+         "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
+   static char audio_mline[256], video_mline[512];
+   snw_log_t *log = 0;
+
+   if (!ice_ctx) return -1;
+   log = ice_ctx->log;
+
+   DEBUG(log,"sendonly=%u",sendonly);
+
+   memset(audio_mline,0,512);
+   snprintf(audio_mline, 256, audio_mline_template,
+       OPUS_PT, sendonly ? "sendonly" : "sendrecv", OPUS_PT);
+
+   memset(video_mline,0,512);
+   snprintf(video_mline, 512, video_mline_template,
+       VP8_PT, sendonly ? "sendonly" : "sendrecv",
+       VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT);
+
+   memset(sdp,0,len);
+   snprintf(sdp, len, sdp_template,
+       get_real_time(), get_real_time(),
+       "PeerCall Replay", audio_mline, video_mline);
+
+   return 0;
+}
+
 
 void ice_send_candidate(snw_ice_session_t *session, int video, char *buffer, int len) {
    snw_context_t *ctx;
@@ -253,6 +289,7 @@ verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const 
 
 int
 snw_ice_generate_sdp(snw_ice_session_t *session) {
+   static char base_sdp[1024];
    snw_log_t *log = session->ice_ctx->log;
    ice_sdp_attr_t sdp_attr;
    char *sdp_merged;
@@ -260,10 +297,11 @@ snw_ice_generate_sdp(snw_ice_session_t *session) {
    if (!session)
       return -1;
 
-   DEBUG(log, "sdp info, sdp=%s",session->sdp);
-   snw_ice_get_sdp_attr(session->ice_ctx,session->sdp,&sdp_attr);
+   snw_ice_generate_base_sdp(session->ice_ctx,base_sdp,1024,0);
+   DEBUG(log, "sdp info, base_sdp=%s",base_sdp);
+   snw_ice_get_sdp_attr(session->ice_ctx,base_sdp,&sdp_attr);
 
-   sdp_merged = snw_ice_sdp_merge(session, session->sdp);
+   sdp_merged = snw_ice_sdp_merge(session, base_sdp);
    if (!sdp_merged) {
       return -2;
    }
@@ -283,6 +321,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    Json::Value root,sdp;
    std::string output;
    Json::FastWriter writer;
+   int ret = 0;
 
    if (!session) return;
 
@@ -298,7 +337,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    stream->cdone = 1;
 
    if (session->streams_gathering_done == session->streams_num) {
-      int ret = snw_ice_generate_sdp(session);
+      ret = snw_ice_generate_sdp(session);
       if (ret < 0 || !session->local_sdp) {
          ERROR(log, "failed to generate sdp, ret=%d, local_sdp=%s",ret,session->local_sdp);
       }
@@ -1382,6 +1421,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    agent = (agent_t*)ice_agent_new(session->base,ICE_COMPATIBILITY_RFC5245,0);
    if (!agent) return -1;
 
+
    // set callbacks and handlers for ice protocols
    ice_set_candidate_gathering_done_cb(agent, snw_ice_cb_candidate_gathering_done, session);
    ice_set_new_selected_pair_cb(agent, snw_ice_cb_new_selected_pair, session);
@@ -1394,8 +1434,8 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    session->streams_num = 0;
    session->control_mode = ICE_CONTROLLED_MODE;
 
-   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, control_mode=%u",
-         session->flowid, ice_ctx->ice_lite_enabled, session->control_mode);
+   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, control_mode=%u, sdp_len=%u",
+         session->flowid, ice_ctx->ice_lite_enabled, session->control_mode, strlen(sdp));
 
    ret = snw_ice_add_local_addresses(session);
    if (ret < 0) {
@@ -1488,7 +1528,6 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
        get_real_time(), get_real_time(),
        "PeerCall Replay", audio_mline, video_mline);
 
-   session->sdp = strdup(sdp);
    ret = snw_ice_session_setup(ice_ctx, session, 0, (char *)sdp);
    if (ret < 0) {
       ERROR(log, "Error setting ICE locally, ret=%d",ret);
@@ -1821,9 +1860,6 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    if (!session || !ice_ctx) return;
    log = ice_ctx->log;
 
-
-   if (session->sdp)
-      free(session->sdp);
 
    if (session->agent) {
       ice_agent_free(session->agent);

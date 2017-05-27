@@ -38,7 +38,6 @@ struct snw_ice_session {
    snw_ice_stream_t *video_stream;   /* Video stream */
 
    char *rtp_profile;                /* RTP profile set by caller (so that we can match it) */
-   //char              *sdp;           /* Hold temporary local sdp */
    char *local_sdp;                  /* SDP generated locally */
    char *remote_sdp;                 /* SDP received by the peer */
 
