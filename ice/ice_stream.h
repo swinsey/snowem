@@ -14,32 +14,28 @@ extern "C" {
 #endif
 
 struct snw_ice_stream {
-   uint32_t stream_id;
-
    snw_ice_session_t *session;
 
-   uint32_t audio_ssrc;
-   uint32_t video_ssrc;
-   uint32_t audio_ssrc_peer;
-   uint32_t video_ssrc_peer;
+   uint32_t id;
+   uint32_t local_audio_ssrc;
+   uint32_t local_video_ssrc;
+   uint32_t remote_audio_ssrc;
+   uint32_t remote_video_ssrc;
 
-   int payload_type;                /* rtp payload type */
-   int dtls_role;                   /* dtls role */
-   //char *rhashing;                /* hashing algorhitm for dtls */
-   //char *rfingerprint;            /* hashed fingerprint in SDP */
-   //char *ruser;                   /* ice username */
-   //char *rpass;                   /* ice password */
-   char rhashing[16];               /* hashing algorhitm for dtls */
-   char rfingerprint[256];          /* hashed fingerprint in SDP */
-   char ruser[32];                  /* ice username */
-   char rpass[64];                  /* ice password */
+   int dtls_mode;
 
-   snw_ice_component_t components;      /* list of components */
-   snw_ice_component_t *rtp_component;  /* rtp component */
-   snw_ice_component_t *rtcp_component; /* rtcp component */
+   char remote_hashing[16];
+   char remote_fingerprint[256];
+   char remote_user[32];
+   char remote_pass[64];
 
-   uint8_t cdone:1;
-   uint8_t disabled:1;              /* a stream has been disabled or not (e.g., m=audio 0) */
+   snw_ice_component_t  components;
+   snw_ice_component_t *rtp_component;
+   snw_ice_component_t *rtcp_component;
+
+   uint8_t gathering_done:1;
+   uint8_t is_disable:1;
+   uint8_t reserved:6;
 
    struct list_head list;
 };

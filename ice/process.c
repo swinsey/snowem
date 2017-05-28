@@ -192,22 +192,22 @@ snw_ice_sdp_send_candidates(snw_ice_session_t *session, int video) {
    snw_ice_stream_t *stream = NULL;
 
    if (video) {
-      uint32_t id = session->video_stream->stream_id;
+      uint32_t id = session->video_stream->id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-          id = session->audio_stream->stream_id > 0 ? 
-                   session->audio_stream->stream_id : 
-                   session->video_stream->stream_id;
+          id = session->audio_stream->id > 0 ? 
+                   session->audio_stream->id : 
+                   session->video_stream->id;
       stream = snw_stream_find(&session->streams, id);
    } else {
-      stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
+      stream = snw_stream_find(&session->streams, session->audio_stream->id);
    }
 
    if (stream == NULL)
       return;
 
-   snw_ice_send_local_candidate(session, video, stream->stream_id, 1);
+   snw_ice_send_local_candidate(session, video, stream->id, 1);
    if (!SET_FLAG(session, WEBRTC_RTCPMUX))
-      snw_ice_send_local_candidate(session, video, stream->stream_id, 2);
+      snw_ice_send_local_candidate(session, video, stream->id, 2);
 
    return;
 }
@@ -261,10 +261,10 @@ verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const 
 
    if (strstr(jsep_sdp, "m=audio 0")) {
       if(!IS_FLAG(session, WEBRTC_BUNDLE) || !video) {
-         snw_ice_stream_t *stream = snw_stream_find(&session->streams, session->audio_stream->stream_id);
+         snw_ice_stream_t *stream = snw_stream_find(&session->streams, session->audio_stream->id);
          if (stream) {
-            DEBUG(log, "disable audio stream, sid=%u",stream->stream_id);
-            stream->disabled = 1;
+            DEBUG(log, "disable audio stream, sid=%u",stream->id);
+            stream->is_disable = 1;
          }
       }
    }
@@ -273,16 +273,16 @@ verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const 
       if (!IS_FLAG(session, WEBRTC_BUNDLE) || !audio) {
          snw_ice_stream_t *stream = NULL;
          if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
-            stream = snw_stream_find(&session->streams, session->video_stream->stream_id);
+            stream = snw_stream_find(&session->streams, session->video_stream->id);
          } else {
-            uint32_t id = session->audio_stream->stream_id > 0 ? 
-                              session->audio_stream->stream_id : 
-                              session->video_stream->stream_id;
+            uint32_t id = session->audio_stream->id > 0 ? 
+                              session->audio_stream->id : 
+                              session->video_stream->id;
             stream = snw_stream_find(&session->streams, id);
          }
          if (stream) {
-            DEBUG(log, "disable video stream, sid=%u",stream->stream_id);
-            stream->disabled = 1;
+            DEBUG(log, "disable video stream, sid=%u",stream->id);
+            stream->is_disable = 1;
          }
       }
    }
@@ -338,7 +338,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
       DEBUG(log, "no stream, stream_id=%d", stream_id);
       return;
    }
-   stream->cdone = 1;
+   stream->gathering_done = 1;
 
    if (session->streams_gathering_done == session->streams_num) {
       ret = snw_ice_generate_sdp(session);
@@ -401,7 +401,7 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
    }
 
    component->fir_latest = get_monotonic_time();
-   component->dtls = srtp_context_new(session->ice_ctx, component, stream->dtls_role);
+   component->dtls = srtp_context_new(session->ice_ctx, component, stream->dtls_mode);
    if (!component->dtls) {
       ERROR(log, "No component DTLS-SRTP session");
       return;
@@ -658,7 +658,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
    }
 
    //FIXME: check cdone equal to num of stream
-   if (!stream->cdone) {
+   if (!stream->gathering_done) {
       goto done;
    }
 
@@ -667,7 +667,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
    }
 
    if (pkt->encrypted) {
-      int sent = ice_agent_send(session->agent, stream->stream_id, component->component_id,
+      int sent = ice_agent_send(session->agent, stream->id, component->component_id,
                                  (const char *)pkt->data, pkt->length);
       if (sent < pkt->length) {
          DEBUG(log, "only sent %d bytes? (was %d)", sent, pkt->length);
@@ -681,19 +681,19 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       memcpy(&sbuf, pkt->data, pkt->length);
       /* Fix all SSRCs! */
       DEBUG(log, "Fixing SSRCs (local %u, peer %u)",
-            video ? stream->video_ssrc : stream->audio_ssrc,
-            video ? stream->video_ssrc_peer : stream->audio_ssrc_peer);
+            video ? stream->local_video_ssrc : stream->local_audio_ssrc,
+            video ? stream->remote_video_ssrc : stream->remote_audio_ssrc);
 
       snw_rtcp_fix_ssrc((char *)&sbuf, pkt->length, 1,
-            video ? stream->video_ssrc : stream->audio_ssrc,
-            video ? stream->video_ssrc_peer : stream->audio_ssrc_peer);
+            video ? stream->local_video_ssrc : stream->local_audio_ssrc,
+            video ? stream->remote_video_ssrc : stream->remote_audio_ssrc);
 
       protected_ = pkt->length;
       ret = srtp_protect_rtcp(component->dtls->srtp_out, &sbuf, &protected_);
       if(ret != err_status_ok) {
          ERROR(log, "SRTCP protect error, len=%d-->%d, s=%u", pkt->length, protected_, ret);
       } else {
-         int sent = ice_agent_send(session->agent, stream->stream_id, component->component_id,
+         int sent = ice_agent_send(session->agent, stream->id, component->component_id,
                                     (const char *)&sbuf, protected_);
          if(sent < protected_) {
             WARN(log, "only sent %d bytes? (was %d)", sent, protected_);
@@ -732,7 +732,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       goto done;
    }
 
-   if(!stream->cdone) {
+   if(!stream->gathering_done) {
       goto done;
    }
 
@@ -743,7 +743,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
    if(pkt->encrypted) {
       rtp_header *header = (rtp_header *)pkt->data;
       DEBUG(log, "Retransmitting seq.nr %u", ntohs(header->seq_number));
-      int sent = ice_agent_send(session->agent, stream->stream_id, component->component_id,
+      int sent = ice_agent_send(session->agent, stream->id, component->component_id,
                                 (const char *)pkt->data, pkt->length);
       if(sent < pkt->length) {
          ERROR(log, "only sent %d bytes? (was %d)", sent, pkt->length);
@@ -752,7 +752,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       char sbuf[ICE_BUFSIZE];
       memcpy(&sbuf, pkt->data, pkt->length);
       rtp_header *header = (rtp_header *)&sbuf;
-      header->ssrc = htonl(video ? stream->video_ssrc : stream->audio_ssrc);
+      header->ssrc = htonl(video ? stream->local_video_ssrc : stream->local_audio_ssrc);
       int protected_ = pkt->length;
       int ret = srtp_protect(component->dtls->srtp_out, &sbuf, &protected_);
       DEBUG(log, "SRTP protect, ret=%d , flowid=%u, len=%d-->%d",
@@ -765,7 +765,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
                ret, session->flowid, pkt->length, protected_, timestamp, seq);
       } else {
          DEBUG(log, "send rtp packet");
-         int sent = ice_agent_send(session->agent, stream->stream_id, component->component_id,
+         int sent = ice_agent_send(session->agent, stream->id, component->component_id,
                                     (const char *)&sbuf, protected_);
          if(sent < protected_) {
             DEBUG(log, "only sent %d bytes? (was %d)", sent, protected_);
@@ -1057,11 +1057,11 @@ void ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    DEBUG(log, "rtp incoming message, len=%u",len);
 
    if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
-      video = (stream->stream_id == session->video_stream->stream_id ? 1 : 0);
+      video = (stream->id == session->video_stream->id ? 1 : 0);
    } else {
       uint32_t packet_ssrc = ntohl(header->ssrc);
-      video = ((stream->video_ssrc_peer == packet_ssrc) ? 1 : 0);
-      if (!video && stream->audio_ssrc_peer != packet_ssrc) {
+      video = ((stream->remote_video_ssrc == packet_ssrc) ? 1 : 0);
+      if (!video && stream->remote_audio_ssrc != packet_ssrc) {
          ERROR(log, "wrong ssrc or other format, ssrc=%u", packet_ssrc);
          return;
       }
@@ -1078,9 +1078,9 @@ void ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       }
    } else {
       if(video) {
-         if(stream->video_ssrc_peer == 0) {
-            stream->video_ssrc_peer = ntohl(header->ssrc);
-            WARN(log, "got peer video ssrc, ssrc%u", stream->video_ssrc_peer);
+         if(stream->remote_video_ssrc == 0) {
+            stream->remote_video_ssrc = ntohl(header->ssrc);
+            WARN(log, "got peer video ssrc, ssrc%u", stream->remote_video_ssrc);
          }
          if IS_FLAG(session,ICE_PUBLISHER) {
             //FIXME: uncomment
@@ -1088,9 +1088,9 @@ void ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
             //recorder_save_frame(handle->v_recorder, buf, buflen);
          }
       } else {
-         if(stream->audio_ssrc_peer == 0) {
-            stream->audio_ssrc_peer = ntohl(header->ssrc);
-            WARN(log, "got peer audio ssrc, ssrc=%u", stream->audio_ssrc_peer);
+         if(stream->remote_audio_ssrc == 0) {
+            stream->remote_audio_ssrc = ntohl(header->ssrc);
+            WARN(log, "got peer audio ssrc, ssrc=%u", stream->remote_audio_ssrc);
          }
          if IS_FLAG(session,ICE_PUBLISHER) {
             //FIXME: uncomment
@@ -1213,22 +1213,22 @@ void ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    } else {
       int video = 0;
       if(!IS_FLAG(session, WEBRTC_BUNDLE)) {
-         video = (stream->stream_id == session->video_stream->stream_id ? 1 : 0);
+         video = (stream->id == session->video_stream->id ? 1 : 0);
       } else {
          if(!IS_FLAG(session, WEBRTC_AUDIO)) {
             video = 1;
          } else if(!IS_FLAG(session, WEBRTC_VIDEO)) {
             video = 0;
          } else {
-            if(stream->audio_ssrc_peer == 0 || stream->video_ssrc_peer == 0) {
+            if(stream->remote_audio_ssrc == 0 || stream->remote_video_ssrc == 0) {
                //FIXME: rewrite this code
                /* We don't know the remote SSRC: this can happen for recvonly clients
                 * (see https://groups.google.com/forum/#!topic/discuss-webrtc/5yuZjV7lkNc)
                 * Check the local SSRC, compare it to what we have */
                uint32_t rtcp_ssrc = snw_rtcp_get_receiver_ssrc(buf, len);
-               if(rtcp_ssrc == stream->audio_ssrc) {
+               if(rtcp_ssrc == stream->local_audio_ssrc) {
                   video = 0;
-               } else if(rtcp_ssrc == stream->video_ssrc) {
+               } else if(rtcp_ssrc == stream->local_video_ssrc) {
                   video = 1;
                } else {
                   /* Mh, no SR or RR? Try checking if there's any FIR, PLI or REMB */
@@ -1237,13 +1237,13 @@ void ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
                   }
                }
                DEBUG(log, "incoming rtcp, video=%u, local_video_ssrc=%u, local_audio_ssrc=%u, got=%u)",
-                     video, stream->video_ssrc, stream->audio_ssrc, rtcp_ssrc);
+                     video, stream->local_video_ssrc, stream->local_audio_ssrc, rtcp_ssrc);
             } else {
                /* Check the remote SSRC, compare it to what we have */
                uint32_t rtcp_ssrc = snw_rtcp_get_sender_ssrc(buf, len);
-               video = (stream->video_ssrc_peer == rtcp_ssrc ? 1 : 0);
+               video = (stream->remote_video_ssrc == rtcp_ssrc ? 1 : 0);
                DEBUG(log, "incoming rtcp, type=%u, is_sender=%u, remote_video_ssrc=%u, remote_audio_ssrc=%u, got=%u)",
-                  video, IS_FLAG(session,ICE_PUBLISHER), stream->video_ssrc, stream->audio_ssrc, rtcp_ssrc);
+                  video, IS_FLAG(session,ICE_PUBLISHER), stream->local_video_ssrc, stream->local_audio_ssrc, rtcp_ssrc);
             }
          }
       }
@@ -1312,7 +1312,7 @@ snw_ice_create_media_component(snw_ice_session_t *session, snw_ice_stream_t *str
    if (!rtp) return 0;
 
    rtp->stream = stream;
-   rtp->stream_id = stream->stream_id;
+   rtp->stream_id = stream->id;
    rtp->component_id = cid;
    rtp->is_started = 0;
    INIT_LIST_HEAD(&rtp->candidates.list);
@@ -1323,7 +1323,7 @@ snw_ice_create_media_component(snw_ice_session_t *session, snw_ice_stream_t *str
    else
       stream->rtp_component = rtp;
 
-   //ice_agent_set_port_range(session->agent, stream->stream_id, cid, rtp_range_min, rtp_range_max);
+   //ice_agent_set_port_range(session->agent, stream->id, cid, rtp_range_min, rtp_range_max);
    return rtp;
 }
 
@@ -1344,33 +1344,32 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
    if (stream == NULL) {
       return -2;
    }
-   stream->stream_id = stream_id;
+   stream->id = stream_id;
    stream->session = session;
-   stream->cdone = 0;
-   stream->payload_type = -1;
-   stream->disabled = 0;
-   stream->dtls_role = DTLS_ROLE_ACTPASS;
+   stream->gathering_done = 0;
+   stream->is_disable = 0;
+   stream->dtls_mode = DTLS_ROLE_ACTPASS;
    INIT_LIST_HEAD(&stream->components.list);
    snw_stream_insert(&session->streams,stream);
       
    if (video) {
       session->video_stream = stream;
-      stream->video_ssrc = random();
-      stream->video_ssrc_peer = 0;
-      stream->audio_ssrc = 0;
-      stream->audio_ssrc_peer = 0;
+      stream->local_video_ssrc = random();
+      stream->remote_video_ssrc = 0;
+      stream->local_audio_ssrc = 0;
+      stream->remote_audio_ssrc = 0;
       DEBUG(log, "created video stream, sid=%u(%p)",
-             session->video_stream->stream_id, session->video_stream);
+             session->video_stream->id, session->video_stream);
    } else {
-      stream->audio_ssrc = random();
-      stream->audio_ssrc_peer = 0;
+      stream->local_audio_ssrc = random();
+      stream->remote_audio_ssrc = 0;
       if (IS_FLAG(session, WEBRTC_BUNDLE)) {
-         stream->video_ssrc = random();
-         DEBUG(log, "generate video ssrc, ssrc=%u",stream->video_ssrc);
+         stream->local_video_ssrc = random();
+         DEBUG(log, "generate video ssrc, ssrc=%u",stream->local_video_ssrc);
       } else {
-         stream->video_ssrc = 0;
+         stream->local_video_ssrc = 0;
       }
-      stream->video_ssrc_peer = 0;
+      stream->remote_video_ssrc = 0;
       session->audio_stream = stream;
    }
 
@@ -1390,7 +1389,7 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
       struct list_head *n;
       list_for_each(n,&session->streams.list) {
          ice_stream_t *s = list_entry(n,ice_stream_t,list);
-         DEBUG("view stream, s-sid=%u(%p)", s->stream_id, s);
+         DEBUG("view stream, s-sid=%u(%p)", s->id, s);
       }
    }*/
 
@@ -1786,7 +1785,7 @@ ice_stream_cleanup(snw_ice_context_t *ice_ctx, snw_ice_stream_t *stream) {
    log = ice_ctx->log;   
 
    //FIXME: delete components
-   DEBUG(log, "stream cleanup, sid=%u",stream->stream_id);
+   DEBUG(log, "stream cleanup, sid=%u",stream->id);
    if (stream->rtp_component != NULL) {
       ice_component_free(ice_ctx, &stream->components, stream->rtp_component);
    }
@@ -1814,16 +1813,16 @@ ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_s
       struct list_head *n;
       list_for_each(n,&streams->list) {
          snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
-         DEBUG(log,"view stream, sid=%u(%p)", s->stream_id, s);
+         DEBUG(log,"view stream, sid=%u(%p)", s->id, s);
       }
    }
 
    list_for_each_safe(pos,n,&streams->list) {
       snw_ice_stream_t *s = list_entry(pos,snw_ice_stream_t,list);
       //DEBUG("delete stream, sid=%u(%p), sid=%u(%p)",
-      //      s->stream_id, s, stream->stream_id, stream);
-      if ( s->stream_id == stream->stream_id ) {
-         //DEBUG("delete stream, sid=%u",s->stream_id);
+      //      s->id, s, stream->id, stream);
+      if ( s->id == stream->id ) {
+         //DEBUG("delete stream, sid=%u",s->id);
          list_del(pos);
          d = s;
       }
@@ -1832,14 +1831,14 @@ ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_s
    if (d) {
       ice_stream_cleanup(ice_ctx, d);
    } else {
-      ERROR(log, "stream not found, sid=%u", stream->stream_id);
+      ERROR(log, "stream not found, sid=%u", stream->id);
    }
 
    /*{//DEBUG
       struct list_head *n;
       list_for_each(n,&streams->list) {
          ice_stream_t *s = list_entry(n,ice_stream_t,list);
-         DEBUG("view stream, s-sid=%u(%p)", s->stream_id, s);
+         DEBUG("view stream, s-sid=%u(%p)", s->id, s);
       }
    }*/
 
@@ -1873,7 +1872,7 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    //FIXME: free streams & components
    list_for_each_safe(n,p,&session->streams.list) {
       snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
-      DEBUG(log, "delete stream, sid=%u(%p)", s->stream_id, s);
+      DEBUG(log, "delete stream, sid=%u(%p)", s->id, s);
       list_del(&s->list);
       //ice_stream_free(session->ice_ctx,&session->streams,s);
       ice_stream_cleanup(session->ice_ctx,s);
@@ -1929,12 +1928,12 @@ snw_ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
    DEBUG(log, "remove unneccessary RTP components, audio=%u,video=%u",audio,video);
    if (audio) {
       if( !list_empty(&session->streams.list) && session->video_stream) {
-         session->audio_stream->video_ssrc = session->video_stream->video_ssrc;
-         session->audio_stream->video_ssrc_peer = session->video_stream->video_ssrc_peer;
-         ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 1, NULL, NULL);
-         ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
-         ice_agent_remove_stream(session->agent, session->video_stream->stream_id);
-         DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->stream_id);
+         session->audio_stream->local_video_ssrc = session->video_stream->local_video_ssrc;
+         session->audio_stream->remote_video_ssrc = session->video_stream->remote_video_ssrc;
+         ice_agent_attach_recv(session->agent, session->video_stream->id, 1, NULL, NULL);
+         ice_agent_attach_recv(session->agent, session->video_stream->id, 2, NULL, NULL);
+         ice_agent_remove_stream(session->agent, session->video_stream->id);
+         DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->id);
          ice_stream_free(session->ice_ctx, &session->streams, session->video_stream);
       }
       session->video_stream = NULL;
@@ -1956,14 +1955,14 @@ snw_ice_merge_components(snw_ice_session_t *session) {
    //FIXME: compare with pre_do_conncheck
 
    if (session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
-      ice_agent_attach_recv(session->agent, session->audio_stream->stream_id, 2, NULL, NULL);
+      ice_agent_attach_recv(session->agent, session->audio_stream->id, 2, NULL, NULL);
       ice_component_free(session->ice_ctx, &session->audio_stream->components, session->audio_stream->rtcp_component);
       session->audio_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
    }
 
    if(session->video_stream && !list_empty(&session->video_stream->components.list)) {
-      ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
+      ice_agent_attach_recv(session->agent, session->video_stream->id, 2, NULL, NULL);
       ice_component_free(session->ice_ctx, &session->video_stream->components, session->video_stream->rtcp_component);
       session->video_stream->rtcp_component = NULL;
       //FIXME: remove component from stream
@@ -1982,12 +1981,12 @@ ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
    DEBUG(log, "remove unneccessary RTP components, audio=%u,video=%u",audio,video);
    if (audio) {
       if( !list_empty(&session->streams.list) && session->video_stream) {
-         session->audio_stream->video_ssrc = session->video_stream->video_ssrc;
-         session->audio_stream->video_ssrc_peer = session->video_stream->video_ssrc_peer;
-         ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 1, NULL, NULL);
-         ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
-         ice_agent_remove_stream(session->agent, session->video_stream->stream_id);
-         DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->stream_id);
+         session->audio_stream->local_video_ssrc = session->video_stream->local_video_ssrc;
+         session->audio_stream->remote_video_ssrc = session->video_stream->remote_video_ssrc;
+         ice_agent_attach_recv(session->agent, session->video_stream->id, 1, NULL, NULL);
+         ice_agent_attach_recv(session->agent, session->video_stream->id, 2, NULL, NULL);
+         ice_agent_remove_stream(session->agent, session->video_stream->id);
+         DEBUG(log, "delete stream due to bundle, sid=%u",session->video_stream->id);
          ice_stream_free(session->ice_ctx,&session->streams, session->video_stream);
       }
       session->video_stream = NULL;
@@ -2009,7 +2008,7 @@ ice_merge_components(snw_ice_session_t *session) {
    //FIXME: compare with pre_do_conncheck
 
    if(session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
-      ice_agent_attach_recv(session->agent, session->audio_stream->stream_id, 2, NULL, NULL);
+      ice_agent_attach_recv(session->agent, session->audio_stream->id, 2, NULL, NULL);
       ice_component_free(session->ice_ctx, &session->audio_stream->components, 
             session->audio_stream->rtcp_component);
       session->audio_stream->rtcp_component = NULL;
@@ -2017,7 +2016,7 @@ ice_merge_components(snw_ice_session_t *session) {
    }
 
    if(session->video_stream && !list_empty(&session->video_stream->components.list)) {
-      ice_agent_attach_recv(session->agent, session->video_stream->stream_id, 2, NULL, NULL);
+      ice_agent_attach_recv(session->agent, session->video_stream->id, 2, NULL, NULL);
       ice_component_free(session->ice_ctx, &session->video_stream->components, 
            session->video_stream->rtcp_component);
       session->video_stream->rtcp_component = NULL;
@@ -2058,8 +2057,8 @@ int ice_setup_remote_credentials(snw_ice_session_t *session, snw_ice_stream_t *s
 
    if (ufrag && pwd) {
       DEBUG(log, "setting remote credentials, ufrag=%s,pwd=%s",ufrag,pwd);
-      if (ice_agent_set_remote_credentials(session->agent, stream->stream_id, ufrag, pwd) != ICE_OK) {
-         DEBUG(log, "failed to set remote credentials, sid=%u, cid=%u",stream->stream_id, component->component_id);
+      if (ice_agent_set_remote_credentials(session->agent, stream->id, ufrag, pwd) != ICE_OK) {
+         DEBUG(log, "failed to set remote credentials, sid=%u, cid=%u",stream->id, component->component_id);
          return -1;
       }
    }
@@ -2084,9 +2083,9 @@ ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint
       return;
    }  
       
-   if (stream->disabled) {
+   if (stream->is_disable) {
       ERROR(log, "stream info, disabled=%u, sid=%u, cid=%u", 
-            stream->disabled, stream_id, component_id);
+            stream->is_disable, stream_id, component_id);
       return;
    }     
       
@@ -2135,19 +2134,19 @@ try_ice_start(snw_ice_session_t *session) {
    } else {
       /* FIXME: never reach here */
       DEBUG(log, "Sending connectivity checks, audio_id=%u,video_id=%u",
-             session->audio_stream->stream_id, session->video_stream->stream_id);
-      if (session->audio_stream->stream_id > 0) {
-         ice_setup_remote_candidates(session, session->audio_stream->stream_id, 1);
+             session->audio_stream->id, session->video_stream->id);
+      if (session->audio_stream->id > 0) {
+         ice_setup_remote_candidates(session, session->audio_stream->id, 1);
          if(!IS_FLAG(session, WEBRTC_RTCPMUX))  {
             /* section-5.1.3 in rfc5761 */
-            ice_setup_remote_candidates(session, session->audio_stream->stream_id, 2);
+            ice_setup_remote_candidates(session, session->audio_stream->id, 2);
          }
       }
-      if (session->video_stream->stream_id > 0) {
-         ice_setup_remote_candidates(session, session->video_stream->stream_id, 1);
+      if (session->video_stream->id > 0) {
+         ice_setup_remote_candidates(session, session->video_stream->id, 1);
          if(!IS_FLAG(session, WEBRTC_RTCPMUX))
             /* section-5.1.3 in rfc5761 */
-            ice_setup_remote_candidates(session, session->video_stream->stream_id, 2);
+            ice_setup_remote_candidates(session, session->video_stream->id, 2);
       }
    }
 
@@ -2306,20 +2305,20 @@ int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
                            ip, &port, type, relip, &relport);
 
    DEBUG(log, "parsing result, ret=%u, cid:%d sid:%d, type:%s, transport=%s, refaddr=%s:%d, addr=%s:%d",
-         ret, component_id, stream->stream_id, type, transport, relip, relport, ip, port);
+         ret, component_id, stream->id, type, transport, relip, relport, ip, port);
 
    if (ret >= 7) {
       component = snw_component_find(&stream->components, component_id);
       if (component == NULL) {
-         ERROR(log, "component not found, cid=%u, sid=%u", component_id, stream->stream_id);
+         ERROR(log, "component not found, cid=%u, sid=%u", component_id, stream->id);
          return -3; 
       }   
-         DEBUG(log, "component found, cid=%u, sid=%u", component_id, stream->stream_id);
+         DEBUG(log, "component found, cid=%u, sid=%u", component_id, stream->id);
       c = snw_ice_remote_candidate_new(type,transport);
       if (c != NULL) {
-         DEBUG(log, "new candidate, cid=%u, sid=%u", component_id, stream->stream_id);
+         DEBUG(log, "new candidate, cid=%u, sid=%u", component_id, stream->id);
          c->component_id = component_id;
-         c->stream_id = stream->stream_id;
+         c->stream_id = stream->id;
 
          if (!strcasecmp(transport, "udp")) {
             c->transport = ICE_CANDIDATE_TRANSPORT_UDP;
@@ -2333,8 +2332,8 @@ int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
          c->priority = priority;
          address_set_from_string(&c->addr, ip);
          address_set_port(&c->addr, port);
-         c->username = strdup(stream->ruser);
-         c->password = strdup(stream->rpass);
+         c->username = strdup(stream->remote_user);
+         c->password = strdup(stream->remote_pass);
          address_set_from_string(&c->base_addr, relip);
          address_set_port(&c->base_addr, relport);
          /* FIXME: new candidate is not free when component->is_started = 0*/

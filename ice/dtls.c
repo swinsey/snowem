@@ -216,13 +216,13 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
    struct list_head *n,*p;
    list_for_each(n,&session->streams.list) {
       snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
-      if (s->disabled)
+      if (s->is_disable)
          continue;
       list_for_each(p,&s->components.list) {
          snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
-         DEBUG(log, "checking component, sid=%u, cid=%u",s->stream_id, c->component_id);
+         DEBUG(log, "checking component, sid=%u, cid=%u",s->id, c->component_id);
          if (!c->dtls || !c->dtls->is_valid) {
-            DEBUG(log, "component not ready, sid=%u, cid=%u",s->stream_id, c->component_id);
+            DEBUG(log, "component not ready, sid=%u, cid=%u",s->id, c->component_id);
             return;
          }    
       }    
@@ -266,7 +266,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          unsigned char rfingerprint[EVP_MAX_MD_SIZE];
          char remote_fingerprint[160];
          char *rfp = (char *)&remote_fingerprint;
-         if(stream->rhashing && !strcasecmp(stream->rhashing, "sha-1")) {
+         if(stream->remote_hashing && !strcasecmp(stream->remote_hashing, "sha-1")) {
             ICE_DEBUG2("Computing sha-1 fingerprint of remote certificate...");
             X509_digest(rcert, EVP_sha1(), (unsigned char *)rfingerprint, &rsize);
          } else {
@@ -282,22 +282,21 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          }
          *(rfp-1) = 0;
          ICE_DEBUG2("Remote fingerprint, remote_hashing=%s, remote_fingerprint=%s",
-            stream->rhashing ? stream->rhashing : "sha-256", remote_fingerprint);
-         if (!strcasecmp(remote_fingerprint, stream->rfingerprint ? stream->rfingerprint : "(none)")) {
+            stream->remote_hashing ? stream->remote_hashing : "sha-256", remote_fingerprint);
+         if (!strcasecmp(remote_fingerprint, stream->remote_fingerprint ? stream->remote_fingerprint : "(none)")) {
             ICE_DEBUG2("Fingerprint is a match!");
             dtls->state = DTLS_STATE_CONNECTED;
             dtls->dtls_connected = get_monotonic_time();
          } else {
             // FIXME NOT a match! MITM?
-            ICE_ERROR2("Fingerprint mismatch, got=%s, expected=%s", remote_fingerprint, stream->rfingerprint);
+            ICE_ERROR2("Fingerprint mismatch, got=%s, expected=%s", remote_fingerprint, stream->remote_fingerprint);
             dtls->state = DTLS_STATE_FAILED;
             goto done;
          }
          if (dtls->state == DTLS_STATE_CONNECTED) {
             //FIX: 28-05 jackiedinh
-            //if(component->stream_id == session->audio_id || component->stream_id == session->video_id) {
-            if (component->stream_id == session->audio_stream->stream_id 
-                || component->stream_id == session->video_stream->stream_id) {
+            if (component->stream_id == session->audio_stream->id 
+                || component->stream_id == session->video_stream->id) {
                // Complete with SRTP setup
                unsigned char material[SRTP_MASTER_LENGTH*2];
                unsigned char *local_key, *local_salt, *remote_key, *remote_salt;

@@ -48,13 +48,13 @@ snw_ice_stream_t*
 snw_stream_find(snw_ice_stream_t *head, uint32_t id) {
    struct list_head *n;
 
-   if ( head == NULL )
+   if (head == NULL)
       return NULL;
    
    list_for_each(n,&head->list) {
       snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
 
-      if ( s->stream_id == id )
+      if (s->id == id)
          return s;
    }
 
