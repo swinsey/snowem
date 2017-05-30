@@ -27,7 +27,7 @@ snw_component_allocate(snw_ice_context_t *ctx) {
       return NULL;
    memset(component,0,sizeof(*component));
    INIT_LIST_HEAD(&component->list);
-	INIT_LIST_HEAD(&component->candidates.list);
+	INIT_LIST_HEAD(&component->remote_candidates.list);
 	INIT_LIST_HEAD(&component->rtplist.list);
 
    return component;
@@ -54,7 +54,7 @@ snw_component_find(snw_ice_component_t *head, uint32_t id) {
    list_for_each(n,&head->list) {
       snw_ice_component_t *s = list_entry(n,snw_ice_component_t,list);
 
-      if ( s->component_id == id )
+      if ( s->id == id )
          return s;
    }
 

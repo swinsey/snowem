@@ -667,7 +667,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
    }
 
    if (pkt->encrypted) {
-      int sent = ice_agent_send(session->agent, stream->id, component->component_id,
+      int sent = ice_agent_send(session->agent, stream->id, component->id,
                                  (const char *)pkt->data, pkt->length);
       if (sent < pkt->length) {
          DEBUG(log, "only sent %d bytes? (was %d)", sent, pkt->length);
@@ -693,7 +693,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
       if(ret != err_status_ok) {
          ERROR(log, "SRTCP protect error, len=%d-->%d, s=%u", pkt->length, protected_, ret);
       } else {
-         int sent = ice_agent_send(session->agent, stream->id, component->component_id,
+         int sent = ice_agent_send(session->agent, stream->id, component->id,
                                     (const char *)&sbuf, protected_);
          if(sent < protected_) {
             WARN(log, "only sent %d bytes? (was %d)", sent, protected_);
@@ -743,7 +743,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
    if(pkt->encrypted) {
       rtp_header *header = (rtp_header *)pkt->data;
       DEBUG(log, "Retransmitting seq.nr %u", ntohs(header->seq_number));
-      int sent = ice_agent_send(session->agent, stream->id, component->component_id,
+      int sent = ice_agent_send(session->agent, stream->id, component->id,
                                 (const char *)pkt->data, pkt->length);
       if(sent < pkt->length) {
          ERROR(log, "only sent %d bytes? (was %d)", sent, pkt->length);
@@ -765,7 +765,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
                ret, session->flowid, pkt->length, protected_, timestamp, seq);
       } else {
          DEBUG(log, "send rtp packet");
-         int sent = ice_agent_send(session->agent, stream->id, component->component_id,
+         int sent = ice_agent_send(session->agent, stream->id, component->id,
                                     (const char *)&sbuf, protected_);
          if(sent < protected_) {
             DEBUG(log, "only sent %d bytes? (was %d)", sent, protected_);
@@ -945,27 +945,12 @@ snw_ice_rtp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, rt
       int ret = snw_ice_rtcp_generate_nacks(nackbuf, sizeof(nackbuf), nacklist);
 
       WARN(log, "nacks missed packets, nacks_count=%u(%u), ret=%u", nacks_count, nacklist.size(), ret);
-      WARN(log, "now sending NACK for missed packets, nacks_count=%u, ret=%u", nacks_count, ret);
-      if (ret > 0)
+      if (ret > 0) {
          ice_relay_rtcp(session, video, nackbuf, ret);
-
-      /* Update stats */
-      //component->nack_sent_recent_cnt += nacks_count;
-      /*if (video) {
-         component->out_stats.video_nacks += nacks_count;
-      } else {
-         component->out_stats.audio_nacks += nacks_count;
-      }*/
+      }
    }
 
-   if (component->nack_sent_recent_cnt &&
-       now - component->nack_sent_log_ts > 5 * ICE_USEC_PER_SEC) {
-      ERROR(log, "sent NACKs for %u missing packets",
-            component->nack_sent_recent_cnt);
-      component->nack_sent_recent_cnt = 0;
-      component->nack_sent_log_ts = now;
-   }
-
+   /* FIXME: Update stats */
    return;
 }
 void
@@ -977,7 +962,7 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
 
    if (force || (component && (session->curtime - component->fir_latest > 10*ICE_USEC_PER_SEC))) {
 
-      DEBUG(log, "sending fir request, cid=%u, curtime=%lu", component->component_id, session->curtime);
+      DEBUG(log, "sending fir request, cid=%u, curtime=%lu", component->id, session->curtime);
       {// send fir command
          rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
          char *rtcpbuf = (char*)malloc(24);
@@ -1007,7 +992,7 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
       //if (force) {
       if (1) {
          DEBUG(log, "vp8 payload sending fir request, cid=%u, curtime=%lu", 
-                    component->component_id, session->curtime);
+                    component->id, session->curtime);
          /*{// send fir command
             rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
             char *rtcpbuf = (char*)malloc(24);
@@ -1043,73 +1028,56 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
 }
 
 
-void ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
-                          snw_ice_component_t *component, char* buf, int len) {
+void
+ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
+      snw_ice_component_t *component, char* buf, int len) {
    snw_log_t *log = 0;
    rtp_header *header = (rtp_header *)buf;
    err_status_t ret;
+   uint32_t ssrc = 0;
+   uint32_t timestamp = 0;
+   uint16_t seq = 0;
    int buflen = len;
    int video = 0;
 
-   if (!session) return;
+   if (!session || !stream || !component) return;
    log = session->ice_ctx->log;
 
-   DEBUG(log, "rtp incoming message, len=%u",len);
-
-   if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
-      video = (stream->id == session->video_stream->id ? 1 : 0);
-   } else {
-      uint32_t packet_ssrc = ntohl(header->ssrc);
-      video = ((stream->remote_video_ssrc == packet_ssrc) ? 1 : 0);
-      if (!video && stream->remote_audio_ssrc != packet_ssrc) {
-         ERROR(log, "wrong ssrc or other format, ssrc=%u", packet_ssrc);
-         return;
-      }
+   ssrc = ntohl(header->ssrc);
+   timestamp = ntohl(header->timestamp);
+   seq = ntohs(header->seq_number);
+   /* XXX: stream ssrc should be set by sdp offer/answer? */
+   if (ssrc != stream->remote_audio_ssrc
+       && ssrc != stream->remote_video_ssrc) {
+      ERROR(log, "wrong ssrc, ssrc=%u, ts=%u, seq=%u", ssrc, timestamp, seq);
+      return;
    }
+   video = ((stream->remote_video_ssrc == ssrc) ? 1 : 0);
+
+   DEBUG(log, "rtp incoming message, len=%u, video=%u, ssrc=%u, a_ssrc=%u, v_ssrc=%u",
+              len, video, ssrc, stream->remote_audio_ssrc, stream->remote_video_ssrc);
 
    ret = srtp_unprotect(component->dtls->srtp_in, buf, &buflen);
-   if(ret != err_status_ok) {
-      if(ret != err_status_replay_fail && ret != err_status_replay_old) {
-         rtp_header *header = (rtp_header *)buf;
-         uint32_t timestamp = ntohl(header->timestamp);
-         uint16_t seq = ntohs(header->seq_number);
-         ERROR(log, "SRTP unprotect error, len=%d, buflen=%d, ts=%u, seq=%u, res=%u",
-               len, buflen, timestamp, seq, ret);
-      }
-   } else {
-      if(video) {
-         if(stream->remote_video_ssrc == 0) {
-            stream->remote_video_ssrc = ntohl(header->ssrc);
-            WARN(log, "got peer video ssrc, ssrc%u", stream->remote_video_ssrc);
-         }
-         if IS_FLAG(session,ICE_PUBLISHER) {
-            //FIXME: uncomment
-            //DEBUG(log, "sender save video packet, roomid: %u", session->roomid);
-            //recorder_save_frame(handle->v_recorder, buf, buflen);
-         }
+   if (ret != err_status_ok) {
+      ERROR(log, "unprotect error, len=%d, buflen=%d, ts=%u, seq=%u, res=%u",
+            len, buflen, timestamp, seq, ret);
+      return;
+   } 
+
+   if (IS_FLAG(session,ICE_PUBLISHER)) {
+      //DEBUG(log, "sender save audio/video packet, video=%u, roomid: %u", 
+      //      video, session->roomid);
+      if (video) {
+         //recorder_save_frame(handle->v_recorder, buf, buflen);// FIXME: impl
       } else {
-         if(stream->remote_audio_ssrc == 0) {
-            stream->remote_audio_ssrc = ntohl(header->ssrc);
-            WARN(log, "got peer audio ssrc, ssrc=%u", stream->remote_audio_ssrc);
-         }
-         if IS_FLAG(session,ICE_PUBLISHER) {
-            //FIXME: uncomment
-            //DEBUG(log, "sender save audio packet, roomid: %u", session->roomid);
-            //recorder_save_frame(handle->a_recorder, buf, buflen);
-         }
+         //recorder_save_frame(handle->a_recorder, buf, buflen);
       }
-
-      //FIXME: uncomment
-      //ice_rtp_plugin(handle,stream,component,0,video,buf,buflen);
-      snw_ice_handle_incoming_rtp(session, 0, video, buf, buflen);
-      /*if(buflen > 0) {
-         ice_rtp_update_stats(component,video,buflen);
-      }*/
-      snw_ice_rtp_nacks(session,component,header,video);
-      snw_ice_send_fir(session,component,0);
-
    }
 
+   snw_ice_handle_incoming_rtp(session, 0, video, buf, buflen);
+   //ice_rtp_plugin(handle,stream,component,0,video,buf,buflen); //FIXME: impl
+   snw_ice_rtp_nacks(session,component,header,video);
+   snw_ice_send_fir(session,component,0);
    return;
 }
 
@@ -1148,8 +1116,9 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
       }
    }
 
-   DEBUG(log, "retransmission done, seqnr=%u, issent=%u", seqnr, issent);
-   component->retransmit_recent_cnt += retransmits_cnt;
+   DEBUG(log, "retransmission done, seqnr=%u, issent=%u, retransmits_cnt=%u", 
+              seqnr, issent, retransmits_cnt);
+   //component->retransmit_recent_cnt += retransmits_cnt;
 
    return 0;
 }
@@ -1157,7 +1126,7 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
 int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, 
                    int video, char *buf, int buflen) {
    snw_log_t *log = session->ice_ctx->log;
-   int64_t now = get_monotonic_time();
+   int64_t now = get_monotonic_time(); // FIXME: get time from session
    uint32_t nacks_count = 0; 
    std::vector<int> nacklist;
 
@@ -1178,22 +1147,10 @@ int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *componen
 
       /* FIXME Remove the NACK compound packet, we've handled it */
       buflen = snw_rtcp_remove_nacks(buf, buflen);
-      /* Update stats */
-      /*if(video) {
-         component->in_stats.video_nacks += nacks_count;
-      } else {
-         component->in_stats.audio_nacks += nacks_count;
-      }*/
+
    }
 
-   if (component->retransmit_recent_cnt &&
-       now - component->retransmit_log_ts > 5 * ICE_USEC_PER_SEC) {
-      DEBUG(log, "retransmitted %u packets due to NACK",
-             component->retransmit_recent_cnt);
-      component->retransmit_recent_cnt = 0; 
-      component->retransmit_log_ts = now; 
-   }
-
+   /* FIXME: Update stats */
    return 0;
 }
 
@@ -1312,10 +1269,9 @@ snw_ice_create_media_component(snw_ice_session_t *session, snw_ice_stream_t *str
    if (!rtp) return 0;
 
    rtp->stream = stream;
-   rtp->stream_id = stream->id;
-   rtp->component_id = cid;
+   rtp->id = cid;
    rtp->is_started = 0;
-   INIT_LIST_HEAD(&rtp->candidates.list);
+   INIT_LIST_HEAD(&rtp->remote_candidates.list);
    INIT_LIST_HEAD(&rtp->retransmit_buffer.list);
    snw_component_insert(&stream->components, rtp);
    if (is_rtcp)
@@ -1348,6 +1304,7 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
    stream->session = session;
    stream->gathering_done = 0;
    stream->is_disable = 0;
+   stream->is_video = video;
    stream->dtls_mode = DTLS_ROLE_ACTPASS;
    INIT_LIST_HEAD(&stream->components.list);
    snw_stream_insert(&session->streams,stream);
@@ -1637,7 +1594,7 @@ ice_component_cleanup(snw_ice_context_t *ice_ctx, snw_ice_component_t *component
       free(p);
    }
    
-   DEBUG(log, "clean component, cid=%u", component->component_id);
+   DEBUG(log, "clean component, cid=%u", component->id);
    snw_component_deallocate(ice_ctx, component);
 
    return;
@@ -1658,14 +1615,14 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
       struct list_head *n;
       list_for_each(n,&components->list) {
          snw_ice_component_t *t = list_entry(n,snw_ice_component_t,list);
-         DEBUG(log, "view component, cid=%u(%p)", t->component_id, t);
+         DEBUG(log, "view component, cid=%u(%p)", t->id, t);
       }
    }
 
    list_for_each_safe(pos,n,&components->list) {
       snw_ice_component_t *t = list_entry(pos,snw_ice_component_t,list);
-      if (t->component_id == component->component_id) {
-         DEBUG(log, "remove component, cid=%u",t->component_id);
+      if (t->id == component->id) {
+         DEBUG(log, "remove component, cid=%u",t->id);
          list_del(pos);
          c = t;
       }
@@ -1674,14 +1631,14 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
    if (c) {
       ice_component_cleanup(ice_ctx,c);
    } else {
-      //ERROR("component not found, cid=%u", component->component_id);
+      //ERROR("component not found, cid=%u", component->id);
    }
 
    /*{//DEBUG
       struct list_head *n;
       list_for_each(n,&components->list) {
          snw_ice_component_t *s = list_entry(n,snw_ice_component_t,list);
-         //DEBUG("view component, cid=%u(%p)", s->component_id, s);
+         //DEBUG("view component, cid=%u(%p)", s->id, s);
       }
    }*/
 
@@ -1693,7 +1650,7 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
    if(handle == NULL)
       return;
    if(components != NULL)
-      g_hash_table_remove(components, GUINT_TO_POINTER(component->component_id));
+      g_hash_table_remove(components, GUINT_TO_POINTER(component->id));
    component->stream = NULL;
    if(component->source != NULL) {
       g_source_destroy(component->source);
@@ -1734,7 +1691,7 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
       candidates = NULL;
    }
    component->candidates = NULL;*/
-   INIT_LIST_HEAD(&component->candidates.list);
+   INIT_LIST_HEAD(&component->remote_candidates.list);
 /*
    if(component->local_candidates != NULL) {
       GSList *i = NULL, *candidates = component->local_candidates;
@@ -2037,7 +1994,7 @@ int ice_setup_remote_credentials(snw_ice_session_t *session, snw_ice_stream_t *s
    log = session->ice_ctx->log;
 
    /* FIXME: make sense? */
-   list_for_each_safe(gsc,n,&component->candidates.list) {
+   list_for_each_safe(gsc,n,&component->remote_candidates.list) {
       c = list_entry(gsc,candidate_t,list);
       DEBUG(log, "remote stream info, sid=%d, cid=%d", c->stream_id, c->component_id);
       if (c->username && !ufrag)
@@ -2058,7 +2015,7 @@ int ice_setup_remote_credentials(snw_ice_session_t *session, snw_ice_stream_t *s
    if (ufrag && pwd) {
       DEBUG(log, "setting remote credentials, ufrag=%s,pwd=%s",ufrag,pwd);
       if (ice_agent_set_remote_credentials(session->agent, stream->id, ufrag, pwd) != ICE_OK) {
-         DEBUG(log, "failed to set remote credentials, sid=%u, cid=%u",stream->id, component->component_id);
+         DEBUG(log, "failed to set remote credentials, sid=%u, cid=%u",stream->id, component->id);
          return -1;
       }
    }
@@ -2100,14 +2057,15 @@ ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint
       return;
    }
 
-   if(list_empty(&component->candidates.list)) {
+   if(list_empty(&component->remote_candidates.list)) {
       DEBUG(log, "candidate list is empty");
       return;
    }
    DEBUG(log, "Setting credentials of remote candidates, sid=%d, cid=%d", stream_id, component_id);
    ice_setup_remote_credentials(session,stream,component);
 
-   added = ice_agent_set_remote_candidates(session->agent, stream_id, component_id, &component->candidates);
+   added = ice_agent_set_remote_candidates(session->agent, stream_id, 
+                component_id, &component->remote_candidates);
    if(added <=  0 ) { //FIXME: compare to size of list candidates
       DEBUG(log, "failed to set remote candidates, added=%u", added);
    } else {

@@ -45,8 +45,6 @@ typedef struct rtp_header_extension {
 #define SEQ_MISSING_WAIT 12000 /*  12ms */
 #define SEQ_NACKED_WAIT 155000 /* 155ms */
 
-//extern int g_max_nack_queue;
-
 typedef struct seq_info seq_info_t;
 struct seq_info {
    int64_t ts;

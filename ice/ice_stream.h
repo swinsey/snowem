@@ -35,7 +35,8 @@ struct snw_ice_stream {
 
    uint8_t gathering_done:1;
    uint8_t is_disable:1;
-   uint8_t reserved:6;
+   uint8_t is_video:1;
+   uint8_t reserved:5;
 
    struct list_head list;
 };

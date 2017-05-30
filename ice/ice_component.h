@@ -18,20 +18,14 @@ extern "C" {
 
 #define LAST_SEQS_MAX_LEN 160
 struct snw_ice_component {
+   uint32_t          id;
+   int               state;
+   int               is_started;
+
    snw_ice_stream_t *stream;
-   uint32_t stream_id;
-   uint32_t component_id;
+   candidate_t       remote_candidates;      /* list of remote candidates */
 
-   int state;
-   int is_started;                    /* Whether the setup of remote candidates for this component has started or not */
-
-   candidate_t candidates;            /* list of remote candidates */
-   dtls_ctx_t *dtls;                  /* DTLS-SRTP stack */
-
-   uint64_t retransmit_log_ts;        /* Last time a log message about sending retransmits was printed */
-   uint32_t retransmit_recent_cnt;    /* Number of retransmitted packets since last log message */
-   uint64_t nack_sent_log_ts;         /* Last time a log message about sending NACKs was printed */
-   uint32_t nack_sent_recent_cnt;     /* Number of NACKs sent since last log message */
+   dtls_ctx_t *dtls;
    seq_info_t *last_seqs_audio;       /* List of recently received audio sequence numbers (as a support to NACK generation) */
    seq_info_t *last_seqs_video;       /* List of recently received video sequence numbers (as a support to NACK generation) */
 

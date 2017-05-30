@@ -663,23 +663,23 @@ snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream
       return;
 
    ICE_DEBUG2("add candidate, sid=%u, cid=%u, flag=%u, started=%u", 
-         stream->id, component->component_id,
+         stream->id, component->id,
          IS_FLAG(session, WEBRTC_START), component->is_started);
 
-   list_add(&candidate->list,&component->candidates.list);
+   list_add(&candidate->list,&component->remote_candidates.list);
    if (!IS_FLAG(session, WEBRTC_START)) {
       SET_FLAG(session, WEBRTC_START);
    }
 
    if (!component->is_started) {
-      ice_setup_remote_candidates(session, component->stream_id, component->component_id);
+      ice_setup_remote_candidates(session, component->stream->id, component->id);
    } else {
       c = candidate_copy(candidate);
       memset(&candidates,0,sizeof(candidate_t));
       INIT_LIST_HEAD(&candidates.list);
       list_add(&c->list,&candidates.list);
       added = ice_agent_set_remote_candidates(session->agent,stream->id,
-                                              component->component_id,&candidates); 
+                                              component->id,&candidates); 
       if ( added < 1) {
          ICE_ERROR2("failed to add candidate, added=%u",added);
       } else {

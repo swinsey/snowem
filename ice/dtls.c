@@ -211,7 +211,7 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
    log = ice_ctx->log;
 
    DEBUG(log, "srtp handshake is completed, cid=%u, sid=%u",
-         component->component_id, component->stream_id);
+         component->id, component->stream->id);
 
    struct list_head *n,*p;
    list_for_each(n,&session->streams.list) {
@@ -220,9 +220,9 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
          continue;
       list_for_each(p,&s->components.list) {
          snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
-         DEBUG(log, "checking component, sid=%u, cid=%u",s->id, c->component_id);
+         DEBUG(log, "checking component, sid=%u, cid=%u",s->id, c->id);
          if (!c->dtls || !c->dtls->is_valid) {
-            DEBUG(log, "component not ready, sid=%u, cid=%u",s->id, c->component_id);
+            DEBUG(log, "component not ready, sid=%u, cid=%u",s->id, c->id);
             return;
          }    
       }    
@@ -295,15 +295,15 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          }
          if (dtls->state == DTLS_STATE_CONNECTED) {
             //FIX: 28-05 jackiedinh
-            if (component->stream_id == session->audio_stream->id 
-                || component->stream_id == session->video_stream->id) {
+            if (component->stream->id == session->audio_stream->id 
+                || component->stream->id == session->video_stream->id) {
                // Complete with SRTP setup
                unsigned char material[SRTP_MASTER_LENGTH*2];
                unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
                // Export keying material for SRTP
                if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
                   ICE_DEBUG2("failed to extract SRTP keying material, cid=%u, sid=%u, err=%s",
-                     component->component_id, stream->stream_id, ERR_reason_error_string(ERR_get_error()));
+                     component->id, stream->stream_id, ERR_reason_error_string(ERR_get_error()));
                   goto done;
                }
                // Key derivation (http://tools.ietf.org/html/rfc5764#section-4.2)
@@ -343,20 +343,20 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
                err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
                if(ret != err_status_ok) {
                   ICE_ERROR2("failed to create inbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                         component->component_id, stream->stream_id, ret);
+                         component->id, stream->stream_id, ret);
                   goto done;
                }
                ICE_DEBUG2("Created inbound SRTP session, cid=%u, sid=%u", 
-                     component->component_id, stream->stream_id);
+                     component->id, stream->stream_id);
                ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
                if(ret != err_status_ok) {
                   ICE_ERROR2("failed to create outbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                         component->component_id, stream->stream_id, ret);
+                         component->id, stream->stream_id, ret);
                   goto done;
                }
                dtls->is_valid = 1;
                ICE_DEBUG2("Created outbound SRTP session for component %d in stream %d", 
-                     component->component_id, stream->stream_id);
+                     component->id, stream->stream_id);
             }
             dtls->ready = 1;
          }
@@ -492,7 +492,7 @@ void srtp_callback(const SSL *ssl, int where, int ret) {
       return;
    }
 
-   ICE_DEBUG2("DTLS alert triggered, sid=%u, cid=%u", stream->stream_id, component->component_id);
+   ICE_DEBUG2("DTLS alert triggered, sid=%u, cid=%u", stream->stream_id, component->id);
 */
    return;
 }
@@ -538,13 +538,13 @@ int srtp_send_data(dtls_ctx_t *dtls) {
          /* FIXME need proper fragmentation */
          ICE_ERROR2("larger than the MTU, len=%u", out);
       }
-      int bytes = ice_agent_send(session->agent, component->stream_id, 
-                                 component->component_id, outgoing, out);
+      int bytes = ice_agent_send(session->agent, component->stream->id, 
+                                 component->id, outgoing, out);
 
       //HEXDUMP(outgoing,out,"dtls");
       if(bytes < out) {
          ICE_ERROR2("failed to send DTLS message, cid=%u, sid=%u, len=%d", 
-               component->component_id, stream->stream_id, bytes);
+               component->id, stream->stream_id, bytes);
       } else {
          //ICE_DEBUG2("send result, bytes=%u,out=%u",bytes,out);
       }
