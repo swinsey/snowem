@@ -24,6 +24,10 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
 void 
 send_rtp_pkt(snw_ice_session_t *session, rtp_packet_t *pkt);
 
+void 
+send_rtp_pkt_new(snw_ice_session_t *session, 
+  int control, int video, char* buf, int len);
+
 #ifdef __cplusplus
 }
 #endif
