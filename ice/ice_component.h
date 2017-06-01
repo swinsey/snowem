@@ -32,9 +32,6 @@ struct snw_ice_component {
    int64_t fir_latest;   
    int     fir_seq;
 
-   rtp_packet_t retransmit_buffer;    /* RTP packets list for restransmission */
-   rtp_packet_t rtplist;              /* list of recent frames */
-
    struct list_head list;
 };
 

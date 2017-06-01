@@ -83,33 +83,18 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
    for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
      
       if (session->channel->players[i] != 0) {
-
          rtp_header *header = (rtp_header *)buf;
          uint16_t seq = ntohs(header->seq_number);
 
          flowid = session->channel->players[i];
          DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
             session->flowid, video, header->type, VP8_PT, seq,len);
-         /*rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         pkt->data = (char*)malloc(len);
-         memcpy(pkt->data, buf, len);
-         pkt->length = len;
-         pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
-         pkt->control = (type == 0) ? 0: 1; //rtcp or rtp
-         pkt->encrypted = 0;*/
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
             DEBUG(log, "forward, flowid=%u -> forwardid=%u", session->flowid, flowid);
-            //send_rtp_pkt(s,pkt);
-            //send_rtp_pkt_new(s,control, video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO, 0, buf, len);
-            //send_rtp_pkt_new(s, control, video, buf, len);
-            send_rtp_pkt_new(s, control, video, buf, len);
+            send_rtp_pkt(s, control, video, buf, len);
          } else {
-            //FIXME: free pkt
-            /*if (pkt && pkt->data ) free(pkt->data);
-            pkt->data = NULL;
-            if (pkt) free(pkt);
-            pkt = NULL;*/
+            // failed
          }
       }
    }
@@ -119,12 +104,8 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
 
 void 
 snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int control, int video, char *buf, int len) {
-   snw_ice_context_t *ice_ctx = 0;
-   snw_log_t *log = 0;
 
    if (!session) return;
-   ice_ctx = session->ice_ctx;
-   log = ice_ctx->log;
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
       snw_ice_broadcast_rtp_pkg(session,control,video,buf,len);

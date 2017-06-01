@@ -28,7 +28,7 @@ snw_component_allocate(snw_ice_context_t *ctx) {
    memset(component,0,sizeof(*component));
    INIT_LIST_HEAD(&component->list);
 	INIT_LIST_HEAD(&component->remote_candidates.list);
-	INIT_LIST_HEAD(&component->rtplist.list);
+	//INIT_LIST_HEAD(&component->rtplist.list);
 
    return component;
 }

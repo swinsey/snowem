@@ -634,7 +634,7 @@ ice_verify_stream_status(snw_ice_session_t *session) {
 }
 
 void 
-send_rtcp_pkt_internal_new(snw_ice_session_t *session, int video, int encrypted, char *buf, int len) {
+send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, char *buf, int len) {
    snw_log_t *log = 0;
    snw_ice_stream_t *stream = 0;
    snw_ice_component_t *component = 0;
@@ -701,99 +701,20 @@ send_rtcp_pkt_internal_new(snw_ice_session_t *session, int video, int encrypted,
    return;
 }
 
-
-void 
-send_rtcp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
-   snw_log_t *log = 0;
-   snw_ice_stream_t *stream = 0;
-   snw_ice_component_t *component = 0;
-   int video = 0;
-
-   if (!session) return;
-   log = session->ice_ctx->log;
-
-   video = (pkt->type == RTP_PACKET_VIDEO);
-   stream = IS_FLAG(session, WEBRTC_BUNDLE)
-               ? (session->audio_stream ? session->audio_stream : session->video_stream)
-               : (video ? session->video_stream : session->audio_stream);
-
-   if (!stream) {
-      goto done;
-   }
-
-   component = IS_FLAG(session, WEBRTC_RTCPMUX) ? stream->rtp_component : stream->rtcp_component;
-   if (!component) {
-      goto done;
-   }
-
-   //FIXME: check cdone equal to num of stream
-   if (!stream->gathering_done) {
-      goto done;
-   }
-
-   if(!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
-      goto done;
-   }
-
-   if (pkt->encrypted) {
-      int sent = ice_agent_send(session->agent, stream->id, component->id,
-                                 (const char *)pkt->data, pkt->length);
-      if (sent < pkt->length) {
-         DEBUG(log, "only sent %d bytes? (was %d)", sent, pkt->length);
-      }
-   } else {
-      /* FIXME Copy in a buffer and fix SSRC */
-      char sbuf[ICE_BUFSIZE];
-      int protected_ = 0;
-      int ret = 0;
-
-      memcpy(&sbuf, pkt->data, pkt->length);
-      /* Fix all SSRCs! */
-      DEBUG(log, "Fixing SSRCs (local %u, peer %u)",
-            video ? stream->local_video_ssrc : stream->local_audio_ssrc,
-            video ? stream->remote_video_ssrc : stream->remote_audio_ssrc);
-
-      snw_rtcp_fix_ssrc((char *)&sbuf, pkt->length, 1,
-            video ? stream->local_video_ssrc : stream->local_audio_ssrc,
-            video ? stream->remote_video_ssrc : stream->remote_audio_ssrc);
-
-      protected_ = pkt->length;
-      ret = srtp_protect_rtcp(component->dtls->srtp_out, &sbuf, &protected_);
-      if(ret != err_status_ok) {
-         ERROR(log, "SRTCP protect error, len=%d-->%d, s=%u", pkt->length, protected_, ret);
-      } else {
-         int sent = ice_agent_send(session->agent, stream->id, component->id,
-                                    (const char *)&sbuf, protected_);
-         if(sent < protected_) {
-            WARN(log, "only sent %d bytes? (was %d)", sent, protected_);
-         }
-      }
-   }
-
-done:
-   if (pkt && pkt->data ) free(pkt->data);
-   pkt->data = NULL;
-   if (pkt) free(pkt);
-   pkt = NULL;
-   return;
-}
-
 void
-send_rtp_pkt_internal_new(snw_ice_session_t *session, 
-  /*int control,*/ int video, int encrypted, char* buf, int len) {
+send_rtp_pkt_internal(snw_ice_session_t *session, 
+  int video, int encrypted, char* buf, int len) {
    snw_log_t *log = 0;
    snw_ice_stream_t *stream = 0;
    snw_ice_component_t *component = 0;
    char sbuf[ICE_BUFSIZE];
    rtp_header *header = (rtp_header *)&sbuf;
    int protected_ = 0;
-   //int video = 0;
    int ret = 0;
 
    if (!session) return;
    log = session->ice_ctx->log;
 
-   //video = (type == RTP_PACKET_VIDEO);
    stream = IS_FLAG(session, WEBRTC_BUNDLE)
          ? (session->audio_stream ? session->audio_stream : session->video_stream)
          : (video ? session->video_stream : session->audio_stream);
@@ -819,168 +740,39 @@ send_rtp_pkt_internal_new(snw_ice_session_t *session,
       uint16_t seq = ntohs(header->seq_number);
       ERROR(log, "SRTP protect error, ret=%d , flowid=%u, len=%d-->%d, ts=%u, seq=%u",
             ret, session->flowid, len, protected_, timestamp, seq);
-   } else {
-      DEBUG(log, "send rtp packet");
-      int sent = ice_agent_send(session->agent, stream->id, component->id,
+      return;
+   } 
+   
+   DEBUG(log, "send rtp packet");
+   int sent = ice_agent_send(session->agent, stream->id, component->id,
                                  (const char *)&sbuf, protected_);
-      if(sent < protected_) {
+   if (sent < protected_) {
          DEBUG(log, "only sent %d bytes? (was %d)", sent, protected_);
-      }
-   }
-   return;
-}
-
-void
-send_rtp_pkt_internal(snw_ice_session_t *session, rtp_packet_t *pkt) {
-   snw_log_t *log = 0;
-   snw_ice_stream_t *stream = 0;
-   snw_ice_component_t *component = 0;
-   int video = 0;
-
-   if (!session) return;
-   log = session->ice_ctx->log;
-
-   video = (pkt->type == RTP_PACKET_VIDEO);
-   stream = IS_FLAG(session, WEBRTC_BUNDLE)
-         ? (session->audio_stream ? session->audio_stream : session->video_stream)
-         : (video ? session->video_stream : session->audio_stream);
-   if (!stream) {
-      goto done;
    }
 
-   component = stream->rtp_component;
-   if (!component) {
-      goto done;
-   }
-
-   if(!stream->gathering_done) {
-      goto done;
-   }
-
-   if(!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
-      goto done;
-   }
-
-   if(pkt->encrypted) {
-      rtp_header *header = (rtp_header *)pkt->data;
-      DEBUG(log, "Retransmitting seq.nr %u", ntohs(header->seq_number));
-      int sent = ice_agent_send(session->agent, stream->id, component->id,
-                                (const char *)pkt->data, pkt->length);
-      if(sent < pkt->length) {
-         ERROR(log, "only sent %d bytes? (was %d)", sent, pkt->length);
-      }
-   } else {
-      char sbuf[ICE_BUFSIZE];
-      memcpy(&sbuf, pkt->data, pkt->length);
-      rtp_header *header = (rtp_header *)&sbuf;
-      header->ssrc = htonl(video ? stream->local_video_ssrc : stream->local_audio_ssrc);
-      int protected_ = pkt->length;
-      int ret = srtp_protect(component->dtls->srtp_out, &sbuf, &protected_);
-      DEBUG(log, "SRTP protect, ret=%d , flowid=%u, len=%d-->%d",
-            ret, session->flowid, pkt->length, protected_);
-      if(ret != err_status_ok) {
-         rtp_header *header = (rtp_header *)&sbuf;
-         uint32_t timestamp = ntohl(header->timestamp);
-         uint16_t seq = ntohs(header->seq_number);
-         ERROR(log, "SRTP protect error, ret=%d , flowid=%u, len=%d-->%d, ts=%u, seq=%u",
-               ret, session->flowid, pkt->length, protected_, timestamp, seq);
-      } else {
-         DEBUG(log, "send rtp packet");
-         int sent = ice_agent_send(session->agent, stream->id, component->id,
-                                    (const char *)&sbuf, protected_);
-         if(sent < protected_) {
-            DEBUG(log, "only sent %d bytes? (was %d)", sent, protected_);
-         }
-
-         // Update stats
-         /*if(sent > 0) {
-            if(pkt->type == RTP_PACKET_AUDIO) {
-               component->out_stats.audio_packets++;
-               component->out_stats.audio_bytes += sent;
-            } else if(pkt->type == RTP_PACKET_VIDEO) {
-               component->out_stats.video_packets++;
-               component->out_stats.video_bytes += sent;
-            }
-         }*/
-
-         rtp_packet_t *p = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         p->data = (char *)malloc(protected_);
-         memcpy(p->data, (char *)&sbuf, protected_);
-         p->length = protected_;
-         p->last_retransmit = 0;
-         rtp_list_add(&component->retransmit_buffer,p);
-         DEBUG(log, "packet list, cur_num=%u, max_queue_num=%u",
-               rtp_list_size(&component->retransmit_buffer), DEFAULT_MAX_NACK_QUEUE);
-         if(rtp_list_size(&component->retransmit_buffer) > DEFAULT_MAX_NACK_QUEUE) {
-            p = rtp_list_remove_last(&component->retransmit_buffer);
-            free(p->data);
-            p->data = NULL;
-            free(p);
-         }
-      }
-   }
-
-done:
-   if (pkt && pkt->data ) free(pkt->data);
-   pkt->data = NULL;
-   if (pkt) free(pkt);
-   pkt = NULL;
+   //TODO: impl circular buffer to keep sent packets for restransmission.
    return;
 }
 
 
 void 
-send_rtp_pkt(snw_ice_session_t *session, rtp_packet_t *pkt) {
-   snw_log_t *log = 0;
-
-   if (!session || !pkt)
-      return;
-   log = session->ice_ctx->log;
-
-   if (pkt->data == NULL) {
-      free(pkt);
-      pkt = 0;
-      return;
-   }
-
-   /* check status of receiver */
-   ice_verify_stream_status(session);
-
-   if (pkt->control) {
-      send_rtcp_pkt_internal(session,pkt);
-   } else {
-      if(pkt->type == RTP_PACKET_AUDIO || pkt->type == RTP_PACKET_VIDEO) {
-         send_rtp_pkt_internal(session,pkt);
-      } else {
-         //send_sctp_pkt_internal(session,pkt);
-         ERROR(log, "unknow media packet, type=%u",pkt->type);
-      }
-   }
-
-   return;
-}
-
-void 
-send_rtp_pkt_new(snw_ice_session_t *session, 
+send_rtp_pkt(snw_ice_session_t *session, 
   int control, int video, char* buf, int len) {
-   snw_log_t *log = 0;
 
    if (!session || !buf)
       return;
-   log = session->ice_ctx->log;
 
    /* check status of receiver */
    ice_verify_stream_status(session);
 
    if (control) {
-      send_rtcp_pkt_internal_new(session,video,0,buf,len);
+      send_rtcp_pkt_internal(session,video,0,buf,len);
    } else {
-      send_rtp_pkt_internal_new(session,video,0,buf,len);
+      send_rtp_pkt_internal(session,video,0,buf,len);
    }
 
    return;
 }
-
 
 void 
 ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
@@ -989,16 +781,8 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
       return;
    log = session->ice_ctx->log;
 
-   //FIXME: rewrite, not use malloc
-   rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-   pkt->data = (char*)malloc(len);
-   memcpy(pkt->data, buf, len);
-   pkt->length = len;
-   pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
-   pkt->control = 1;
-   pkt->encrypted = 0;
    DEBUG(log, "send rtcp packet, len=%u",len);
-   send_rtp_pkt(session,pkt);
+   send_rtp_pkt(session,1,video,buf,len);
 }
 
 void 
@@ -1107,59 +891,21 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
 
       DEBUG(log, "sending fir request, cid=%u, curtime=%lu", component->id, session->curtime);
       {// send fir command
-         rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         char *rtcpbuf = (char*)malloc(24);
-
+         char rtcpbuf[24];
          snw_gen_rtcp_fir(session->ice_ctx, rtcpbuf, 20, &component->fir_seq);
-         pkt->data = rtcpbuf;
-         pkt->length = 20;
-         pkt->type = RTP_PACKET_VIDEO;
-         pkt->control = 1;
-         pkt->encrypted = 0;
-         send_rtcp_pkt_internal(session,pkt);
+         send_rtcp_pkt_internal(session,1,0,rtcpbuf,20);
       }
 
       {// send pli report
-         rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         char *rtcpbuf = (char*)malloc(12);
-
+         char rtcpbuf[12];
          snw_gen_rtcp_pli(rtcpbuf, 12);
-         pkt->data = rtcpbuf;
-         pkt->length = 12;
-         pkt->type = RTP_PACKET_VIDEO;
-         pkt->control = 1;
-         pkt->encrypted = 0;
-         send_rtcp_pkt_internal(session,pkt);
+         send_rtcp_pkt_internal(session,1,0,rtcpbuf,12);
       }
 
       //if (force) {
       if (1) {
          DEBUG(log, "vp8 payload sending fir request, cid=%u, curtime=%lu", 
                     component->id, session->curtime);
-         /*{// send fir command
-            rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-            char *rtcpbuf = (char*)malloc(24);
-
-            snw_gen_rtcp_fir(rtcpbuf, 20, &component->fir_seq);
-            pkt->data = rtcpbuf;
-            pkt->length = 20;
-            pkt->type = RTP_PACKET_AUDIO;
-            pkt->control = 1;
-            pkt->encrypted = 0;
-            send_rtcp_pkt_internal(session,pkt);
-         }*/
-         /*{// send pli report
-            rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-            char *rtcpbuf = (char*)malloc(12);
-
-            gen_rtcp_pli(rtcpbuf, 12);
-            pkt->data = rtcpbuf; 
-            pkt->length = 12;
-            pkt->type = JANUS_ICE_PACKET_AUDIO;
-            pkt->control = 1;
-            pkt->encrypted = 0;
-            send_rtcp_pkt_internal(handle,pkt);
-         }*/
       }
 
       if (!force && component) {
@@ -1227,7 +973,7 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 int
 snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
               int video, int seqnr, int64_t now) {
-   snw_log_t *log = session->ice_ctx->log;
+   /*snw_log_t *log = session->ice_ctx->log;
    struct list_head *n;
    int retransmits_cnt = 0;
    int issent = 0;
@@ -1245,16 +991,18 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
          p->last_retransmit = now;
          retransmits_cnt++;
 
-         rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         pkt->data = (char*)malloc(p->length);
-         memcpy(pkt->data, p->data, p->length);
-         pkt->length = p->length;
-         pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
-         pkt->control = 0;
-         pkt->encrypted = 1;
+         //rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
+         //pkt->data = (char*)malloc(p->length);
+         //memcpy(pkt->data, p->data, p->length);
+         //pkt->length = p->length;
+         //pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
+         //pkt->control = 0;
+         //pkt->encrypted = 1;
          issent = 1;
 
-         send_rtp_pkt(session,pkt);
+         //send_rtp_pkt(session,pkt);
+         //send_rtp_pkt_new(session,0,video,p->data,p->length);
+         send_rtp_pkt_internal_new(session,video,1,p->data,p->length);
          break;
       }
    }
@@ -1262,7 +1010,7 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
    DEBUG(log, "retransmission done, seqnr=%u, issent=%u, retransmits_cnt=%u", 
               seqnr, issent, retransmits_cnt);
    //component->retransmit_recent_cnt += retransmits_cnt;
-
+   */
    return 0;
 }
 
@@ -1415,7 +1163,6 @@ snw_ice_create_media_component(snw_ice_session_t *session, snw_ice_stream_t *str
    rtp->id = cid;
    rtp->is_started = 0;
    INIT_LIST_HEAD(&rtp->remote_candidates.list);
-   INIT_LIST_HEAD(&rtp->retransmit_buffer.list);
    snw_component_insert(&stream->components, rtp);
    if (is_rtcp)
       stream->rtcp_component = rtp;
@@ -1719,7 +1466,7 @@ snw_ice_stream_cleanup(snw_ice_context_t *ice_ctx, snw_ice_stream_t *s) {
 void 
 ice_component_cleanup(snw_ice_context_t *ice_ctx, snw_ice_component_t *component) {
    snw_log_t *log = 0;
-   struct list_head *pos, *n;
+   //struct list_head *pos, *n;
 
    if (!component) return;
    log = ice_ctx->log;
@@ -1730,12 +1477,12 @@ ice_component_cleanup(snw_ice_context_t *ice_ctx, snw_ice_component_t *component
       component->dtls = NULL;
    }
 
-   list_for_each_safe(pos,n,&component->retransmit_buffer.list) {
+   /*list_for_each_safe(pos,n,&component->retransmit_buffer.list) {
       rtp_packet_t *p = list_entry(pos,rtp_packet_t,list);
       list_del(pos);
       free(p->data);
       free(p);
-   }
+   }*/
    
    DEBUG(log, "clean component, cid=%u", component->id);
    snw_component_deallocate(ice_ctx, component);
