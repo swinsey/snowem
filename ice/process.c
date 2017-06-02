@@ -1021,7 +1021,7 @@ int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *componen
    uint32_t nacks_count = 0; 
    std::vector<int> nacklist;
 
-   snw_ice_rtcp_get_nacks(buf, buflen, nacklist);
+   snw_rtcp_get_nacks(buf, buflen, nacklist);
 
    nacks_count = nacklist.size(); 
    if (nacks_count) {
@@ -1051,6 +1051,7 @@ void ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    snw_log_t *log = 0;
    err_status_t ret;
    int buflen = len;
+   int video = 0;
 
    if (!session) return;
    log = session->ice_ctx->log;
@@ -1058,48 +1059,28 @@ void ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    ret = srtp_unprotect_rtcp(component->dtls->srtp_in, buf, &buflen);
    if (ret != err_status_ok) {
       DEBUG(log, "SRTCP unprotect error, ret=%u, len=%d, buflen=%d", ret, len, buflen);
+      return;
+   } 
+
+   if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
+      //video = (stream->id == session->video_stream->id ? 1 : 0);
+      video = stream->is_video;
    } else {
-      int video = 0;
-      if(!IS_FLAG(session, WEBRTC_BUNDLE)) {
-         video = (stream->id == session->video_stream->id ? 1 : 0);
+      if (!IS_FLAG(session, WEBRTC_AUDIO)) {
+         video = 1;
+      } else if (!IS_FLAG(session, WEBRTC_VIDEO)) {
+         video = 0;
       } else {
-         if(!IS_FLAG(session, WEBRTC_AUDIO)) {
-            video = 1;
-         } else if(!IS_FLAG(session, WEBRTC_VIDEO)) {
-            video = 0;
-         } else {
-            if(stream->remote_audio_ssrc == 0 || stream->remote_video_ssrc == 0) {
-               //FIXME: rewrite this code
-               /* We don't know the remote SSRC: this can happen for recvonly clients
-                * (see https://groups.google.com/forum/#!topic/discuss-webrtc/5yuZjV7lkNc)
-                * Check the local SSRC, compare it to what we have */
-               uint32_t rtcp_ssrc = snw_rtcp_get_receiver_ssrc(buf, len);
-               if(rtcp_ssrc == stream->local_audio_ssrc) {
-                  video = 0;
-               } else if(rtcp_ssrc == stream->local_video_ssrc) {
-                  video = 1;
-               } else {
-                  /* Mh, no SR or RR? Try checking if there's any FIR, PLI or REMB */
-                  if (snw_rtcp_has_fir(buf, len) || snw_rtcp_has_pli(buf, len) || snw_rtcp_get_remb(buf, len)) {
-                     video = 1;
-                  }
-               }
-               DEBUG(log, "incoming rtcp, video=%u, local_video_ssrc=%u, local_audio_ssrc=%u, got=%u)",
-                     video, stream->local_video_ssrc, stream->local_audio_ssrc, rtcp_ssrc);
-            } else {
-               /* Check the remote SSRC, compare it to what we have */
-               uint32_t rtcp_ssrc = snw_rtcp_get_sender_ssrc(buf, len);
-               video = (stream->remote_video_ssrc == rtcp_ssrc ? 1 : 0);
-               DEBUG(log, "incoming rtcp, type=%u, is_sender=%u, remote_video_ssrc=%u, remote_audio_ssrc=%u, got=%u)",
-                  video, IS_FLAG(session,ICE_PUBLISHER), stream->local_video_ssrc, stream->local_audio_ssrc, rtcp_ssrc);
-            }
-         }
+         DEBUG(log, "not supported stream, flags=%u",session->flags);
+         return;
       }
-      //FIXME: uncomment
-      //ice_rtp_plugin(handle,stream,component,1,video,buf,buflen);
-      snw_ice_handle_incoming_rtp(session, 1, video, buf, buflen);
-      snw_ice_rtcp_nacks(session, component, video, buf, buflen);
    }
+
+   //FIXME: uncomment
+   //ice_rtp_plugin(handle,stream,component,1,video,buf,buflen);
+   snw_ice_handle_incoming_rtp(session, 1, video, buf, buflen);
+   snw_ice_rtcp_nacks(session, component, video, buf, buflen);
+   //}
 
    return;
 }

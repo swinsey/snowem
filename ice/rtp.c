@@ -95,6 +95,7 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
             send_rtp_pkt(s, control, video, buf, len);
          } else {
             // failed
+            ERROR(log, "session not found, flowid=%u",flowid);
          }
       }
    }
