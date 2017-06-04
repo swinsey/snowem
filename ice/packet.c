@@ -51,32 +51,6 @@ int rtp_list_size(rtp_packet_t* head) {
    return cnt;
 }
 
-//FIXME: change number to CONSTANTS
-int ice_get_packet_type(char* buf, int len) {
-   rtp_header *header = NULL;
-   
-   if (!buf || len <= 0) {
-      return UNKNOWN_PT;
-   }
-
-   if ((*buf >= 20) && (*buf < 64)) {
-      return DTLS_PT;
-   }
-
-   if (len < RTP_HEADER_SIZE) {
-      return UNKNOWN_PT;
-   }
-
-   header = (rtp_header *)buf;
-   if ((header->type < 64) || (header->type >= 96)) {
-      return RTP_PT;
-   } else if ((header->type >= 64) && (header->type < 96)) {
-      return RTCP_PT;
-   }
-
-   return UNKNOWN_PT;
-}
-
 
 
 

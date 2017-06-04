@@ -1,28 +1,108 @@
 #include "log.h"
-#include "ice_types.h"
 #include "rtcp.h"
+#include "types.h"
+
+uint8_t
+snw_rtcp_get_payload_type(snw_ice_session_t *s, char *buf, int len) {
+   rtcp_hdr_t *rtcp = 0;
+
+   if (!s || !buf || len == 0)
+      return 0;
+
+   rtcp = (rtcp_hdr_t *)buf;
+   if (rtcp->v != 2)
+      return 0;
+   
+   return rtcp->pt;
+}
+
+int 
+snw_rtcp_has_type(char *buf, int len, int8_t type) {
+	int total, length;
+	rtcp_hdr_t *rtcp = (rtcp_hdr_t *)buf;
+
+	if (rtcp->v != 2)
+		return 0;
+
+   total = len;
+	while (rtcp) {
+      if (rtcp->pt == type)
+         return 1;
+		// compound packet
+		length = ntohs(rtcp->len);
+		if (length == 0)
+			break;
+		//total -= length*4+4
+		total -= (length+1)*RTCP_LENGTH_IN_WORDS;
+		if (total <= 0)
+			break;
+		rtcp = (rtcp_hdr_t *)((uint32_t*)rtcp + length + 1);
+	}
+	return 0;
+}
+
+uint32_t
+snw_rtcp_get_ssrc(snw_ice_session_t *s, char *buf, int len) {
+   snw_log_t *log = 0;
+   rtcp_pkt_t *rtcp = 0;
+   char *end = buf + len;
+   int rtcp_len;
+
+   if (!s || !buf || len == 0) return 0;
+   log = s->ice_ctx->log;
+
+   rtcp = (rtcp_pkt_t *)buf;
+   if (rtcp->hdr.v != RTCP_VERSION) return 0;
+
+   //HEXDUMP(log,(const char*)buf,len,"rtcp");
+   /* the first rtcp pkt must be either sender report or recevier report.*/
+   while (rtcp) {
+      switch (rtcp->hdr.pt) {
+         case RTCP_SR: {
+            DEBUG(log, "got sender report, rc=%u, len=%u", rtcp->hdr.rc, len);
+            return ntohl(rtcp->pkt.sr.ssrc);
+         }
+         case RTCP_RR: {
+            DEBUG(log, "got receiver report, rc=%u, len=%u", rtcp->hdr.rc, len);
+            return ntohl(rtcp->pkt.rr.ssrc);
+         }
+         default: {
+            break;
+         }
+      }
+
+      rtcp_len = ntohs(rtcp->hdr.len);
+      rtcp = (rtcp_pkt_t *)((uint32_t*)rtcp + rtcp_len + 1); // len + 1 in 32-bits word.
+      if (rtcp_len ==0 || (char*)rtcp >= end) break;
+   }
+   return 0;
+}
+
 
 int
-snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr) {
-	rtcp_hdr_t *rtcp = NULL;
+snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr) {
+   snw_log_t *log;
+	rtcp_hdr_t *rtcp = 0;
 	int pno = 0, total = len;
 
-	if (!packet || len == 0)
+	if (!s || !packet || len == 0)
 		return -1;
+   log = s->ice_ctx->log;
 
 	rtcp = (rtcp_hdr_t *)packet;
 	if (rtcp->v != 2)
 		return -2;
 
-	ICE_DEBUG2("Parsing compound packet, total=%d", total);
+	DEBUG(log, "parsing compound packet, flowid=%u, pt=%u, len=%d", 
+          s->flowid, rtcp->pt, len);
 
 	while (rtcp) {
 		pno++;
 		/* TODO Should we handle any of these packets ourselves, or just relay them? */
-		switch(rtcp->pt) {
+		switch (rtcp->pt) {
 			case RTCP_SR: {
 				/* SR, sender report */
-				ICE_DEBUG2("#%d SR (200)", pno);
+				DEBUG(log, "FIXSSRC #%d SR (200)", pno);
 				rtcp_sr *sr = (rtcp_sr*)rtcp;
 				//ICE_DEBUG2("SSRC: %u (%u in RB)", ntohl(sr->ssrc), report_block_get_ssrc(&sr->rb[0]));
 				//ICE_DEBUG2("Lost: %u/%u", report_block_get_fraction_lost(&sr->rb[0]), report_block_get_cum_packet_loss(&sr->rb[0]));
@@ -36,7 +116,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_RR: {
 				/* RR, receiver report */
-				ICE_DEBUG2("#%d RR (201)", pno);
+				DEBUG(log, "FIXSSRC #%d RR (201)", pno);
 				rtcp_rr *rr = (rtcp_rr*)rtcp;
 				//ICE_DEBUG2("SSRC: %u (%u in RB)", ntohl(rr->ssrc), report_block_get_ssrc(&rr->rb[0]));
 				//ICE_DEBUG2("Lost: %u/%u", report_block_get_fraction_lost(&rr->rb[0]), report_block_get_cum_packet_loss(&rr->rb[0]));
@@ -50,7 +130,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_SDES: {
 				/* SDES, source description */
-				ICE_DEBUG2("#%d SDES (202)", pno);
+				DEBUG(log, "FIXSSRC #%d SDES (202)", pno);
 				rtcp_sdes *sdes = (rtcp_sdes*)rtcp;
 				ICE_DEBUG2("SSRC: %u", ntohl(sdes->ssrc));
 				if(fixssrc && newssrcl) {
@@ -60,7 +140,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_BYE: {
 				/* BYE, goodbye */
-				ICE_DEBUG2("#%d BYE (203)", pno);
+				DEBUG(log, "FXISSRC #%d BYE (203)", pno);
 				rtcp_bye_t *bye = (rtcp_bye_t*)rtcp;
 				ICE_DEBUG2("SSRC: %u", ntohl(bye->ssrc[0]));
 				if(fixssrc && newssrcl) {
@@ -70,7 +150,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_APP: {
 				/* APP, application-defined */
-				ICE_DEBUG2("#%d APP (204)", pno);
+				DEBUG(log, "FIXSSRC #%d APP (204)", pno);
 				rtcp_app_t *app = (rtcp_app_t*)rtcp;
 				ICE_DEBUG2("SSRC: %u", ntohl(app->ssrc));
 				if(fixssrc && newssrcl) {
@@ -80,7 +160,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_FIR: {
 				/* FIR, rfc2032 */
-				ICE_DEBUG2("%d FIR (192)", pno);
+				DEBUG(log, "FIXSSRC %d FIR (192)", pno);
 				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
 				if(fixssrc && newssrcr && (ntohs(rtcp->len) >= 20)) {
 					rtcpfb->media = htonl(newssrcr);
@@ -93,7 +173,7 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 			case RTCP_RTPFB: {
 				/* RTPFB, Transport layer FB message (rfc4585) */
-				ICE_DEBUG2("#%d RTPFB (205)", pno);
+				DEBUG(log, "FIXSSRC #%d RTPFB (205)", pno);
 				int fmt = rtcp->rc;
 				ICE_DEBUG2("FMT: %u", fmt);
 				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
@@ -126,13 +206,13 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 					}
 				} else if(fmt == 3) {	/* rfc5104 */
 					/* TMMBR: http://tools.ietf.org/html/rfc5104#section-4.2.1.1 */
-					ICE_DEBUG2("#%d TMMBR -- RTPFB (205)", pno);
+					DEBUG(log, "FIXSSRC #%d TMMBR -- RTPFB (205)", pno);
 					if(fixssrc && newssrcr) {
 						uint32_t *ssrc = (uint32_t *)rtcpfb->fci;
 						*ssrc = htonl(newssrcr);
 					}
 				} else {
-					ICE_DEBUG2("#%d ??? -- RTPFB (205, fmt=%d)", pno, fmt);
+					DEBUG(log, "FIXSSRC #%d ??? -- RTPFB (205, fmt=%d)", pno, fmt);
 				}
 
 				if(fixssrc && newssrcl) {
@@ -142,15 +222,12 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 			}
 
 			case RTCP_PSFB: {
-				/* PSFB, Payload-specific FB message (rfc4585) */
-				ICE_DEBUG2("#%d PSFB (206)", pno);
 				int fmt = rtcp->rc;
-				//~ JANUS_LOG(LOG_HUGE, "       -- FMT: %u\n", fmt);
 				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-				//~ JANUS_LOG(LOG_HUGE, "       -- SSRC: %u\n", ntohl(rtcpfb->ssrc));
-				if(fmt == 1) {
-					ICE_DEBUG2("#%d PLI -- PSFB (206)", pno);
-					if(fixssrc && newssrcr) {
+				DEBUG(log, "FIXSSRC PSFB (206), pno=%u, fmt=%u, ssrc=%u", pno, fmt, ntohl(rtcpfb->ssrc));
+				if (fmt == 1) {
+					DEBUG(log, "PLI -- PSFB (206), pno=%u", pno);
+					if (fixssrc && newssrcr) {
 						rtcpfb->media = htonl(newssrcr);
 					}
 				} else if(fmt == 2) {
@@ -230,59 +307,60 @@ snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_
 	return 0;
 }
 
-/*
-int snw_rtcp_has_type(char *packet, int len, int type) {
-	int got_pli = 0;
-	rtcp_hdr_t *rtcp = (rtcp_hdr_t *)packet;
-	if(rtcp->v != 2)
-		return 0;
-	int pno = 0, total = len;
-	while(rtcp) {
-		pno++;
-		switch(rtcp->pt) {
-			case RTCP_PSFB: {
-				int fmt = rtcp->rc;
-				if(fmt == 1)
-					got_pli = 1;
-				break;
-			}
-			default:
-				break;
-		}
-		// compound packet
-		int length = ntohs(rtcp->len);
-		if(length == 0)
-			break;
-		total -= length*4+4;
-		if(total <= 0)
-			break;
-		rtcp = (rtcp_hdr_t *)((uint32_t*)rtcp + length + 1);
-	}
-	return got_pli ? 1 : 0;
-}
-*/
-
 void
-snw_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist) {
-	rtcp_hdr_t *rtcp = NULL;
-
-	if (!packet || len == 0)
-		return;
-
-	rtcp = (rtcp_hdr_t *)packet;
-	if (rtcp->v != 2)
-		return;
-
-	// Get list of sequence numbers we should send again 
+snw_rtcp_get_nacks_new(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist) {
+   snw_log_t *log = 0;
+	rtcp_pkt_t *rtcp = 0;
+   char *end;
 	int total = len;
-	while(rtcp) {
-		if(rtcp->pt == RTCP_RTPFB) {
-			int fmt = rtcp->rc;
-			if(fmt == 1) {
+   uint16_t pid = 0;
+   uint16_t blp = 0;
+   int i, cnt = 0;
+
+	if (!s || !buf || len == 0) return;
+   log = s->ice_ctx->log;
+	rtcp = (rtcp_pkt_t *)buf;
+
+	if (rtcp->hdr.v != RTCP_VERSION) return;
+
+   HEXDUMP(log,buf,len,"rtcp");
+	while (rtcp) {
+		if (rtcp->hdr.pt == RTCP_RTPFB && rtcp->hdr.rc == GENERIC_FMT) {
+         snw_rtcp_nack_t *nack = rtcp->pkt.fb.fci.nack;
+         end = (char*)rtcp + 4*(ntohs(rtcp->hdr.len) + 1);
+
+         DEBUG(log,"nacks info, buf=%p, end=%p,nack=%p(%p)", rtcp,end,nack,rtcp->pkt.fb.fci.nack);
+
+         cnt = 0;
+         do {
+            char bitmask[20];
+            pid = ntohs(nack->pid);
+            blp = ntohs(nack->blp);
+            DEBUG(log,"nacks info, cnt=%u, pid=%u, blp=%u", cnt, pid, blp);
+            nacklist.push_back(pid);
+            memset(bitmask, 0, 20);
+            for (i=0; i<16; i++) {
+               bitmask[i] = (blp & ( 1 << i )) >> i ? '1' : '0';
+               if ((blp & (1 << i)) >> i) {
+                  nacklist.push_back(pid+i+1);
+               }
+            }
+            bitmask[16] = '\n';
+            DEBUG(log, "nacks [%d] %u / %s", cnt, pid, bitmask);
+
+            cnt++;
+            nack++;
+            // make sure no loop
+            if (cnt > RTCP_PKT_NUM_MAX) break;
+
+         } while ((char*)nack < end);
+
+         DEBUG(log, "Got nacks, flowid=%u, num=%d", s->flowid, cnt);
+			/*if(fmt == GENERIC_FMT) {
 				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-				int nacks = ntohs(rtcp->len)-2;	// Skip SSRCs
-				if(nacks > 0) {
-					ICE_DEBUG2("Got nacks, num=%d", nacks);
+				int nacks = ntohs(rtcp->hdr.len)-2;	// Skip SSRCs
+				if (nacks > 0) {
+					DEBUG(log, "Got nacks, num=%d", nacks);
 					rtcp_nack *nack = NULL;
 					uint16_t pid = 0;
 					uint16_t blp = 0;
@@ -301,7 +379,67 @@ snw_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist) {
                      }
 						}
 						bitmask[16] = '\n';
-						ICE_DEBUG2("[%d] %u / %s", i, pid, bitmask);
+						DEBUG(log, "[%d] %u / %s", i, pid, bitmask);
+					}
+				}
+			}*/
+		}
+		// Is this a compound packet? 
+		int length = ntohs(rtcp->hdr.len);
+		if(length == 0)
+			break;
+		total -= length*4+4;
+		if(total <= 0)
+			break;
+		rtcp = (rtcp_pkt_t *)((uint32_t*)rtcp + length + 1);
+	}
+	return;
+}
+
+
+
+void
+snw_rtcp_get_nacks(snw_ice_session_t *s, char *packet, int len, std::vector<int> &nacklist) {
+   snw_log_t *log = 0;
+	rtcp_hdr_t *rtcp = NULL;
+	int total = len;
+
+	if (!packet || len == 0)
+		return;
+   log = s->ice_ctx->log;
+	rtcp = (rtcp_hdr_t *)packet;
+	if (rtcp->v != 2)
+		return;
+
+	// Get list of sequence numbers we should send again 
+	while(rtcp) {
+		if(rtcp->pt == RTCP_RTPFB) {
+			int fmt = rtcp->rc;
+			DEBUG(log, "got rtpfb nacks, flowid=%u", s->flowid);
+			if (fmt == 1) {
+				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
+				int nacks = ntohs(rtcp->len)-2;	// Skip SSRCs
+				if(nacks > 0) {
+					DEBUG(log, "Got nacks, num=%d", nacks);
+					rtcp_nack *nack = NULL;
+					uint16_t pid = 0;
+					uint16_t blp = 0;
+					int i=0, j=0;
+					char bitmask[20];
+					for(i=0; i< nacks; i++) {
+						nack = (rtcp_nack *)rtcpfb->fci + i;
+						pid = ntohs(nack->pid);
+                  nacklist.push_back(pid);
+						blp = ntohs(nack->blp);
+						memset(bitmask, 0, 20);
+						for(j=0; j<16; j++) {
+							bitmask[j] = (blp & ( 1 << j )) >> j ? '1' : '0';
+							if((blp & ( 1 << j )) >> j) {
+								nacklist.push_back(pid+j+1);
+                     }
+						}
+						bitmask[16] = '\n';
+						DEBUG(log, "nacks [%d] %u / %s", i, pid, bitmask);
 					}
 				}
 			}
@@ -373,7 +511,7 @@ int snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seq
    if (!ice_ctx) return -1;
    log = ice_ctx->log;
 
-	if(packet == NULL || len != 20 || seqnr == NULL)
+	if (!packet || len != 20 || !seqnr)
 		return -1;
 
    memset(packet, 0, len);
@@ -389,7 +527,7 @@ int snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seq
 	/* Now set FIR stuff */
 	rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
 	rtcp_fir *fir = (rtcp_fir *)rtcpfb->fci;
-	fir->seqnr = htonl(*seqnr << 24);	/* FCI: Sequence number */
+	fir->seqno = htonl(*seqnr << 24);	/* FCI: Sequence number */
 	WARN(log, "[FIR] seqnr=%d (%d bytes)", *seqnr, 4*(ntohs(rtcp->len)+1));
 	return 20;
 }

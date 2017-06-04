@@ -8,37 +8,39 @@
 
 #include "ice_types.h"
 
+#define RTP_VERSION    2
 #define RTP_HEADER_SIZE	12
 
-/*! \brief RTP Header (http://tools.ietf.org/html/rfc3550#section-5.1) */
-typedef struct rtp_header
+typedef struct rtp_hdr rtp_hdr_t;
+struct rtp_hdr
 {
 #if __BYTE_ORDER == __BIG_ENDIAN
-	uint16_t version:2;
-	uint16_t padding:1;
-	uint16_t extension:1;
-	uint16_t csrccount:4;
-	uint16_t markerbit:1;
-	uint16_t type:7;
+	uint16_t v:2;
+	uint16_t p:1;
+	uint16_t x:1;
+	uint16_t cc:4;
+	uint16_t m:1;
+	uint16_t pt:7;
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
-	uint16_t csrccount:4;
-	uint16_t extension:1;
-	uint16_t padding:1;
-	uint16_t version:2;
-	uint16_t type:7;
-	uint16_t markerbit:1;
+	uint16_t cc:4;
+	uint16_t x:1;
+	uint16_t p:1;
+	uint16_t v:2;
+	uint16_t pt:7;
+	uint16_t m:1;
 #endif
-	uint16_t seq_number;
-	uint32_t timestamp;
+	uint16_t seq;
+	uint32_t ts;
 	uint32_t ssrc;
-	uint32_t csrc[16];
-} rtp_header;
+	uint32_t csrc[1];
+};
 
 /* RTP extension */
-typedef struct rtp_header_extension {
+typedef struct rtp_hdr_ext rtp_hdr_ext_t;
+struct rtp_hdr_ext {
 	uint16_t type;
-	uint16_t length;
-} rtp_header_extension;
+	uint16_t len;
+};
 
 #define DEFAULT_MAX_NACK_QUEUE   300
 #define MAX_NACK_IGNORE       100000 /* retransmission time (100ms) */

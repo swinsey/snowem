@@ -12,6 +12,13 @@
 #include <vector>
 
 #include "ice.h"
+#include "ice_types.h"
+#include "ice_session.h"
+
+#define RTCP_VERSION    2
+#define RTCP_LENGTH_IN_WORDS 4
+#define RTCP_HDR_LENGTH 4
+#define RTCP_PKT_NUM_MAX 31
 
 #define RTCP_FIR   192
 #define RTCP_SR    200
@@ -57,7 +64,8 @@ struct report_block
 	uint32_t dlsr;
 };
 
-typedef struct rtcp_sr
+typedef struct rtcp_sr rtcp_sr_t;
+struct rtcp_sr
 {
 	rtcp_hdr_t hdr;
 	uint32_t ssrc;
@@ -67,109 +75,179 @@ typedef struct rtcp_sr
 	uint32_t packet_cnt;
 	uint32_t octet_cnt;
 	report_block_t rb[1];
-} rtcp_sr;
+};
 
-typedef struct rtcp_rr
+typedef struct rtcp_rr rtcp_rr_t;
+struct rtcp_rr
 {
 	rtcp_hdr_t     hdr;
 	uint32_t       ssrc;
 	report_block_t rb[1];
-} rtcp_rr;
+};
 
-/* http://tools.ietf.org/html/rfc3550#section-6.5 */
-typedef struct rtcp_sdes_chunk
+typedef struct rtcp_sdes_chunk rtcp_sdes_chunk_t;
+struct rtcp_sdes_chunk
 {
 	uint32_t csrc;
-} rtcp_sdes_chunk;
+};
 
-typedef struct rtcp_sdes_item
+typedef struct rtcp_sdes_item rtcp_sdes_item_t;
+struct rtcp_sdes_item
 {
 	uint8_t type;
 	uint8_t len;
 	char    content[1];
-} rtcp_sdes_item;
+};
 
-typedef struct rtcp_sdes
+typedef struct rtcp_sdes rtcp_sdes_t;
+struct rtcp_sdes
 {
-	rtcp_hdr_t header;
+	rtcp_hdr_t hdr;
 	uint32_t ssrc;
 	rtcp_sdes_chunk chunk;
 	rtcp_sdes_item item;
-} rtcp_sdes;
+};
 
-/* http://tools.ietf.org/html/rfc3550#section-6.6 */
-typedef struct rtcp_bye
+typedef struct rtcp_bye rtcp_bye_t;
+struct rtcp_bye
 {
-	rtcp_hdr_t header;
+	rtcp_hdr_t hdr;
 	uint32_t ssrc[1];
-} rtcp_bye_t;
+};
 
-/* http://tools.ietf.org/html/rfc3550#section-6.7 */
-typedef struct rtcp_app
+typedef struct rtcp_app rtcp_app_t;
+struct rtcp_app
 {
-	rtcp_hdr_t header;
+	rtcp_hdr_t hdr;
 	uint32_t ssrc;
 	char name[4];
-} rtcp_app_t;
+};
 
-/* http://tools.ietf.org/html/rfc4585#section-6.2.1 */
-typedef struct rtcp_nack
+typedef struct rtcp_nack rtcp_nack_t;
+struct rtcp_nack
 {
 	uint16_t pid;
 	uint16_t blp;
-} rtcp_nack;
+};
 
-typedef struct nack_seq {
-	uint16_t seq_no;
+typedef struct nack_seq  nack_seq_t;
+struct nack_seq {
+	uint16_t seqno;
 	struct nack_seq *next;
-} nack_seq;
+};
 
 
-/* look at http://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03 */
-typedef struct rtcp_remb
+typedef struct rtcp_remb rtcp_remb_t;
+struct rtcp_remb
 {
 	char id[4];
 	uint32_t bitrate;
 	uint32_t ssrc[1];
-} rtcp_remb;
+};
 
-
-/* look at http://tools.ietf.org/search/rfc5104#section-4.3.1.1 */
-typedef struct rtcp_fir
+typedef struct rtcp_fir rtcp_fir_t;
+struct rtcp_fir
 {
 	uint32_t ssrc;
-	uint32_t seqnr;
-} rtcp_fir;
+	uint32_t seqno;
+};
 
 
-/* look at http://tools.ietf.org/html/rfc4585 */
-typedef struct rtcp_fb
+typedef struct rtcp_fb rtcp_fb_t;
+struct rtcp_fb
 {
 	rtcp_hdr_t header;
 	uint32_t ssrc;
 	uint32_t media;
 	char fci[1];
-} rtcp_fb;
+};
+
+typedef struct snw_rtcp_nack snw_rtcp_nack_t;
+struct snw_rtcp_nack
+{
+	uint16_t pid;
+	uint16_t blp;
+};
+
+
+typedef struct snw_rtcp_fb snw_rtcp_fb_t;
+struct snw_rtcp_fb
+{
+	uint32_t ssrc;
+	uint32_t media;
+	union fci {
+      snw_rtcp_nack_t nack[1];
+   } fci;
+};
+
+
+typedef struct snw_rtcp_sr snw_rtcp_sr_t;
+struct snw_rtcp_sr
+{
+	uint32_t ssrc;
+	uint32_t ntp_secs;
+	uint32_t ntp_frac;
+	uint32_t rtp_ts;
+	uint32_t packet_cnt;
+	uint32_t octet_cnt;
+	report_block_t rb[1];
+};
+
+typedef struct snw_rtcp_rr snw_rtcp_rr_t;
+struct snw_rtcp_rr
+{
+	uint32_t       ssrc;
+	report_block_t rb[1];
+};
+
+
+typedef struct rtcp_pkt rtcp_pkt_t;
+struct rtcp_pkt {
+   rtcp_hdr_t hdr;
+   union pkt {
+      snw_rtcp_sr_t   sr;
+      snw_rtcp_rr_t   rr;
+      rtcp_sdes_t sdes;
+      rtcp_bye_t  bye;
+      rtcp_app_t  app;
+      rtcp_remb_t remb;
+      rtcp_fir_t  fir;
+      snw_rtcp_fb_t   fb;
+   } pkt;
+}__attribute__((packed));
+
+uint8_t
+snw_rtcp_get_payload_type(snw_ice_session_t *s, char *buf, int len);
 
 int
-snw_rtcp_fix_ssrc(char *packet, int len, int fixssrc, uint32_t newssrcl, uint32_t newssrcr);
+snw_rtcp_has_type(char *buf, int len, int type);
 
-//int
-//snw_rtcp_has_type(char *packet, int len, int type);
+uint32_t
+snw_rtcp_get_ssrc(snw_ice_session_t *s, char *buf, int len);
+
+uint32_t
+snw_rtcp_get_ssrc_new(snw_ice_session_t *s, char *buf, int len);
+
+int
+snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *buf, int len, 
+   int fixssrc, uint32_t newssrcl, uint32_t newssrcr);
 
 void 
-snw_rtcp_get_nacks(char *packet, int len, std::vector<int> &nacklist);
+snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist);
+
+void 
+snw_rtcp_get_nacks_new(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist);
 
 int 
-snw_rtcp_remove_nacks(char *packet, int len);
+snw_rtcp_remove_nacks(char *buf, int len);
 
 int
-snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seqnr);
+snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *buf, int len, int *seqnr);
 
 int
-snw_gen_rtcp_pli(char *packet, int len);
+snw_gen_rtcp_pli(char *buf, int len);
 
 int
-snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks);
+snw_ice_rtcp_generate_nacks(char *buf, int len, std::vector<int> nacks);
 
 #endif

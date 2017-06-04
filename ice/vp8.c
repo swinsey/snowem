@@ -8,7 +8,7 @@
 int g_max_rtp_queue = 3001;
 void ice_rtp_is_vp8(rtp_packet_t *head, int type, char* buf, int len) {
    rtp_packet_t *rtp = NULL;
-   rtp_header   *rtp_hdr = NULL;
+   rtp_hdr_t   *rtp_hdr = NULL;
    vp8_desc_t   *vp8 = NULL;
    int rtp_bytes = 0;
    int vp8_desc_bytes = 0;
@@ -19,8 +19,8 @@ void ice_rtp_is_vp8(rtp_packet_t *head, int type, char* buf, int len) {
       return;
    if (!type)
    {   
-   rtp_hdr = (rtp_header*)buf;
-   rtp_bytes = RTP_HEADER_SIZE + rtp_hdr->csrccount*4;
+   rtp_hdr = (rtp_hdr_t*)buf;
+   rtp_bytes = RTP_HEADER_SIZE + rtp_hdr->cc*4;
    vp8 = (vp8_desc_t*)(buf + rtp_bytes);
 
    //HEXDUMP(buf,rtp_bytes,"rtp");

@@ -83,15 +83,16 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
    for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
      
       if (session->channel->players[i] != 0) {
-         rtp_header *header = (rtp_header *)buf;
-         uint16_t seq = ntohs(header->seq_number);
+         rtp_hdr_t *header = (rtp_hdr_t *)buf;
+         uint16_t seq = ntohs(header->seq);
 
          flowid = session->channel->players[i];
          DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
-            session->flowid, video, header->type, VP8_PT, seq,len);
+            session->flowid, video, header->pt, VP8_PT, seq,len);
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
-            DEBUG(log, "forward, flowid=%u -> forwardid=%u", session->flowid, flowid);
+            DEBUG(log, "forward, is_rtcp=%u, flowid=%u -> forwardid=%u", 
+                  control, session->flowid, flowid);
             send_rtp_pkt(s, control, video, buf, len);
          } else {
             // failed

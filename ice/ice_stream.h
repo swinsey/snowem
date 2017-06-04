@@ -59,6 +59,8 @@ snw_stream_insert(snw_ice_stream_t *head, snw_ice_stream_t *item);
 void
 snw_stream_free(snw_ice_stream_t *streams, snw_ice_stream_t *stream);
 
+void
+snw_stream_print_ssrc(snw_ice_context *ctx, snw_ice_stream_t *s, const char *info);
 
 #ifdef __cplusplus
 }

@@ -34,8 +34,6 @@ void rtp_list_add(rtp_packet_t* head, rtp_packet_t *item);
 rtp_packet_t* rtp_list_remove_last(rtp_packet_t* head);
 int rtp_list_size(rtp_packet_t* head);
 
-int ice_get_packet_type(char* buf, int len);
-
 
 
 #endif //_ICE_PACKET_H_

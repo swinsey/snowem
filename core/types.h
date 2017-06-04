@@ -40,11 +40,11 @@ enum SGN_INTERNAL_SUBCMD {
 
 
 #define ENABLE_SNW_DEBUG
-#define HEXDUMP(p,len,type)\
+#define HEXDUMP(log,p,len,type)\
 {\
    char __buf__[4*1024];\
    int i, j, _i;\
-   DEBUG("---- dump buffer (%s) ---- len=%d",type,len);\
+   DEBUG(log,"---- dump buffer (%s) ---- len=%d",type,len);\
    for (i = 0; i < (int)len; ) {\
       memset(__buf__, sizeof(__buf__), ' ');\
       sprintf(__buf__, "%5d: ", i); \
@@ -55,7 +55,7 @@ enum SGN_INTERNAL_SUBCMD {
       for (j=0; j < 16 && i < (int)len; i++, j++)\
          sprintf(__buf__ +7+j + 48, "%c",\
             isprint((p)[i]) ? (p)[i] : '.'); \
-      DEBUG("%s: %s", type, __buf__);\
+      DEBUG(log, "%s: %s", type, __buf__);\
    }\
 }
 
