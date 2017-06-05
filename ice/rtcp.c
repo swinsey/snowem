@@ -307,8 +307,9 @@ snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *packet, int len, int fixssrc, uint
 	return 0;
 }
 
-void
-snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist) {
+void 
+snw_rtcp_get_nacks(snw_ice_session_t *s, snw_ice_component_t *c, 
+       int video, char *buf, int len, resend_callback_fn cb) {
    snw_log_t *log = 0;
 	rtcp_pkt_t *rtcp = 0;
    char *end;
@@ -317,8 +318,9 @@ snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &n
    uint16_t blp = 0;
    int i, cnt = 0;
 
-	if (!s || !buf || len == 0) return;
+	if (!s || !c || !buf || len == 0) return;
    log = s->ice_ctx->log;
+
 	rtcp = (rtcp_pkt_t *)buf;
 
 	if (rtcp->hdr.v != RTCP_VERSION) return;
@@ -333,21 +335,14 @@ snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &n
 
          cnt = 0;
          do {
-            char bitmask[20];
             pid = ntohs(nack->pid);
             blp = ntohs(nack->blp);
-            DEBUG(log,"nacks info, cnt=%u, pid=%u, blp=%u", cnt, pid, blp);
-            nacklist.push_back(pid);
-            memset(bitmask, 0, 20);
+            if (cb) cb(s,c,video,pid,s->curtime);
             for (i=0; i<16; i++) {
-               bitmask[i] = (blp & ( 1 << i )) >> i ? '1' : '0';
                if ((blp & (1 << i)) >> i) {
-                  nacklist.push_back(pid+i+1);
+                  if (cb) cb(s,c,video,pid+i+1,s->curtime);
                }
             }
-            bitmask[16] = '\n';
-            DEBUG(log, "nacks [%d] %u / %s", cnt, pid, bitmask);
-
             cnt++;
             nack++;
             // make sure no loop
@@ -355,36 +350,8 @@ snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &n
 
          } while ((char*)nack < end);
 
-         DEBUG(log, "Got nacks, flowid=%u, num=%d", s->flowid, cnt);
-			/*if(fmt == GENERIC_FMT) {
-				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-				int nacks = ntohs(rtcp->hdr.len)-2;	// Skip SSRCs
-				if (nacks > 0) {
-					DEBUG(log, "Got nacks, num=%d", nacks);
-					rtcp_nack *nack = NULL;
-					uint16_t pid = 0;
-					uint16_t blp = 0;
-					int i=0, j=0;
-					char bitmask[20];
-					for(i=0; i< nacks; i++) {
-						nack = (rtcp_nack *)rtcpfb->fci + i;
-						pid = ntohs(nack->pid);
-                  nacklist.push_back(pid);
-						blp = ntohs(nack->blp);
-						memset(bitmask, 0, 20);
-						for(j=0; j<16; j++) {
-							bitmask[j] = (blp & ( 1 << j )) >> j ? '1' : '0';
-							if((blp & ( 1 << j )) >> j) {
-								nacklist.push_back(pid+j+1);
-                     }
-						}
-						bitmask[16] = '\n';
-						DEBUG(log, "[%d] %u / %s", i, pid, bitmask);
-					}
-				}
-			}*/
+         DEBUG(log, "total lost packets, flowid=%u, num=%d", s->flowid, cnt);
 		}
-		// Is this a compound packet? 
 		int length = ntohs(rtcp->hdr.len);
 		if(length == 0)
 			break;
@@ -394,58 +361,11 @@ snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &n
 		rtcp = (rtcp_pkt_t *)((uint32_t*)rtcp + length + 1);
 	}
 	return;
+
 }
 
 int
-snw_rtcp_remove_nacks(char *packet, int len) {
-	if(packet == NULL || len == 0)
-		return len;
-	rtcp_hdr_t *rtcp = (rtcp_hdr_t *)packet;
-	if(rtcp->v != 2)
-		return len;
-	/* Find the NACK message */
-	char *nacks = NULL;
-	int total = len, nacks_len = 0;
-	while(rtcp) {
-		if(rtcp->pt == RTCP_RTPFB) {
-			int fmt = rtcp->rc;
-			if(fmt == 1) {
-				nacks = (char *)rtcp;
-			}
-		}
-		/* Is this a compound packet? */
-		int length = ntohs(rtcp->len);
-		if(length == 0)
-			break;
-		if(nacks != NULL) {
-			nacks_len = length*4+4;
-			break;
-		}
-		total -= length*4+4;
-		if(total <= 0)
-			break;
-		rtcp = (rtcp_hdr_t *)((uint32_t*)rtcp + length + 1);
-	}
-	if(nacks != NULL) {
-		total = len - ((nacks-packet)+nacks_len);
-		if(total < 0) {
-			/* FIXME Should never happen, but you never know: do nothing */
-			return len;
-		} else if(total == 0) {
-			/* NACK was the last compound packet, easy enough */
-			return len-nacks_len;
-		} else {
-			/* NACK is between two compound packets, move them around */
-			int i=0;
-			for(i=0; i<total; i++)
-				*(nacks+i) = *(nacks+nacks_len+i);
-			return len-nacks_len;
-		}
-	}
-	return len;
-}
-
-int snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seqnr) {
+snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *packet, int len, int *seqnr) {
    snw_log_t *log = 0;
 
    if (!ice_ctx) return -1;

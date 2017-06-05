@@ -978,13 +978,14 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
 int
 snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
-              int video, int seqnr, int64_t now) {
-   /*snw_log_t *log = session->ice_ctx->log;
-   struct list_head *n;
-   int retransmits_cnt = 0;
-   int issent = 0;
+              int video, int seqno, int64_t now) {
+   snw_log_t *log = session->ice_ctx->log;
+   //struct list_head *n;
+   //int retransmits_cnt = 0;
+   //int issent = 0;
 
-   list_for_each(n,&component->retransmit_buffer.list) {
+   DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",session->flowid, seqno, now);
+   /*list_for_each(n,&component->retransmit_buffer.list) {
       rtp_packet_t *p = list_entry(n,rtp_packet_t,list);
       rtp_hdr_t *rh = (rtp_hdr_t *)p->data;
       if(ntohs(rh->seq_number) == seqnr) {
@@ -1023,33 +1024,11 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
 int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, 
                    int video, char *buf, int buflen) {
    snw_log_t *log = session->ice_ctx->log;
-   int64_t now = get_monotonic_time(); // FIXME: get time from session
-   uint32_t nacks_count = 0; 
-   std::vector<int> nacklist;
+   resend_callback_fn cb = snw_ice_resend_pkt;
 
-   snw_rtcp_get_nacks_new(session, buf, buflen, nacklist);
-   //nacklist.clear();
-   //snw_rtcp_get_nacks(session,buf, buflen, nacklist);
+   snw_rtcp_get_nacks(session, component, video, buf, buflen, cb);
 
-   nacks_count = nacklist.size(); 
-   if (nacks_count) {
-      DEBUG(log, "nacks count, flow=%u, nacks_cnt=%u, is_sender=%u",
-            session->flowid,nacklist.size(), IS_FLAG(session,ICE_PUBLISHER));
-     
-      for (unsigned int i=0; i<nacklist.size(); i++) {
-         unsigned int seqnr = nacklist.front();
-         nacklist.erase(nacklist.begin());
-     
-         DEBUG(log, "nacks >> %u", seqnr);
-         snw_ice_resend_pkt(session,component,video,seqnr,now);
-      }    
-
-      /* FIXME Remove the NACK compound packet, we've handled it */
-      buflen = snw_rtcp_remove_nacks(buf, buflen);
-
-   }
-
-   /* FIXME: Update stats */
+   /* TODO: Update stats */
    return 0;
 }
 
@@ -1084,12 +1063,10 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    DEBUG(log, "handle rtcp pkt, flowid=%u, pt=%u, len=%d, buflen=%u", session->flowid, pt, len, buflen);
 
    //3. Handle rtcp packets
-   //3.1 nacks
-   //if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_rtcp_nacks(session, component, video, buf, buflen);
-   //}
+   //snw_ice_rtcp_nacks(session, component, video, buf, buflen);
+   snw_rtcp_get_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
    
-   //3.2 rtcp_fb 
+   //4. rtcp_fb 
 
    // FIXME: depending on publisher & subsriber roles?
    /*if (!IS_FLAG(session, WEBRTC_BUNDLE)) {

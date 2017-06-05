@@ -232,11 +232,12 @@ int
 snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *buf, int len, 
    int fixssrc, uint32_t newssrcl, uint32_t newssrcr);
 
-void 
-snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist);
+typedef int (*resend_callback_fn)(snw_ice_session_t *session, snw_ice_component_t *component,
+              int video, int seqnr, int64_t now);
 
-int 
-snw_rtcp_remove_nacks(char *buf, int len);
+void 
+snw_rtcp_get_nacks(snw_ice_session_t *s, snw_ice_component_t *c, 
+       int video, char *buf, int len, resend_callback_fn);
 
 int
 snw_gen_rtcp_fir(snw_ice_context_t *ice_ctx, char *buf, int len, int *seqnr);
