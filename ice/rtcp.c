@@ -308,7 +308,7 @@ snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *packet, int len, int fixssrc, uint
 }
 
 void
-snw_rtcp_get_nacks_new(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist) {
+snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist) {
    snw_log_t *log = 0;
 	rtcp_pkt_t *rtcp = 0;
    char *end;
@@ -392,66 +392,6 @@ snw_rtcp_get_nacks_new(snw_ice_session_t *s, char *buf, int len, std::vector<int
 		if(total <= 0)
 			break;
 		rtcp = (rtcp_pkt_t *)((uint32_t*)rtcp + length + 1);
-	}
-	return;
-}
-
-
-
-void
-snw_rtcp_get_nacks(snw_ice_session_t *s, char *packet, int len, std::vector<int> &nacklist) {
-   snw_log_t *log = 0;
-	rtcp_hdr_t *rtcp = NULL;
-	int total = len;
-
-	if (!packet || len == 0)
-		return;
-   log = s->ice_ctx->log;
-	rtcp = (rtcp_hdr_t *)packet;
-	if (rtcp->v != 2)
-		return;
-
-	// Get list of sequence numbers we should send again 
-	while(rtcp) {
-		if(rtcp->pt == RTCP_RTPFB) {
-			int fmt = rtcp->rc;
-			DEBUG(log, "got rtpfb nacks, flowid=%u", s->flowid);
-			if (fmt == 1) {
-				rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-				int nacks = ntohs(rtcp->len)-2;	// Skip SSRCs
-				if(nacks > 0) {
-					DEBUG(log, "Got nacks, num=%d", nacks);
-					rtcp_nack *nack = NULL;
-					uint16_t pid = 0;
-					uint16_t blp = 0;
-					int i=0, j=0;
-					char bitmask[20];
-					for(i=0; i< nacks; i++) {
-						nack = (rtcp_nack *)rtcpfb->fci + i;
-						pid = ntohs(nack->pid);
-                  nacklist.push_back(pid);
-						blp = ntohs(nack->blp);
-						memset(bitmask, 0, 20);
-						for(j=0; j<16; j++) {
-							bitmask[j] = (blp & ( 1 << j )) >> j ? '1' : '0';
-							if((blp & ( 1 << j )) >> j) {
-								nacklist.push_back(pid+j+1);
-                     }
-						}
-						bitmask[16] = '\n';
-						DEBUG(log, "nacks [%d] %u / %s", i, pid, bitmask);
-					}
-				}
-			}
-		}
-		// Is this a compound packet? 
-		int length = ntohs(rtcp->len);
-		if(length == 0)
-			break;
-		total -= length*4+4;
-		if(total <= 0)
-			break;
-		rtcp = (rtcp_hdr_t *)((uint32_t*)rtcp + length + 1);
 	}
 	return;
 }

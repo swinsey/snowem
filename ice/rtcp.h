@@ -235,9 +235,6 @@ snw_rtcp_fix_ssrc(snw_ice_session_t *s, char *buf, int len,
 void 
 snw_rtcp_get_nacks(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist);
 
-void 
-snw_rtcp_get_nacks_new(snw_ice_session_t *s, char *buf, int len, std::vector<int> &nacklist);
-
 int 
 snw_rtcp_remove_nacks(char *buf, int len);
 

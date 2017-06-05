@@ -1027,8 +1027,9 @@ int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *componen
    uint32_t nacks_count = 0; 
    std::vector<int> nacklist;
 
-   snw_rtcp_get_nacks(session,buf, buflen, nacklist);
    snw_rtcp_get_nacks_new(session, buf, buflen, nacklist);
+   //nacklist.clear();
+   //snw_rtcp_get_nacks(session,buf, buflen, nacklist);
 
    nacks_count = nacklist.size(); 
    if (nacks_count) {
