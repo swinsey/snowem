@@ -646,14 +646,10 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
                ? (session->audio_stream ? session->audio_stream : session->video_stream)
                : (video ? session->video_stream : session->audio_stream);
 
-   if (!stream) {
-      return;
-   }
+   if (!stream) return;
 
    component = IS_FLAG(session, WEBRTC_RTCPMUX) ? stream->rtp_component : stream->rtcp_component;
-   if (!component) {
-      return;
-   }
+   if (!component) return;
 
    //FIXME: check cdone equal to num of stream
    if (!stream->gathering_done) {
@@ -671,7 +667,6 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
          DEBUG(log, "partially sent, sent=%u, len=%u", sent, len);
       }
    } else {
-      /* FIXME Copy in a buffer and fix SSRC */
       char sbuf[ICE_BUFSIZE];
       int protected_ = 0;
       int local_ssrc, remote_ssrc;
@@ -683,9 +678,9 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
       remote_ssrc = video ? stream->remote_video_ssrc : stream->remote_audio_ssrc;
 
       /* Fix all SSRCs! */
-      DEBUG(log, "Fixing SSRCs, flowid=%u, sid=%u, cid=%u, local_ssrc=%u, ssrc_remote=%u)", 
-             session->flowid, stream->id, component->id, local_ssrc, remote_ssrc);
-      snw_rtcp_fix_ssrc(session, (char *)&sbuf, len, 1, local_ssrc, remote_ssrc);
+      DEBUG(log, "gen_ Fixing SSRCs, flowid=%u, video=%u, local_ssrc=%x, ssrc_remote=%x", 
+             session->flowid, video, local_ssrc, remote_ssrc);
+      //snw_rtcp_fix_ssrc(session, (char *)&sbuf, len, 1, local_ssrc, remote_ssrc);
 
       protected_ = len;
       ret = srtp_protect_rtcp(component->dtls->srtp_out, &sbuf, &protected_);
@@ -695,7 +690,7 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
          int sent = ice_agent_send(session->agent, stream->id, component->id,
                                     (const char *)&sbuf, protected_);
          if (sent < protected_) {
-            WARN(log, "partially sent, sent=%u, protected_=%u", sent, protected_);
+            ERROR(log, "failed to send, sent=%u, protected_=%u", sent, protected_);
          }
       }
    }
@@ -757,14 +752,17 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
 void 
 send_rtp_pkt(snw_ice_session_t *session, 
   int control, int video, char* buf, int len) {
+   snw_log_t *log = 0;
 
    if (!session || !buf)
       return;
+   log = session->ice_ctx->log;
 
    /* check status of receiver */
    ice_verify_stream_status(session);
 
    if (control) {
+      DEBUG(log,"never reach me");
       send_rtcp_pkt_internal(session,video,0,buf,len);
    } else {
       send_rtp_pkt_internal(session,video,0,buf,len);
@@ -785,122 +783,56 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
 }
 
 void 
-snw_ice_rtp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, rtp_hdr_t *header, int video) {
-   snw_log_t *log = 0;
-   std::vector<int> nacklist;
-   seq_info_t **last_seqs = 0;
-   seq_info_t *cur_seq = 0;
-   int last_seqs_len = 0; 
-   int64_t now = get_monotonic_time();
-   uint16_t new_seqn = ntohs(header->seq);
-   uint16_t cur_seqn;
+snw_ice_handle_lost_packets(snw_ice_session_t *session, 
+      snw_ice_component_t *component, uint16_t seqno, int video) {
 
-   if (!session || !component) return;
-   log = session->ice_ctx->log;
-     
-   last_seqs = video ? &component->last_seqs_video : &component->last_seqs_audio;
-   cur_seq = *last_seqs;
-
-   if (cur_seq) {
-      cur_seq = cur_seq->prev;
-      cur_seqn = cur_seq->seq;
-   } else {
-      cur_seqn = new_seqn - (uint16_t)1; /* Can wrap */
-   }
-
-   // FIXME: check meaning of the second condition.
-   if (!snw_ice_seq_in_range(new_seqn, cur_seqn, LAST_SEQS_MAX_LEN) &&
-       !snw_ice_seq_in_range(cur_seqn, new_seqn, 1000)) {
-      /* Jump too big, start fresh */
-      ERROR(log, "big sequence number jump %hu -> %hu , video=%u", cur_seqn, new_seqn, video);
-      snw_ice_seq_list_free(last_seqs);
-      cur_seq = NULL;
-      cur_seqn = new_seqn - (uint16_t)1;
-   }
-   DEBUG(log, "current sequence number, video=%u, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
-         video, cur_seqn, new_seqn, last_seqs_len);
-
-   if (snw_ice_seq_in_range(new_seqn, cur_seqn, LAST_SEQS_MAX_LEN)) {
-      while(cur_seqn != new_seqn) {
-         cur_seqn += (uint16_t)1; /* can wrap */
-         seq_info_t *seq_obj = (seq_info_t*)malloc(sizeof(seq_info_t));
-         seq_obj->seq = cur_seqn;
-         seq_obj->ts = now; 
-         seq_obj->state = (cur_seqn == new_seqn) ? SEQ_RECVED : SEQ_MISSING;
-         snw_ice_seq_append(last_seqs, seq_obj);
-         last_seqs_len++;
-         if ( seq_obj->state == SEQ_MISSING ) {
-            WARN(log, "missing packet, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
-               cur_seqn,new_seqn,last_seqs_len);
-         }
-      }
-   }
-
-   if (cur_seq) {
-      for (;;) {
-         last_seqs_len++;
-         if(cur_seq->seq == new_seqn) {
-            WARN(log, "Recieved missed sequence number %u", cur_seq->seq);
-            cur_seq->state = SEQ_RECVED;
-         } else if(cur_seq->state == SEQ_MISSING && now - cur_seq->ts > SEQ_MISSING_WAIT) {
-            WARN(log, "Missed sequence number, sending 1st nack, seq=%u", cur_seq->seq);
-            nacklist.push_back(cur_seq->seq);
-            cur_seq->state = SEQ_NACKED;
-         } else if(cur_seq->state == SEQ_NACKED  && now - cur_seq->ts > SEQ_NACKED_WAIT) {
-            ERROR(log, "Missed sequence number, sending 2nd nack, seq=%u", cur_seq->seq);
-            nacklist.push_back(cur_seq->seq);
-            cur_seq->state = SEQ_GIVEUP;
-         }
-         if(cur_seq == *last_seqs) {
-            /* Just processed head */
-            break;
-         }
-         cur_seq = cur_seq->prev;
-      }
-   }
-
-   while (last_seqs_len > LAST_SEQS_MAX_LEN) {
-      seq_info_t *node = snw_ice_seq_pop_head(last_seqs);
-      free(node);
-      last_seqs_len--;
-   }
-
-   uint32_t nacks_count = nacklist.size();
-   if (nacks_count) {
-      char nackbuf[120];
-      int ret = snw_ice_rtcp_generate_nacks(nackbuf, sizeof(nackbuf), nacklist);
-
-      WARN(log, "nacks missed packets, flowid=%u, nacks_count=%u(%u), ret=%u", 
-                 session->flowid, nacks_count, nacklist.size(), ret);
-      if (ret > 0) {
-         ice_relay_rtcp(session, video, nackbuf, ret);
-      }
-   }
-
-   /* FIXME: Update stats */
+   //FIXME: impl
+   // Save current seq number
+   // Check and generate list of lost seqs
+   // Generate NACK rtpfb message
    return;
 }
 void
 snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int force) {
    snw_log_t *log = 0;
+   snw_ice_stream_t *stream = 0;
 
    if (!session) return;
    log = session->ice_ctx->log;
 
+   stream = IS_FLAG(session, WEBRTC_BUNDLE)
+               ? (session->audio_stream ? session->audio_stream : session->video_stream)
+               : session->video_stream;
+
    if (force || (component && (session->curtime - component->fir_latest > 10*ICE_USEC_PER_SEC))) {
 
-      DEBUG(log, "sending fir request, flowid=%u, cid=%u, curtime=%lu", 
-             session->flowid, component->id, session->curtime);
       {// send fir command
-         char rtcpbuf[24];
-         snw_gen_rtcp_fir(session->ice_ctx, rtcpbuf, 20, &component->fir_seq);
-         send_rtcp_pkt_internal(session,1,0,rtcpbuf,20);
+         char rtcpbuf[RTCP_PSFB_FIR_MSG_LEN];
+         component->fir_seq++;
+         DEBUG(log,"sending fir request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
+                              session->flowid,
+                              stream->local_video_ssrc, 
+                              stream->remote_video_ssrc, 
+                              component->fir_seq);
+                            
+         snw_gen_rtcp_fir(rtcpbuf, RTCP_PSFB_FIR_MSG_LEN, 
+                           stream->local_video_ssrc, 
+                           stream->remote_video_ssrc, 
+                           component->fir_seq);
+         send_rtcp_pkt_internal(session,1,0,rtcpbuf,RTCP_PSFB_FIR_MSG_LEN);
       }
 
       {// send pli report
-         char rtcpbuf[12];
-         snw_gen_rtcp_pli(rtcpbuf, 12);
-         send_rtcp_pkt_internal(session,1,0,rtcpbuf,12);
+         char rtcpbuf[RTCP_PSFB_PLI_MSG_LEN];
+         DEBUG(log,"sending pli request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
+                              session->flowid,
+                              stream->local_video_ssrc, 
+                              stream->remote_video_ssrc, 
+                              component->fir_seq);
+         snw_gen_rtcp_pli(rtcpbuf, RTCP_PSFB_PLI_MSG_LEN,
+                          stream->local_video_ssrc, 
+                          stream->remote_video_ssrc);
+         send_rtcp_pkt_internal(session,1,0,rtcpbuf,RTCP_PSFB_PLI_MSG_LEN);
       }
 
       //if (force) {
@@ -967,10 +899,9 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    snw_ice_handle_incoming_rtp(session, 0, video, buf, buflen);
    //ice_rtp_plugin(handle,stream,component,0,video,buf,buflen); //FIXME: impl
 
-   //FIXME jackie: fir request forces publisher send key frames.
-   //FIXME jackie: only send nacks to publisher.
    if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_rtp_nacks(session,component,header,video);
+      snw_ice_handle_lost_packets(session,
+          component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);
    }
    return;
@@ -980,55 +911,10 @@ int
 snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
               int video, int seqno, int64_t now) {
    snw_log_t *log = session->ice_ctx->log;
-   //struct list_head *n;
-   //int retransmits_cnt = 0;
-   //int issent = 0;
 
    DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",session->flowid, seqno, now);
-   /*list_for_each(n,&component->retransmit_buffer.list) {
-      rtp_packet_t *p = list_entry(n,rtp_packet_t,list);
-      rtp_hdr_t *rh = (rtp_hdr_t *)p->data;
-      if(ntohs(rh->seq_number) == seqnr) {
-         if((p->last_retransmit > 0) && (now-p->last_retransmit < MAX_NACK_IGNORE)) {
-            DEBUG(log, "retransmitted packet was skipped, seqnr=%u, ago=%lu",
-                  seqnr, now-p->last_retransmit);
-            break;
-         }
-         DEBUG(log, "scheduling for retransmission due to NACK, seqnr=%u", seqnr);
-         p->last_retransmit = now;
-         retransmits_cnt++;
-
-         //rtp_packet_t *pkt = (rtp_packet_t *)malloc(sizeof(rtp_packet_t));
-         //pkt->data = (char*)malloc(p->length);
-         //memcpy(pkt->data, p->data, p->length);
-         //pkt->length = p->length;
-         //pkt->type = video ? RTP_PACKET_VIDEO : RTP_PACKET_AUDIO;
-         //pkt->control = 0;
-         //pkt->encrypted = 1;
-         issent = 1;
-
-         //send_rtp_pkt(session,pkt);
-         //send_rtp_pkt_new(session,0,video,p->data,p->length);
-         send_rtp_pkt_internal_new(session,video,1,p->data,p->length);
-         break;
-      }
-   }
-
-   DEBUG(log, "retransmission done, seqnr=%u, issent=%u, retransmits_cnt=%u", 
-              seqnr, issent, retransmits_cnt);
-   //component->retransmit_recent_cnt += retransmits_cnt;
-   */
-   return 0;
-}
-
-int snw_ice_rtcp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, 
-                   int video, char *buf, int buflen) {
-   snw_log_t *log = session->ice_ctx->log;
-   resend_callback_fn cb = snw_ice_resend_pkt;
-
-   snw_rtcp_get_nacks(session, component, video, buf, buflen, cb);
-
-   /* TODO: Update stats */
+   //FIXME: impl
+   
    return 0;
 }
 
@@ -1038,7 +924,6 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    snw_log_t *log = 0;
    err_status_t ret;
    uint32_t ssrc = 0;
-   uint8_t pt = 0;
    int buflen = len;
    int video = 0;
 
@@ -1051,65 +936,28 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       return;
    } 
 
-   //1. Determine which stream: audio or video?
+   /* Determine which stream: audio or video? */
    ssrc = snw_rtcp_get_ssrc(session,buf,len);
    video = stream->remote_video_ssrc == ssrc ? 1 : 0;
    DEBUG(log, "ssrc info, flowid=%u, flags=%u, video=%u, ssrc=%u, buflen=%u",
            session->flowid, session->flags, video, ssrc, buflen);
    snw_stream_print_ssrc(session->ice_ctx, stream, "stream");
     
-   //2. Get first rtcp payload type
-   pt = snw_rtcp_get_payload_type(session,buf,len);
-   DEBUG(log, "handle rtcp pkt, flowid=%u, pt=%u, len=%d, buflen=%u", session->flowid, pt, len, buflen);
-
-   //3. Handle rtcp packets
-   //snw_ice_rtcp_nacks(session, component, video, buf, buflen);
-   snw_rtcp_get_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
+   /* Resend lost packets if having any */
+   if (IS_FLAG(session,ICE_SUBSCRIBER))
+      snw_rtcp_handle_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
    
-   //4. rtcp_fb 
-
-   // FIXME: depending on publisher & subsriber roles?
-   /*if (!IS_FLAG(session, WEBRTC_BUNDLE)) {
-      //video = (stream->id == session->video_stream->id ? 1 : 0);
-      video = stream->is_video;
-   } else {
-      if (!IS_FLAG(session, WEBRTC_AUDIO)) {
-         video = 1;
-      } else if (!IS_FLAG(session, WEBRTC_VIDEO)) {
-         video = 0;
-      } else {
-         uint32_t r_ssrc = snw_rtcp_get_receiver_ssrc(session,buf,len);
-         uint32_t s_ssrc = snw_rtcp_get_sender_ssrc(session,buf,len);
-         DEBUG(log, "not supported stream, flags=%u, r_ssrc=%u, s_ssrc=%u",
-                 session->flags, r_ssrc, s_ssrc);
-         snw_stream_print_ssrc(session->ice_ctx, session->audio_stream, "audio");
-         snw_stream_print_ssrc(session->ice_ctx, session->video_stream, "video");
-         return;
-      }
-   }
-
-   //FIXME: uncomment
-   //ice_rtp_plugin(handle,stream,component,1,video,buf,buflen);
-   DEBUG(log, "handle rtcp pkt, flowid=%u, len=%d", session->flowid, len);
-   snw_ice_handle_incoming_rtp(session, 1, video, buf, buflen);
-   if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_rtcp_nacks(session, component, video, buf, buflen);
-   }*/
-
    return;
 }
 
-//FIXME: change number to CONSTANTS
 int ice_get_packet_type(snw_ice_session_t *session, char* buf, int len) {
-   //snw_log_t *log = 0;
    rtp_hdr_t *header = 0;
    
    if (!session || !buf || len <= 0) {
       return UNKNOWN_PT;
    }
-   //log = session->ice_ctx->log;
 
-
+   //FIXME: change number to CONSTANTS
    if ((*buf >= 20) && (*buf < 64)) {
       return DTLS_PT;
    }

@@ -22,17 +22,13 @@ struct snw_ice_component {
    int               state;
    int               is_started;
 
+   dtls_ctx_t       *dtls;
    snw_ice_stream_t *stream;
-   candidate_t       remote_candidates;      /* list of remote candidates */
+   candidate_t       remote_candidates;
+   int64_t           fir_latest;   
+   uint8_t           fir_seq;
 
-   dtls_ctx_t *dtls;
-   seq_info_t *last_seqs_audio;       /* List of recently received audio sequence numbers (as a support to NACK generation) */
-   seq_info_t *last_seqs_video;       /* List of recently received video sequence numbers (as a support to NACK generation) */
-
-   int64_t fir_latest;   
-   int     fir_seq;
-
-   struct list_head list;
+   struct list_head  list;
 };
 
 void
