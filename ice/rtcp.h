@@ -76,7 +76,7 @@ struct snw_report_block
 	uint32_t cum_lost:24;
 	uint32_t frac_lost:8;
 #endif
-	uint32_t highest_seqno;
+	uint32_t hi_seqno;
 	uint32_t jitter;
 	uint32_t lsr;
 	uint32_t dlsr;
@@ -154,10 +154,10 @@ snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c,
        int video, char *buf, int len, resend_callback_fn);
 
 int
-snw_gen_rtcp_fir(char *buf, int len, uint32_t local_ssrc, 
+snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc, 
        uint32_t remote_ssrc, int seqnr);
 
-int snw_gen_rtcp_pli(char *buf, int len,
+int snw_rtcp_gen_pli(char *buf, int len,
       uint32_t local_ssrc, uint32_t remote_ssrc);
 
 #ifdef __cplusplus

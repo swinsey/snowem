@@ -121,7 +121,7 @@ snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c,
 }
 
 int
-snw_gen_rtcp_fir(char *buf, int len, uint32_t local_ssrc, 
+snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc, 
       uint32_t remote_ssrc, int seqnr) {
 
 	if (!buf || len < RTCP_PSFB_FIR_MSG_LEN)
@@ -146,7 +146,7 @@ snw_gen_rtcp_fir(char *buf, int len, uint32_t local_ssrc,
 	return RTCP_PSFB_FIR_MSG_LEN;
 }
 
-int snw_gen_rtcp_pli(char *buf, int len,
+int snw_rtcp_gen_pli(char *buf, int len,
       uint32_t local_ssrc, uint32_t remote_ssrc) {
 
 	if (buf == NULL || len < RTCP_PSFB_PLI_MSG_LEN)
