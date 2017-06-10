@@ -28,6 +28,9 @@ struct snw_ice_component {
    int64_t           fir_latest;   
    uint8_t           fir_seq;
 
+   seq_info_t *last_seqs_audio;
+   seq_info_t *last_seqs_video;
+
    struct list_head  list;
 };
 

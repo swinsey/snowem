@@ -160,6 +160,47 @@ snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc,
 int snw_rtcp_gen_pli(char *buf, int len,
       uint32_t local_ssrc, uint32_t remote_ssrc);
 
+typedef struct rtcp_nack rtcp_nack_t;
+struct rtcp_nack
+{
+   uint16_t pid;
+   uint16_t blp;
+};
+
+typedef struct nack_seq  nack_seq_t;
+struct nack_seq {
+   uint16_t seqno;
+   struct nack_seq *next;
+};
+
+
+typedef struct rtcp_remb rtcp_remb_t;
+struct rtcp_remb
+{
+   char id[4];
+   uint32_t bitrate;
+   uint32_t ssrc[1];
+};
+
+typedef struct rtcp_fir rtcp_fir_t;
+struct rtcp_fir
+{
+   uint32_t ssrc;
+   uint32_t seqno;
+};
+
+typedef struct rtcp_fb rtcp_fb_t;
+struct rtcp_fb
+{
+   rtcp_hdr_t header;
+   uint32_t ssrc;
+   uint32_t media;
+   char fci[1];
+};
+
+int 
+snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks);
+
 #ifdef __cplusplus
 }
 #endif
