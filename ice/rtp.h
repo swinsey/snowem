@@ -79,6 +79,21 @@ snw_ice_seq_list_free(seq_info_t **head);
 int
 snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
 
+#define RTP_SLIDEWIN_SIZE 16
+typedef struct rtp_seq rtp_seq_t;
+struct rtp_seq {
+   uint16_t  seqno;
+   uint16_t  status;
+   char     *pkt;
+   int       len;
+};
+
+struct rtp_slidewin {
+   int       begin;
+   int       end;
+   int       current;
+   rtp_seq_t seqlist[RTP_SLIDEWIN_SIZE];
+};
 
 void 
 snw_ice_handle_incoming_rtp(snw_ice_session_t *handle, 
