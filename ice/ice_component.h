@@ -16,7 +16,6 @@
 extern "C" {
 #endif
 
-#define LAST_SEQS_MAX_LEN 160
 struct snw_ice_component {
    uint32_t          id;
    int               state;
@@ -30,6 +29,8 @@ struct snw_ice_component {
 
    seq_info_t *last_seqs_audio;
    seq_info_t *last_seqs_video;
+
+   rtp_slidewin_t    slidewin;
 
    struct list_head  list;
 };

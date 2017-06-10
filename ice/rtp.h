@@ -50,7 +50,8 @@ struct rtp_hdr_ext {
 #define MAX_NACK_IGNORE       100000 /* retransmission time (100ms) */
 #define SEQ_MISSING_WAIT 12000 /*  12ms */
 #define SEQ_NACKED_WAIT 155000 /* 155ms */
-   
+#define LAST_SEQS_MAX_LEN 160
+
 typedef struct seq_info seq_info_t;
 struct seq_info {
    int64_t ts;
@@ -80,20 +81,29 @@ int
 snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
 
 #define RTP_SLIDEWIN_SIZE 16
+
+#define RTP_MISS 0
+#define RTP_RECV 1
+
 typedef struct rtp_seq rtp_seq_t;
 struct rtp_seq {
    uint16_t  seqno;
    uint16_t  status;
+   uint64_t  ts;
    char     *pkt;
    int       len;
 };
 
+typedef struct rtp_slidewin rtp_slidewin_t;
 struct rtp_slidewin {
    int       begin;
    int       end;
    int       current;
    rtp_seq_t seqlist[RTP_SLIDEWIN_SIZE];
 };
+
+void
+rtp_slidewin_put(rtp_slidewin_t *win, uint16_t seq);
 
 void 
 snw_ice_handle_incoming_rtp(snw_ice_session_t *handle, 

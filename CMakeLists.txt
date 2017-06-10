@@ -9,7 +9,7 @@ include(CheckTypeSize)
 add_subdirectory(cicero)
 add_subdirectory(wslay)
 add_subdirectory(modules/videocall)
-add_subdirectory(modules/democall)
+#add_subdirectory(modules/democall)
 
 SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 

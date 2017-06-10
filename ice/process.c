@@ -767,8 +767,11 @@ snw_ice_handle_lost_packets(snw_ice_session_t *session,
       snw_ice_component_t *component, uint16_t seqno, int video) {
 
    //FIXME: impl
-   // Save current seq number
+   // Save current seq number and payload
+   rtp_slidewin_put(&component->slidewin, seqno);
+    
    // Check and generate list of lost seqs
+   
    // Generate NACK rtpfb message
    return;
 }

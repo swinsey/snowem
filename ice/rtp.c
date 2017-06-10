@@ -123,3 +123,9 @@ snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int control, int video, 
    return;
 }
 
+void
+rtp_slidewin_put(rtp_slidewin_t *win, uint16_t seq) {
+
+   return;
+}
+
