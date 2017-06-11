@@ -80,14 +80,29 @@ snw_ice_seq_list_free(seq_info_t **head);
 int
 snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
 
+#define RTP_SEQ_NUM_MAX   (1<<16)
 #define RTP_SLIDEWIN_SIZE 16
+#define RTP_SYNC_TIME_MAX 500000 //500ms
 
 #define RTP_MISS 0
 #define RTP_RECV 1
 
+typedef struct nack_data nack_data_t;
+struct nack_data {
+   uint16_t seq;
+   uint16_t blp;
+};
+typedef struct nack_payload nack_payload_t;
+struct nack_payload {
+   union {
+      nack_data_t pl;
+      uint32_t    num;
+   } data;
+};
+
 typedef struct rtp_seq rtp_seq_t;
 struct rtp_seq {
-   uint16_t  seqno;
+   uint16_t  seq;
    uint16_t  status;
    uint64_t  ts;
    char     *pkt;
@@ -96,14 +111,14 @@ struct rtp_seq {
 
 typedef struct rtp_slidewin rtp_slidewin_t;
 struct rtp_slidewin {
-   int       begin;
-   int       end;
-   int       current;
-   rtp_seq_t seqlist[RTP_SLIDEWIN_SIZE];
+   uint16_t   head;
+   uint16_t   last_seq;
+   int64_t    last_ts;
+   rtp_seq_t  seqlist[RTP_SLIDEWIN_SIZE];
 };
 
 void
-rtp_slidewin_put(rtp_slidewin_t *win, uint16_t seq);
+snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq);
 
 void 
 snw_ice_handle_incoming_rtp(snw_ice_session_t *handle, 

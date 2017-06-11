@@ -124,8 +124,109 @@ snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int control, int video, 
 }
 
 void
-rtp_slidewin_put(rtp_slidewin_t *win, uint16_t seq) {
+snw_rtp_slidewin_reset(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq) {
+   snw_log_t *log = 0;
+   int idx = 0;
+
+   if (!session || !win) 
+      return;
+   log = session->ice_ctx->log;
+
+   memset(win,0,sizeof(*win)); //reset all
+   idx = seq % RTP_SLIDEWIN_SIZE; 
+   win->head = idx;
+   win->last_seq = seq;
+   win->last_ts  = session->curtime;
+   win->seqlist[idx].status = RTP_RECV;
+
+   DEBUG(log, "slidewin reset, flowid=%u, seq=%u", session->flowid, seq);
 
    return;
 }
+
+void
+snw_rtp_slidewin_update(rtp_slidewin_t *win, nack_payload_t *nack, 
+      int begin, int end, uint16_t seq) {
+
+   for (int i = begin; i < end; i++) {
+      //case of missing seq: update nack payload
+      if (win->seqlist[i].seq != 0 && win->seqlist[i].status == RTP_MISS) {
+         if (nack->data.pl.seq == 0) {
+            nack->data.pl.seq = win->seqlist[i].seq;
+         } else {
+            uint16_t blp = ntohs(nack->data.pl.blp);
+            blp |= 1 << (win->seqlist[i].seq - nack->data.pl.seq - 1);
+            nack->data.pl.blp = htons(blp);
+         }
+      } 
+      
+      //update seq list 
+      win->seqlist[i].seq = seq + i - begin;
+      win->seqlist[i].status = RTP_MISS;
+   }
+   return;
+}
+
+void
+snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq) {
+   snw_log_t *log = 0;
+   nack_payload_t nack;
+   int nseq = RTP_SEQ_NUM_MAX + seq;
+   int nlast_seq = RTP_SEQ_NUM_MAX + win->last_seq;
+   int idx = 0;
+   
+
+   if (!session || !win) 
+      return;
+   log = session->ice_ctx->log;
+
+   DEBUG(log, "slidewin put, flowid=%u, seq=%u",session->flowid, seq);
+   if (session->curtime - win->last_ts > RTP_SYNC_TIME_MAX) {
+      WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u", session->flowid, seq);
+      snw_rtp_slidewin_reset(session, win, seq);
+      return;
+   }
+
+   if (seq - win->last_seq > RTP_SLIDEWIN_SIZE || nseq - win->last_seq > RTP_SLIDEWIN_SIZE) {
+      WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u", session->flowid, seq);
+      snw_rtp_slidewin_reset(session, win, seq);
+      return;
+   }
+
+   if (win->last_seq - seq > RTP_SLIDEWIN_SIZE || nlast_seq - seq > RTP_SLIDEWIN_SIZE) {
+      WARN(log, "slidewin packet out of sync, flowid=%u, seq=%u", session->flowid, seq);
+      return;
+   }
+
+   win->last_ts = session->curtime;
+   idx = seq % RTP_SLIDEWIN_SIZE;
+   if (seq < win->last_seq) {
+      win->seqlist[idx].seq = seq;
+      win->seqlist[idx].status = RTP_RECV;
+   } else if (seq > win->last_seq) {
+      if (idx > win->head) {
+         // [head -- idx]: overlap area, generate report and init 
+         nack.data.num = 0;
+         snw_rtp_slidewin_update(win, &nack, win->head, idx, win->seqlist[win->head].seq);
+      } else if (idx < win->head) {
+         // [head -- end] and [begin -- idx]: overlap area
+         snw_rtp_slidewin_update(win, &nack, win->head, RTP_SLIDEWIN_SIZE, win->seqlist[win->head].seq);
+         snw_rtp_slidewin_update(win, &nack, 0, idx, win->seqlist[win->head].seq);
+      } else {
+         WARN(log,"slidewin duplicate packet, flowid=%u, seq=%u", session->flowid, seq);
+      }
+      win->head = idx;
+      win->last_seq = seq;
+      win->seqlist[idx].seq = seq;
+      win->seqlist[idx].status = RTP_RECV;
+
+   } else {
+      WARN(log,"slidewin duplicate packet, flowid=%u, seq=%u", session->flowid, seq);
+   }
+
+   return;
+}
+
+
+
 

@@ -30,7 +30,8 @@ struct snw_ice_component {
    seq_info_t *last_seqs_audio;
    seq_info_t *last_seqs_video;
 
-   rtp_slidewin_t    slidewin;
+   rtp_slidewin_t    a_slidewin;
+   rtp_slidewin_t    v_slidewin;
 
    struct list_head  list;
 };

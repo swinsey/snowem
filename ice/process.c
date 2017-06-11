@@ -765,14 +765,19 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
 void 
 snw_ice_handle_lost_packets(snw_ice_session_t *session, 
       snw_ice_component_t *component, uint16_t seqno, int video) {
+   int nack = 0;
 
-   //FIXME: impl
-   // Save current seq number and payload
-   rtp_slidewin_put(&component->slidewin, seqno);
+   /* Save current seq number and 
+      generate list of lost seqs */
+   if (!video) {
+      nack = snw_rtp_slidewin_put(session, &component->v_slidewin, seqno);
+   }
     
-   // Check and generate list of lost seqs
-   
-   // Generate NACK rtpfb message
+   /* Generate NACK rtpfb message */
+   if (nack != 0) {
+      //TODO: impl
+   }
+
    return;
 }
 
@@ -1065,7 +1070,6 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    snw_ice_session_t *session = 0;
    snw_ice_stream_t *stream = 0;
    snw_ice_component_t *component = 0;
-   int64_t now = get_monotonic_time();
    int pt = 0;
 
    component = (snw_ice_component_t *)data;
@@ -1076,7 +1080,7 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    stream = component->stream;
    session = stream->session;
    log = session->ice_ctx->log;
-   session->curtime = now;
+   session->curtime = get_monotonic_time();
 
    pt = ice_get_packet_type(session, buf,len);
    DEBUG(log, "get packet type, flowid=%u, pt=%u", 

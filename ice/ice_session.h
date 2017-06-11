@@ -31,7 +31,6 @@ struct snw_ice_session {
    snw_ice_stream_t   streams;
    snw_ice_stream_t  *audio_stream;
    snw_ice_stream_t  *video_stream;
-   snw_ice_stream_t  *data_stream; /* TODO: support data channel */
 
    char              *local_sdp;
    char              *remote_sdp;
