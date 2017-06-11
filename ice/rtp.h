@@ -117,7 +117,7 @@ struct rtp_slidewin {
    rtp_seq_t  seqlist[RTP_SLIDEWIN_SIZE];
 };
 
-void
+uint32_t
 snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq);
 
 void 

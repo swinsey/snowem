@@ -35,6 +35,8 @@ extern "C" {
 #define RTCP_RTPFB 205
 #define RTCP_RTPFB_GENERIC_FMT 1
 
+#define RTCP_RTPFB_MSG_LEN     16
+
 /* see rfc4858, rfc5104 */
 #define RTCP_PSFB  206
 #define RTCP_PSFB_PLI_FMT       1
@@ -197,6 +199,10 @@ struct rtcp_fb
    uint32_t media;
    char fci[1];
 };
+
+uint32_t
+snw_rtcp_gen_nack(char *buf, int len,
+      uint32_t local_ssrc, uint32_t remote_ssrc, uint32_t payload);
 
 int 
 snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks);

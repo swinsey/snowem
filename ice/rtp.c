@@ -167,7 +167,7 @@ snw_rtp_slidewin_update(rtp_slidewin_t *win, nack_payload_t *nack,
    return;
 }
 
-void
+uint32_t
 snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq) {
    snw_log_t *log = 0;
    nack_payload_t nack;
@@ -175,27 +175,28 @@ snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t s
    int nlast_seq = RTP_SEQ_NUM_MAX + win->last_seq;
    int idx = 0;
    
-
+  
    if (!session || !win) 
-      return;
+      return 0;
    log = session->ice_ctx->log;
+   nack.data.num = 0;
 
    DEBUG(log, "slidewin put, flowid=%u, seq=%u",session->flowid, seq);
    if (session->curtime - win->last_ts > RTP_SYNC_TIME_MAX) {
       WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u", session->flowid, seq);
       snw_rtp_slidewin_reset(session, win, seq);
-      return;
+      return 0;
    }
 
    if (seq - win->last_seq > RTP_SLIDEWIN_SIZE || nseq - win->last_seq > RTP_SLIDEWIN_SIZE) {
       WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u", session->flowid, seq);
       snw_rtp_slidewin_reset(session, win, seq);
-      return;
+      return 0;
    }
 
    if (win->last_seq - seq > RTP_SLIDEWIN_SIZE || nlast_seq - seq > RTP_SLIDEWIN_SIZE) {
       WARN(log, "slidewin packet out of sync, flowid=%u, seq=%u", session->flowid, seq);
-      return;
+      return 0;
    }
 
    win->last_ts = session->curtime;
@@ -206,7 +207,6 @@ snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t s
    } else if (seq > win->last_seq) {
       if (idx > win->head) {
          // [head -- idx]: overlap area, generate report and init 
-         nack.data.num = 0;
          snw_rtp_slidewin_update(win, &nack, win->head, idx, win->seqlist[win->head].seq);
       } else if (idx < win->head) {
          // [head -- end] and [begin -- idx]: overlap area
@@ -224,7 +224,7 @@ snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t s
       WARN(log,"slidewin duplicate packet, flowid=%u, seq=%u", session->flowid, seq);
    }
 
-   return;
+   return nack.data.num;
 }
 
 

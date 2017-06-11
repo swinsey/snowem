@@ -763,9 +763,13 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
 }
 
 void 
-snw_ice_handle_lost_packets(snw_ice_session_t *session, 
+snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream,
       snw_ice_component_t *component, uint16_t seqno, int video) {
-   int nack = 0;
+   snw_log_t *log = 0;
+   uint32_t nack = 0;
+
+   if (!session) return;
+   log = session->ice_ctx->log;
 
    /* Save current seq number and 
       generate list of lost seqs */
@@ -775,7 +779,18 @@ snw_ice_handle_lost_packets(snw_ice_session_t *session,
     
    /* Generate NACK rtpfb message */
    if (nack != 0) {
-      //TODO: impl
+      char rtcpbuf[RTCP_RTPFB_MSG_LEN];
+      DEBUG(log,"sending rtpfb nack, flowid=%u, local_ssrc=%x, remote_ssrc=%x, payload=%x",
+                              session->flowid,
+                              stream->local_video_ssrc, 
+                              stream->remote_video_ssrc, 
+                              nack);
+                            
+         snw_rtcp_gen_nack(rtcpbuf, RTCP_RTPFB_MSG_LEN, 
+                           stream->local_video_ssrc, 
+                           stream->remote_video_ssrc, 
+                           nack);
+         send_rtcp_pkt_internal(session,video,0,rtcpbuf,RTCP_RTPFB_MSG_LEN);
    }
 
    return;
@@ -987,7 +1002,7 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
       snw_ice_rtp_nacks(session,component,header,video);
-      snw_ice_handle_lost_packets(session,
+      snw_ice_handle_lost_packets(session,stream,
           component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);
    }

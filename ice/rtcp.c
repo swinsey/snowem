@@ -169,6 +169,32 @@ int snw_rtcp_gen_pli(char *buf, int len,
 	return RTCP_PSFB_PLI_MSG_LEN;
 }
 
+uint32_t
+snw_rtcp_gen_nack(char *buf, int len,
+      uint32_t local_ssrc, uint32_t remote_ssrc, uint32_t payload) {
+
+	if (buf == NULL || len < RTCP_RTPFB_MSG_LEN)
+		return -1;
+
+	memset(buf, 0, RTCP_RTPFB_MSG_LEN);
+	rtcp_pkt_t *rtcp = (rtcp_pkt_t *)buf;
+	rtcp->hdr.v = RTCP_VERSION;
+	rtcp->hdr.pt = RTCP_RTPFB;
+	rtcp->hdr.rc = RTCP_RTPFB_GENERIC_FMT;
+   if (len % RTCP_LENGTH_IN_WORDS != 0) {
+      // FIXME: has padding
+      return -1;
+   }
+	rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
+
+   rtcp->pkt.fb.ssrc = htonl(local_ssrc);
+   rtcp->pkt.fb.media = htonl(remote_ssrc);
+   memcpy(rtcp->pkt.fb.fci.nack, &payload, 4);
+
+	return RTCP_PSFB_PLI_MSG_LEN;
+}
+
+
 int 
 snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks) {
    if(packet == NULL || len < 16 || nacks.size() == 0)
