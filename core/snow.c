@@ -6,8 +6,7 @@
 
 #include <json/json.h>
 
-#include "base_str.h"
-#include "config_file.h"
+#include "conf.h"
 #include "connection.h"
 #include "core.h"
 #include "log.h"
@@ -15,52 +14,6 @@
 #include "snow.h"
 #include "snw_event.h"
 #include "utils.h"
-
-using namespace mqf::base;
-
-int
-snw_conf_init(snw_context_t *ctx, const char *file) {
-   snw_module_t *module;
-   CFileConfig &page = * new CFileConfig();
-
-   printf("config file: %s\n",file);
-
-   page.Init(file);
-   ctx->config_file = file;
-   ctx->ice_cert_file = strdup(page["root\\ice\\cert_file"].c_str());
-   ctx->ice_key_file = strdup(page["root\\ice\\key_file"].c_str());
-
-   ctx->wss_cert_file = strdup(page["root\\websocket\\cert_file"].c_str());
-   ctx->wss_key_file = strdup(page["root\\websocket\\key_file"].c_str());
-   ctx->wss_port = from_str<uint16_t>(page["root\\websocket\\bind_port"]);
-   ctx->wss_ip = strdup(page["root\\websocket\\bind_ip"].c_str());
-
-   ctx->log_level = from_str<uint16_t>(page["root\\log\\log_level"]);
-
-   const vector<string> &module_list = page.GetDomains("root\\modules");
-   unsigned int module_num = module_list.size();
-   for ( unsigned int i = 0; i < module_num; i++) {
-      std::string module_path = "root\\" + module_list[i]; 
-      module = (snw_module_t*)malloc(sizeof(snw_module_t));
-      if (!module) return -1;
-      INIT_LIST_HEAD(&module->list);
-      module->name = strdup(page[module_path + "\\name"].c_str());
-      module->type = from_str<uint32_t>(page[module_path + "\\type"]);
-      module->sofile = strdup(page[module_path + "\\sofile"].c_str());
-      list_add_tail(&module->list,&ctx->modules.list);
-   }
-
-   /*{//DEBUG
-      struct list_head *p;
-      list_for_each(p,&ctx->modules.list) {
-         snw_module_t *m = list_entry(p,snw_module_t,list);
-         printf("module info, name=%s, type=%0x, sofile=%s\n", 
-             m->name, m->type, m->sofile);
-      }
-   }*/
-
-   return 0;
-}
 
 int
 snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
@@ -370,7 +323,7 @@ main(int argc, char** argv) {
    if (argc < 2)
       exit(-2);
 
-   snw_conf_init(ctx,argv[1]);
+   snw_config_init(ctx,argv[1]);
    daemonize();
 
    pid = fork();
