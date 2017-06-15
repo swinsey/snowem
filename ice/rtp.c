@@ -105,24 +105,6 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
    return;
 }
 
-void 
-snw_ice_handle_incoming_rtp(snw_ice_session_t *session, int control, int video, char *buf, int len) {
-
-   if (!session) return;
-
-   if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_broadcast_rtp_pkg(session,control,video,buf,len);
-   } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
-      if (control == 1) {
-         //DEBUG("forward receiver rtcp pkt, flowid=%u", session->flowid);
-      }
-   } else {
-     //DEBUG("unknown rtp type of agent, flowid=%u", session->flowid);
-   }
-
-   return;
-}
-
 void
 snw_rtp_slidewin_reset(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq) {
    snw_log_t *log = 0;
@@ -188,13 +170,16 @@ snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t s
       return 0;
    }
 
-   if (seq - win->last_seq > RTP_SLIDEWIN_SIZE || nseq - win->last_seq > RTP_SLIDEWIN_SIZE) {
-      WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u", session->flowid, seq);
+   //FIXME: modular arithmetics
+   if (seq - win->last_seq > RTP_SLIDEWIN_SIZE /*|| nseq - win->last_seq > RTP_SLIDEWIN_SIZE*/) {
+      WARN(log, "slidewin stream out of sync, flowid=%u, seq=%u, last_seq=%u", 
+              session->flowid, seq, win->last_seq);
       snw_rtp_slidewin_reset(session, win, seq);
       return 0;
    }
 
-   if (win->last_seq - seq > RTP_SLIDEWIN_SIZE || nlast_seq - seq > RTP_SLIDEWIN_SIZE) {
+   //FIXME: modular arithmetics
+   if (win->last_seq - seq > RTP_SLIDEWIN_SIZE /*|| nlast_seq - seq > RTP_SLIDEWIN_SIZE*/) {
       WARN(log, "slidewin packet out of sync, flowid=%u, seq=%u", session->flowid, seq);
       return 0;
    }

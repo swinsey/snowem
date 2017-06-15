@@ -154,7 +154,7 @@ snw_ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp
    if (orig_sdp->sdp_subject && strlen(orig_sdp->sdp_subject) > 0) {
       snprintf(buffer, 512, "s=%s\r\n", orig_sdp->sdp_subject);
    } else {
-      snprintf(buffer, 512, "s=%s\r\n", "PeerCall");
+      snprintf(buffer, 512, "s=%s\r\n", "snowsvr");
    }
    strncat(sdp, buffer, ICE_BUFSIZE);
 
@@ -181,7 +181,7 @@ snw_ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp
    strncat(sdp, "\r\n", ICE_BUFSIZE);
 
    /* msid-semantic: add new global attribute */
-   strncat(sdp, "a=msid-semantic: WMS peercall\r\n", ICE_BUFSIZE);
+   strncat(sdp, "a=msid-semantic: WMS snowsvr\r\n", ICE_BUFSIZE);
    memset(wms, 0, ICE_BUFSIZE);
    strncat(wms, "WMS", ICE_BUFSIZE);
    if (orig_sdp->sdp_attributes) {
@@ -301,7 +301,7 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
       "a=setup:%s\r\n"
       "a=connection:new\r\n",
       ufrag, password,
-      srtp_get_local_fingerprint(),
+      session->ice_ctx->local_fingerprint,
       dtls_mode);
    strncat(sdp, buffer, ICE_BUFSIZE);
 
@@ -337,14 +337,13 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
    snw_ice_stream_t *stream = NULL;
    char buffer[512];
 
-   if ( m == NULL )
+   if (m == NULL)
       return;
 
-   if ( video ) {
+   if (video) {
       uint32_t id = session->video_stream->id;
 
       ICE_DEBUG2("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
-
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_stream->id > 0 ? 
                    session->audio_stream->id : 
@@ -355,26 +354,24 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
       stream = snw_stream_find(&session->streams, session->audio_stream->id);
    }
 
-   if ( stream == NULL )
+   if (stream == NULL)
       return;
 
-
-   ICE_DEBUG2("add single ssrc");
    if (m->m_type == sdp_media_audio && m->m_mode != sdp_inactive && m->m_mode != sdp_recvonly) {
       snprintf(buffer, 512,
-         "a=ssrc:%u cname:peercallaudio\r\n"
-         "a=ssrc:%u msid:peercall peercalla0\r\n"
-         "a=ssrc:%u mslabel:peercall\r\n"
-         "a=ssrc:%u label:peercalla0\r\n",
+         "a=ssrc:%u cname:snowsvraudio\r\n"
+         "a=ssrc:%u msid:snowsvr snowsvra0\r\n"
+         "a=ssrc:%u mslabel:snowsvr\r\n"
+         "a=ssrc:%u label:snowsvra0\r\n",
          stream->local_audio_ssrc, stream->local_audio_ssrc, 
          stream->local_audio_ssrc, stream->local_audio_ssrc);
       strncat(sdp, buffer, ICE_BUFSIZE);
    } else if (m->m_type == sdp_media_video && m->m_mode != sdp_inactive && m->m_mode != sdp_recvonly) {
       snprintf(buffer, 512,
-         "a=ssrc:%u cname:peercallvideo\r\n"
-         "a=ssrc:%u msid:peercall peercallv0\r\n"
-         "a=ssrc:%u mslabel:peercall\r\n"
-         "a=ssrc:%u label:peercallv0\r\n",
+         "a=ssrc:%u cname:snowsvrvideo\r\n"
+         "a=ssrc:%u msid:snowsvr snowsvrv0\r\n"
+         "a=ssrc:%u mslabel:snowsvr\r\n"
+         "a=ssrc:%u label:snowsvrv0\r\n",
          stream->local_video_ssrc, stream->local_video_ssrc, 
          stream->local_video_ssrc, stream->local_video_ssrc);
       strncat(sdp, buffer, ICE_BUFSIZE);
@@ -503,10 +500,9 @@ snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video
    if ( stream == NULL )
       return;
 
-   //FIXME: uncomment
-   /*ice_generate_candidate_attribute(session, sdp, stream->id, 1);
+   ice_generate_candidate_attribute(session, sdp, stream->id, 1);
    if(!SET_FLAG(session, WEBRTC_RTCPMUX) && m->m_type != sdp_media_application)
-      ice_generate_candidate_attribute(session, sdp, stream->id, 2);*/
+      ice_generate_candidate_attribute(session, sdp, stream->id, 2);
 
    return;
 }
@@ -514,7 +510,7 @@ snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video
 void 
 snw_ice_sdp_add_mline(snw_ice_session_t *session, sdp_media_t *m, int inactive, int video, char* sdp) {
    char buffer[512];
-   int ipv6 = 0; //ipv6 not support now
+   int ipv6 = 0; //FIXME: ipv6 not support now
 
    if (inactive) {
       snprintf(buffer, 512, "m=%s 0 %s 0\r\n", video ? "video" : "audio", RTP_PROFILE);
@@ -543,8 +539,7 @@ snw_ice_sdp_add_mline(snw_ice_session_t *session, sdp_media_t *m, int inactive, 
       }
    } else {
       sdp_rtpmap_t *r = m->m_rtpmaps;
-      while(r) {
-         ICE_DEBUG2("rtp format, rm_pt=%d, sdp=%s",r->rm_pt,sdp);
+      while (r) {
          snprintf(buffer, 512, " %d", r->rm_pt);
          strncat(sdp, buffer, ICE_BUFSIZE);
          r = r->rm_next;

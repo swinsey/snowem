@@ -997,7 +997,12 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       }
    }*/
 
-   snw_ice_handle_incoming_rtp(session, 0, video, buf, buflen);
+   if (IS_FLAG(session,ICE_PUBLISHER)) {
+      snw_ice_broadcast_rtp_pkg(session,0,video,buf,buflen);
+   } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
+      //do nothing
+   }
+
    //ice_rtp_plugin(handle,stream,component,0,video,buf,buflen); //FIXME: impl
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {

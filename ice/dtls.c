@@ -1,96 +1,99 @@
 #include "dtls.h"
-#include "rtcp.h"
 
 #include "log.h"
 #include "ice.h"
 #include "ice_types.h"
 #include "ice_session.h"
-#include "utils.h"
+#include "rtcp.h"
 #include "session.h"
+#include "types.h"
+#include "utils.h"
 
-static SSL_CTX *ssl_ctx = NULL;
-SSL_CTX *srtp_get_ssl_ctx(void) {
-   return ssl_ctx;
-}
-
-static char local_fingerprint[160];
-char *srtp_get_local_fingerprint(void) {
-   return (char *)local_fingerprint;
-}
-
-int srtp_setup(char *server_pem, char *server_key) {
-   BIO *certbio = NULL;
-   X509 *cert = NULL;
-   unsigned int size;
-   unsigned char fingerprint[EVP_MAX_MD_SIZE];
-   char *tempbuf = NULL;
+int
+srtp_print_fingerprint(char *buf, unsigned int len, 
+      unsigned char *rfingerprint, unsigned int rsize) {
    unsigned int i = 0;
 
-   ssl_ctx = SSL_CTX_new(DTLSv1_method());
-   if (!ssl_ctx) {
-      ICE_ERROR2("failed to create ssl context");
+   if (len < (rsize*3 - 1))
+      return -1;
+
+   for (i = 0; i < rsize; i++) {
+      snprintf(buf + i*3, 4, "%.2X:", rfingerprint[i]);
+   }
+   buf[rsize*3-1] = 0;
+
+   return 0;
+}
+
+int
+srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
+   unsigned char fingerprint[EVP_MAX_MD_SIZE];
+   snw_log_t *log = 0;
+   BIO *certbio = 0;
+   X509 *cert = 0;
+   unsigned int size;
+   //char *tempbuf = 0;
+   //unsigned int i = 0;
+
+   ctx->ssl_ctx = SSL_CTX_new(DTLSv1_method());
+   if (!ctx->ssl_ctx) {
+      ERROR(log, "failed to create ssl context");
       return -1;
    }
 
-   SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, srtp_verify_cb);
-   SSL_CTX_set_tlsext_use_srtp(ssl_ctx, "SRTP_AES128_CM_SHA1_80");
-   if (!server_pem || !SSL_CTX_use_certificate_file(ssl_ctx, server_pem, SSL_FILETYPE_PEM)) {
-      ICE_ERROR2("certificate error, err=%s", SRTP_ERR_STR);
+   SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, srtp_verify_cb);
+   SSL_CTX_set_tlsext_use_srtp(ctx->ssl_ctx, "SRTP_AES128_CM_SHA1_80");
+   if (!server_pem || !SSL_CTX_use_certificate_file(ctx->ssl_ctx, server_pem, SSL_FILETYPE_PEM)) {
+      ERROR(log, "certificate error, err=%s", SRTP_ERR_STR);
       return -2;
    }
 
-   if (!server_key || !SSL_CTX_use_PrivateKey_file(ssl_ctx, server_key, SSL_FILETYPE_PEM)) {
-      ICE_ERROR2("certificate key error, err=%s", SRTP_ERR_STR);
+   if (!server_key || !SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, server_key, SSL_FILETYPE_PEM)) {
+      ERROR(log, "certificate key error, err=%s", SRTP_ERR_STR);
       return -3;
    }
 
-   if (!SSL_CTX_check_private_key(ssl_ctx)) {
-      ICE_ERROR2("certificate check error,err-%s", SRTP_ERR_STR);
+   if (!SSL_CTX_check_private_key(ctx->ssl_ctx)) {
+      ERROR(log, "certificate check error,err-%s", SRTP_ERR_STR);
       return -4;
    }
 
-   SSL_CTX_set_read_ahead(ssl_ctx,1);
+   SSL_CTX_set_read_ahead(ctx->ssl_ctx,1);
    certbio = BIO_new(BIO_s_file());
-   if (certbio == NULL) {
-      ICE_ERROR2("certificate BIO error");
+   if (!certbio) {
+      ERROR(log, "certificate BIO error");
       return -5;
    }
 
    if (BIO_read_filename(certbio, server_pem) == 0) {
-      ICE_ERROR2("failed to read certificate, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to read certificate, err=%s", SRTP_ERR_STR);
       BIO_free_all(certbio);
       return -6;
    }
 
    cert = PEM_read_bio_X509(certbio, NULL, 0, NULL);
-   if (cert == NULL) {
-      ICE_ERROR2("failed to read certificate, err=%s", SRTP_ERR_STR);
+   if (!cert) {
+      ERROR(log, "failed to read certificate, err=%s", SRTP_ERR_STR);
       BIO_free_all(certbio);
       return -7;
    }
 
    if (X509_digest(cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
-      ICE_ERROR2("failed to convert X509 structure, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to convert X509 structure, err=%s", SRTP_ERR_STR);
       X509_free(cert);
       BIO_free_all(certbio);
       return -8;
    }
-
-   tempbuf = (char *)&local_fingerprint;
-   for(i = 0; i < size; i++) {
-      snprintf(tempbuf, 4, "%.2X:", fingerprint[i]);
-      tempbuf += 3;
-   }
-   *(tempbuf-1) = 0;
-
-   ICE_DEBUG2("fingerprint of certificate: %s", local_fingerprint);
+   
+   srtp_print_fingerprint((char *)&ctx->local_fingerprint,160,fingerprint,size);
+   DEBUG(log, "fingerprint of certificate: %s", ctx->local_fingerprint);
    X509_free(cert);
    BIO_free_all(certbio);
-   SSL_CTX_set_cipher_list(ssl_ctx, DTLS_CIPHERS);
+   SSL_CTX_set_cipher_list(ctx->ssl_ctx, DTLS_CIPHERS);
 
    /* Initialize libsrtp */
    if(srtp_init() != err_status_ok) {
-      ICE_ERROR2("failed to set up libsrtp");
+      ERROR(log, "failed to set up libsrtp");
       return -9;
    }
 
@@ -100,7 +103,7 @@ int srtp_setup(char *server_pem, char *server_key) {
 dtls_ctx_t *
 srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    snw_log_t *log = 0;
-   dtls_ctx_t *dtls = NULL;
+   dtls_ctx_t *dtls = 0;
 
    if (!ice_ctx) return 0;
    log = ice_ctx->log;
@@ -108,29 +111,29 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    DEBUG(log, "create DTLS/SRTP, role=%d", role);
 
    dtls = (dtls_ctx_t*)malloc(sizeof(dtls_ctx_t));
-   if (dtls == NULL) {
-      ICE_ERROR2("getting dtls failed");
-      return NULL;
+   if (!dtls) {
+      ERROR(log, "getting dtls failed");
+      return 0;
    }
    memset(dtls,0,sizeof(dtls_ctx_t));
 
    /* Create SSL context */
    dtls->is_valid = 0;
-   dtls->ssl = SSL_new(srtp_get_ssl_ctx());
+   dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
-      ICE_ERROR2("failed to create DTLS session, err=%s",
+      ERROR(log, "failed to create DTLS session, err=%s",
          ERR_reason_error_string(ERR_get_error()));
       srtp_context_free(dtls);
-      return NULL;
+      return 0;
    }
 
    SSL_set_ex_data(dtls->ssl, 0, dtls);
    SSL_set_info_callback(dtls->ssl, srtp_callback);
    dtls->read_bio = BIO_new(BIO_s_mem());
    if (!dtls->read_bio) {
-      ICE_ERROR2("failed to create read_BIO, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to create read_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
-      return NULL;
+      return 0;
    }
 
    BIO_set_mem_eof_return(dtls->read_bio, -1);
@@ -138,16 +141,16 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    if (!dtls->write_bio) {
       ICE_ERROR2("failed to create write_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
-      return NULL;
+      return 0;
    }
    BIO_set_mem_eof_return(dtls->write_bio, -1);
 
    /* The write BIO needs our custom filter, or fragmentation won't work */
    dtls->filter_bio = BIO_new(BIO_ice_dtls_filter()); //call: dtls_bio_filter_ctrl
    if (!dtls->filter_bio) {
-      ICE_ERROR("failed to create filter_BIO, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to create filter_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
-      return NULL;
+      return 0;
    }
    dtls->filter_bio->ptr = &dtls->bio_pending_state;
 
@@ -168,17 +171,16 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
     * commonly supported.
     */
    EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-   if(ecdh == NULL) {
-      ICE_ERROR2("Error creating ECDH group! (%s)",
+   if (!ecdh) {
+      ERROR(log, "failed to create ECDH group, err=%s",
          ERR_reason_error_string(ERR_get_error()));
       srtp_context_free(dtls);
-      return NULL;
+      return 0;
    }
    SSL_set_options(dtls->ssl, SSL_OP_SINGLE_ECDH_USE);
    SSL_set_tmp_ecdh(dtls->ssl, ecdh);
    EC_KEY_free(ecdh);
    dtls->ready = 0;
-   dtls->dtls_connected = 0;
    dtls->component = component;
 
    return dtls;
@@ -235,138 +237,128 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
 
 int
 srtp_dtls_setup(dtls_ctx_t *dtls) {
-   snw_ice_component_t *component = NULL;
-   snw_ice_stream_t *stream = NULL;
-   snw_ice_session_t *session = NULL;
+   unsigned char rfingerprint[EVP_MAX_MD_SIZE];
+   char remote_fingerprint[160];
+   snw_ice_component_t *component = 0;
+   snw_ice_stream_t *stream = 0;
+   snw_ice_session_t *session = 0;
+   snw_log_t *log = 0;
+   unsigned int rsize;
 
-   if (dtls == NULL) {
-      return -1;
-   }
+   if (!dtls) return -1;
 
    component = (snw_ice_component_t *)dtls->component;
-   if(component == NULL) {
+   if (!component || !component->stream 
+       || !component->stream->session
+       || !component->stream->session->agent) 
       return -2;
-   }
-
    stream = component->stream;
-   if(!stream) {
-      return -3;
-   }
-
    session = stream->session;
-   if (!session || !session->agent) {
+   log = session->ice_ctx->log;
+
+   if (!stream->remote_fingerprint) {
+      ERROR(log,"no remote fingerprint, flowid=%u", session->flowid);
       return -4;
    }
 
    X509 *rcert = SSL_get_peer_certificate(dtls->ssl);
-   if(!rcert) {
-      ICE_DEBUG2("No remote certificate, s=%s", ERR_reason_error_string(ERR_get_error()));
+   if (!rcert) {
+      ERROR(log,"no remote certificate, s=%s", ERR_reason_error_string(ERR_get_error()));
+      return -3;
+   } 
+
+   if (stream->remote_hashing && !strcasecmp(stream->remote_hashing, "sha-1")) {
+      X509_digest(rcert, EVP_sha1(), (unsigned char *)rfingerprint, &rsize);
    } else {
-         unsigned int rsize;
-         unsigned char rfingerprint[EVP_MAX_MD_SIZE];
-         char remote_fingerprint[160];
-         char *rfp = (char *)&remote_fingerprint;
-         if(stream->remote_hashing && !strcasecmp(stream->remote_hashing, "sha-1")) {
-            ICE_DEBUG2("Computing sha-1 fingerprint of remote certificate...");
-            X509_digest(rcert, EVP_sha1(), (unsigned char *)rfingerprint, &rsize);
-         } else {
-            ICE_DEBUG2("Computing sha-256 fingerprint of remote certificate...");
-            X509_digest(rcert, EVP_sha256(), (unsigned char *)rfingerprint, &rsize);
-         }
-         X509_free(rcert);
-         rcert = NULL;
-         unsigned int i = 0;
-         for(i = 0; i < rsize; i++) {
-            snprintf(rfp, 4, "%.2X:", rfingerprint[i]);
-            rfp += 3;
-         }
-         *(rfp-1) = 0;
-         ICE_DEBUG2("Remote fingerprint, remote_hashing=%s, remote_fingerprint=%s",
-            stream->remote_hashing ? stream->remote_hashing : "sha-256", remote_fingerprint);
-         if (!strcasecmp(remote_fingerprint, stream->remote_fingerprint ? stream->remote_fingerprint : "(none)")) {
-            ICE_DEBUG2("Fingerprint is a match!");
-            dtls->state = DTLS_STATE_CONNECTED;
-            dtls->dtls_connected = get_monotonic_time();
-         } else {
-            // FIXME NOT a match! MITM?
-            ICE_ERROR2("Fingerprint mismatch, got=%s, expected=%s", remote_fingerprint, stream->remote_fingerprint);
-            dtls->state = DTLS_STATE_FAILED;
+      X509_digest(rcert, EVP_sha256(), (unsigned char *)rfingerprint, &rsize);
+   }
+
+   srtp_print_fingerprint(remote_fingerprint,160,rfingerprint,rsize);
+
+   DEBUG(log, "remote fingerprint, remote_hashing=%s, remote_fingerprint=%s",
+      stream->remote_hashing ? stream->remote_hashing : "sha-256", remote_fingerprint);
+   if (!strcasecmp(remote_fingerprint, stream->remote_fingerprint)) {
+      dtls->state = DTLS_STATE_CONNECTED;
+   } else {
+      ERROR(log, "fingerprint mismatch, got=%s, expected=%s", 
+            remote_fingerprint, stream->remote_fingerprint);
+      dtls->state = DTLS_STATE_FAILED;
+      goto done;
+   }
+
+   if (dtls->state == DTLS_STATE_CONNECTED) {
+      //FIX: 28-05 jackiedinh
+      if (component->stream->id == session->audio_stream->id 
+          || component->stream->id == session->video_stream->id) {
+         unsigned char material[SRTP_MASTER_LENGTH*2];
+         unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
+         if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, 
+                  "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
+            ERROR(log, "exporting SRTP keying material failed, cid=%u, sid=%u, err=%s",
+               component->id, component->stream->id, ERR_reason_error_string(ERR_get_error()));
             goto done;
          }
-         if (dtls->state == DTLS_STATE_CONNECTED) {
-            //FIX: 28-05 jackiedinh
-            if (component->stream->id == session->audio_stream->id 
-                || component->stream->id == session->video_stream->id) {
-               // Complete with SRTP setup
-               unsigned char material[SRTP_MASTER_LENGTH*2];
-               unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
-               // Export keying material for SRTP
-               if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
-                  ICE_DEBUG2("failed to extract SRTP keying material, cid=%u, sid=%u, err=%s",
-                     component->id, stream->stream_id, ERR_reason_error_string(ERR_get_error()));
-                  goto done;
-               }
-               // Key derivation (http://tools.ietf.org/html/rfc5764#section-4.2)
-               if(dtls->role == DTLS_ROLE_CLIENT) {
-                  local_key = material;
-                  remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
-                  local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
-                  remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
-               } else {
-                  remote_key = material;
-                  local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
-                  remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
-                  local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
-               }
-               // Build master keys and set SRTP policies
-               // Remote (inbound)
-               crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
-               crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
-               dtls->remote_policy.ssrc.type = ssrc_any_inbound;
-               unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
-               dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
-               memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
-               memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
-
-               dtls->remote_policy.next = NULL;
-               // Local (outbound)
-               crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
-               crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
-               dtls->local_policy.ssrc.type = ssrc_any_outbound;
-               unsigned char local_policy_key[SRTP_MASTER_LENGTH];
-               dtls->local_policy.key = (unsigned char *)&local_policy_key;
-               memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
-               memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
-
-               dtls->local_policy.next = NULL;
-               // Create SRTP sessions
-               err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
-               if(ret != err_status_ok) {
-                  ICE_ERROR2("failed to create inbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                         component->id, stream->stream_id, ret);
-                  goto done;
-               }
-               ICE_DEBUG2("Created inbound SRTP session, cid=%u, sid=%u", 
-                     component->id, stream->stream_id);
-               ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
-               if(ret != err_status_ok) {
-                  ICE_ERROR2("failed to create outbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                         component->id, stream->stream_id, ret);
-                  goto done;
-               }
-               dtls->is_valid = 1;
-               ICE_DEBUG2("Created outbound SRTP session for component %d in stream %d", 
-                     component->id, stream->stream_id);
-            }
-            dtls->ready = 1;
-         }
-done:
-         if (dtls->is_valid) {
-            ice_srtp_handshake_done(session, component);
+         // Key derivation (http://tools.ietf.org/html/rfc5764#section-4.2)
+         if(dtls->role == DTLS_ROLE_CLIENT) {
+            local_key = material;
+            remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
+            local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
+            remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
          } else {
-            srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
+            remote_key = material;
+            local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
+            remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
+            local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
          }
+         // Build master keys and set SRTP policies
+         // Remote (inbound)
+         crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
+         crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
+         dtls->remote_policy.ssrc.type = ssrc_any_inbound;
+         unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
+         dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
+         memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
+         memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
+
+         dtls->remote_policy.next = NULL;
+         // Local (outbound)
+         crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
+         crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
+         dtls->local_policy.ssrc.type = ssrc_any_outbound;
+         unsigned char local_policy_key[SRTP_MASTER_LENGTH];
+         dtls->local_policy.key = (unsigned char *)&local_policy_key;
+         memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
+         memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
+         dtls->local_policy.next = NULL;
+         // Create SRTP sessions
+         err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
+         if(ret != err_status_ok) {
+            ICE_ERROR2("failed to create inbound SRTP session, cid=%u, sid=%u, ret=%d", 
+                   component->id, stream->stream_id, ret);
+            goto done;
+         }
+         ICE_DEBUG2("Created inbound SRTP session, cid=%u, sid=%u", 
+               component->id, stream->stream_id);
+         ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
+         if(ret != err_status_ok) {
+            ICE_ERROR2("failed to create outbound SRTP session, cid=%u, sid=%u, ret=%d", 
+                   component->id, stream->stream_id, ret);
+            goto done;
+         }
+         dtls->is_valid = 1;
+         ICE_DEBUG2("Created outbound SRTP session for component %d in stream %d", 
+               component->id, stream->stream_id);
+      }
+      dtls->ready = 1;
    }
+done:
+   if (dtls->is_valid) {
+      ice_srtp_handshake_done(session, component);
+   } else {
+      srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
+   }
+   
+   if (rcert) X509_free(rcert);
 
    return 0;
 }
@@ -459,73 +451,34 @@ void srtp_context_free(dtls_ctx_t *dtls) {
    dtls = NULL;
 }
 
-/* DTLS alert callback */
 void srtp_callback(const SSL *ssl, int where, int ret) {
-
-   ICE_DEBUG2("dtls callback, where=%u",where);//SSL_CB_ALERT
-
-/*   if (!(where & SSL_CB_ALERT)) {
-      return;
-   }
-
-   dtls_ctx_t *dtls = (dtls_ctx_t*)SSL_get_ex_data(ssl, 0);
-   if (!dtls) {
-      ICE_ERROR2("no dtls session, where=%d, ret=%d", where, ret);
-      return;
-   }
-
-   snw_ice_component_t *component = (snw_ice_component_t*)dtls->component;
-   if (component == NULL) {
-      ICE_ERROR2("no ice component, where=%d, ret=%d", where, ret);
-      return;
-   }
-
-   snw_ice_stream_t *stream = (snw_ice_stream_t*)component->stream;
-   if (!stream) {
-      ICE_ERROR2("no ice stream, where=%d, ret=%d", where, ret);
-      return;
-   }
-
-   snw_ice_session_t *handle = stream->session;
-   if (!handle) {
-      ICE_ERROR2("no ice session, where=%d, ret=%d", where, ret);
-      return;
-   }
-
-   ICE_DEBUG2("DTLS alert triggered, sid=%u, cid=%u", stream->stream_id, component->id);
-*/
+   //FIXME: do real verification
    return;
 }
 
-/* DTLS certificate verification callback */
 int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
-
+   //FIXME: do real verification
    return 1;
 }
 
 int srtp_send_data(dtls_ctx_t *dtls) {
-   snw_ice_session_t *session = NULL;
-   snw_ice_component_t *component = NULL;
-   snw_ice_stream_t *stream = NULL;
+   snw_ice_session_t *session = 0;
+   snw_ice_component_t *component = 0;
+   snw_ice_stream_t *stream = 0;
+   snw_log_t *log = 0;
    int pending = 0;
 
-   if (dtls == NULL) {
-      return -1;
-   }
+   if (!dtls) return -1;
 
    component = (snw_ice_component_t *)dtls->component;
-   if (component == NULL) {
+   if (!component || !component->stream || !component->stream->session) 
       return -2;
-   }
 
    stream = component->stream;
-   if (!stream) {
-      return -3;
-   }
-
    session = stream->session;
+   log = session->ice_ctx->log;
    if (!session || !session->agent || !dtls->write_bio) {
-      return -4;
+      return -3;
    }
 
    pending = BIO_ctrl_pending(dtls->filter_bio);
@@ -533,10 +486,10 @@ int srtp_send_data(dtls_ctx_t *dtls) {
       char outgoing[pending]; //FIXME: change init of array?
       int out = BIO_read(dtls->write_bio, outgoing, sizeof(outgoing));
 
-      ICE_DEBUG2("read data from the write_BIO, pending=%u, len=%u", pending, out);
-      if(out > 1500) {
+      DEBUG(log, "read data from the write_BIO, pending=%u, len=%u", pending, out);
+      if (out > 1500) {
          /* FIXME need proper fragmentation */
-         ICE_ERROR2("larger than the MTU, len=%u", out);
+         WARN(log, "larger than the MTU, len=%u", out);
       }
       int bytes = ice_agent_send(session->agent, component->stream->id, 
                                  component->id, outgoing, out);

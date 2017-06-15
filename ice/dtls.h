@@ -48,6 +48,7 @@ struct dtls_ctx {
    BIO *read_bio;               /* incoming DTLS data */
    BIO *write_bio;              /* outgoing DTLS data */
    BIO *filter_bio;             /* to fix MTU fragmentation on outgoing DTLS data */
+
    srtp_t srtp_in;              /* libsrtp context for incoming SRTP packets */
    srtp_t srtp_out;             /* libsrtp context for outgoing SRTP packets */
    srtp_policy_t remote_policy; /* libsrtp policy for incoming SRTP packets */
@@ -57,13 +58,11 @@ struct dtls_ctx {
    int state;                   /* DTLS state */
    int is_valid;              
    int ready;                   
-   int64_t dtls_connected;      /* Monotonic time of when the DTLS state has switched to connected */
    dtls_bio_filter bio_pending_state;
 };
 
-int srtp_setup(char *server_pem, char *server_key);
-SSL_CTX *srtp_get_ssl_ctx(void);
-char *srtp_get_local_fingerprint(void);
+int
+srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key);
 
 dtls_ctx_t*
 srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role);

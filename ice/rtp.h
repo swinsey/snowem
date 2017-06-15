@@ -120,9 +120,9 @@ struct rtp_slidewin {
 uint32_t
 snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq);
 
-void 
-snw_ice_handle_incoming_rtp(snw_ice_session_t *handle, 
-      int type, int video, char *buf, int len);
+void
+snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, 
+      int control, int video, char *buf, int len);
 
 #ifdef __cplusplus
 }

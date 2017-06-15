@@ -2,6 +2,7 @@
 #define _SNOW_ICE_ICE_H_
 
 #include <arpa/inet.h>
+#include <openssl/ssl.h>
 
 #include "cache.h"
 #include "connection.h"
@@ -48,6 +49,9 @@ struct snw_ice_context {
    /* mempools for fixed-size objects, fast in (de)allocation */
    snw_mempool_t  *stream_mempool;
    snw_mempool_t  *component_mempool;
+   
+   SSL_CTX        *ssl_ctx;
+   char            local_fingerprint[160];
 
    snw_ice_api_t   api_handlers;
 };

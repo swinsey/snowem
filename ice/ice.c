@@ -98,9 +98,8 @@ snw_ice_dispatch_msg(int fd, short int event,void* data) {
 static char *server_pem = NULL;
 static char *server_key = NULL;
 SSL_CTX *
-ice_srtp_init(snw_context_t *ctx, const char* pem, const char *key) {
+ice_srtp_init(snw_ice_context_t *ctx, const char* pem, const char *key) {
    snw_log_t *log = 0;
-   SSL_CTX  *server_ctx = 0;
 
    if (!ctx) return 0;
    log = ctx->log;
@@ -113,13 +112,13 @@ ice_srtp_init(snw_context_t *ctx, const char* pem, const char *key) {
    SSL_load_error_strings();
    OpenSSL_add_all_algorithms();
 
-   if (srtp_setup(server_pem, server_key) < 0) { 
+   if (srtp_setup(ctx, server_pem, server_key) < 0) { 
       ERROR(log, "Failed to init dtls");
       exit(1);
    }
-   server_ctx= srtp_get_ssl_ctx();
+   //ctx->ssl_ctx = srtp_get_ssl_ctx();
 
-   return server_ctx;
+   return ctx->ssl_ctx;
 }
 
 void  
@@ -212,7 +211,7 @@ snw_ice_init(snw_context_t *ctx) {
    ice_ctx->ipv6_enabled = 0; 
    ice_ctx->ice_tcp_enabled = 0;
 
-   ice_srtp_init(ctx, ctx->wss_cert_file, ctx->wss_key_file);
+   ice_srtp_init(ice_ctx, ctx->wss_cert_file, ctx->wss_key_file);
 
    //DEBUG(ctx->log,"core2ice fd=%d",ctx->snw_core2ice_mq->_fd);
    q_event = event_new(ctx->ev_base, ctx->snw_core2ice_mq->_fd, 
