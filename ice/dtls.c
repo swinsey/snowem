@@ -119,6 +119,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
 
    /* Create SSL context */
    dtls->bio_pending_state.ctx = ice_ctx;
+   dtls->bio_pending_state.dtls = dtls;
    dtls->is_valid = 0;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
@@ -188,17 +189,19 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
 }
 
 void srtp_do_handshake(dtls_ctx_t *dtls) {
+   snw_log_t *log;
+   snw_ice_component_t *c = (snw_ice_component_t*)dtls->component;
 
    if (dtls == NULL || dtls->ssl == NULL)
       return;
+   log = c->stream->session->ice_ctx->log;
 
    //FIXME: state not used?
    if (dtls->state == DTLS_STATE_CREATED)
       dtls->state = DTLS_STATE_TRYING;
 
-   //DEBUG("Start DTLS handshake");
    SSL_do_handshake(dtls->ssl);
-   srtp_send_data(dtls);
+   DEBUG(log, "Start DTLS handshake");
 
    return;
 }
@@ -381,15 +384,12 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    
    DEBUG(log, "dtls message, len=%u",len);
 
-   srtp_send_data(dtls);
    written = BIO_write(dtls->read_bio, buf, len);
    if (written != len) {
       ERROR(log, "failed to write, written=%u, len=%u", written, len);
    } else {
       DEBUG(log, "bio write, written=%u", written);
    }
-   //DEBUG(log, "srtp_send_data 1, written=%d",written);
-   //srtp_send_data(dtls);
 
    /* Try to read data */
    memset(&data, 0, 1500);
@@ -403,8 +403,6 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
          return -9;
       }
    }
-   DEBUG(log, "srtp_send_data 2, read=%d",read);
-   srtp_send_data(dtls);
 
    if (!SSL_is_init_finished(dtls->ssl)) {
       return -8;
@@ -463,54 +461,6 @@ int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
    return 1;
 }
 
-int srtp_send_data(dtls_ctx_t *dtls) {
-   snw_ice_session_t *session = 0;
-   snw_ice_component_t *component = 0;
-   snw_ice_stream_t *stream = 0;
-   snw_log_t *log = 0;
-   int pending = 0;
-
-   if (!dtls) return -1;
-
-   component = (snw_ice_component_t *)dtls->component;
-   if (!component || !component->stream || !component->stream->session) 
-      return -2;
-
-   stream = component->stream;
-   session = stream->session;
-   log = session->ice_ctx->log;
-   if (!session || !session->agent || !dtls->write_bio) {
-      return -3;
-   }
-
-   pending = BIO_ctrl_pending(dtls->filter_bio);
-   while (pending > 0) {
-      char outgoing[pending]; //FIXME: change init of array?
-      int out = BIO_read(dtls->write_bio, outgoing, sizeof(outgoing));
-
-      DEBUG(log, "read data from the write_BIO, pending=%u, len=%u", pending, out);
-      if (out > 1500) {
-         /* FIXME need proper fragmentation */
-         WARN(log, "larger than the MTU, len=%u", out);
-      }
-      int bytes = ice_agent_send(session->agent, component->stream->id, 
-                                 component->id, outgoing, out);
-
-      //HEXDUMP(outgoing,out,"dtls");
-      if(bytes < out) {
-         ICE_ERROR2("failed to send DTLS message, cid=%u, sid=%u, len=%d", 
-               component->id, stream->stream_id, bytes);
-      } else {
-         //ICE_DEBUG2("send result, bytes=%u,out=%u",bytes,out);
-      }
-
-      /* Check if there's anything left to send (e.g., fragmented packets) */
-      pending = BIO_ctrl_pending(dtls->filter_bio);
-   }
-
-   return 0;
-}
-
 /* Starting MTU value for the DTLS BIO filter */
 static int mtu = 1472;
 void srtp_bio_filter_set_mtu(int start_mtu) {
@@ -558,9 +508,11 @@ BIO_METHOD *BIO_ice_dtls_filter(void) {
 
 int
 ice_dtls_append_pkt(dtls_bio_filter *filter, int pkt) {
+   snw_log_t *log = 0;
+   log = filter->ctx->log;
 
+   ERROR(log, "dtls append, pkt=%d",pkt);
    for (int i=0; i<ICE_DTLS_PKT_NUM; i++) {
-      ICE_ERROR2("append, pkt=%d",filter->pkts[i]);
       if ( filter->pkts[i] == 0 ) {
          filter->pkts[i] = pkt;
          filter->num++;
@@ -574,9 +526,12 @@ ice_dtls_append_pkt(dtls_bio_filter *filter, int pkt) {
 
 int
 ice_dtls_get_pkt(dtls_bio_filter *filter) {
+   snw_log_t *log = 0;
+   log = filter->ctx->log;
    
    for (int i=0; i<ICE_DTLS_PKT_NUM; i++) {
       if ( filter->pkts[i] != 0 ) {
+         DEBUG(log, "dtls get pkt, len=%u", filter->pkts[i]);
          return filter->pkts[i];
       }
    }
@@ -605,12 +560,6 @@ ice_dtls_remove_pkt(dtls_bio_filter *filter) {
 
    return 0;
 }
-
-/*void print_test(gpointer data, gpointer user_data) {
-   int pkt = GPOINTER_TO_INT(data);
-
-   ICE_DEBUG2("old list: %u", pkt);
-}*/
 
 void
 ice_dtls_print_pkt_list(dtls_bio_filter *filter, const char *type) {
@@ -652,11 +601,51 @@ int dtls_bio_filter_free(BIO *bio) {
    bio->flags = 0;
    return 1;
 }
-   
+
+int srtp_send_data(dtls_ctx_t *dtls, int len) {
+   snw_ice_session_t *session = 0;
+   snw_ice_component_t *component = 0;
+   snw_ice_stream_t *stream = 0;
+   snw_log_t *log = 0;
+   char data[DTLS_BUFFER_SIZE];
+   int sent, bytes;
+
+   if (!dtls) return -1;
+
+   component = (snw_ice_component_t *)dtls->component;
+   if (!component || !component->stream || !component->stream->session) 
+      return -2;
+
+   stream = component->stream;
+   session = stream->session;
+   log = session->ice_ctx->log;
+   if (!session || !session->agent || !dtls->write_bio) {
+      return -3;
+   }
+
+   //FIXME: a loop is needed to read all data?
+   sent = BIO_read(dtls->write_bio, data, DTLS_MTU_SIZE);
+   if (sent <= 0) {
+      DEBUG(log, "failed to read dtls data, sent=%d", sent);
+      return -1;
+   }
+   DEBUG(log, "sending dtls msg, len=%u, sent=%u", len, sent);
+   bytes = ice_agent_send(session->agent, component->stream->id, 
+                          component->id, data, sent);
+
+   if(bytes < sent) {
+      ERROR(log, "failed to send dtls message, cid=%u, sid=%u, len=%d", 
+            component->id, stream->id, bytes);
+   } 
+
+   return 0;
+}
+
+  
 int dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
    snw_log_t *log = 0;
    dtls_bio_filter *filter = 0;
-   long ret = 0;
+   int ret = 0;
 
    ret = BIO_write(bio->next_bio, in, inl);
    filter = (dtls_bio_filter *)bio->ptr;
@@ -664,10 +653,14 @@ int dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
 
    DEBUG(log, "dtls_bio_filter_write, len=%d, written_len=%ld", inl, ret);
    
-   if(filter != NULL) {
+   srtp_send_data(filter->dtls,ret); 
+
+   //FIXME: test the above line.
+   /*if (filter != NULL) {
       ice_dtls_append_pkt(filter, ret);
       //ice_dtls_print_pkt_list(filter,"append");
-   }
+   }*/
+
    return ret;
 }
 

@@ -18,14 +18,15 @@
 
 #define SRTP_ERR_STR ERR_reason_error_string(ERR_get_error())
 
-/* DTLS role */
+#define DTLS_BUFFER_SIZE 1500
+#define DTLS_MTU_SIZE 1472
+
 enum  {
    DTLS_ROLE_ACTPASS = 0,
    DTLS_ROLE_SERVER,
    DTLS_ROLE_CLIENT,
 };
 
-/* DTLS state */
 enum {
    DTLS_STATE_FAILED = 0,
    DTLS_STATE_CREATED,
@@ -37,12 +38,12 @@ enum {
 #define ICE_DTLS_PKT_NUM 10
 typedef struct dtls_bio_filter {
    snw_ice_context_t *ctx;
+   dtls_ctx_t    *dtls;
    int pkts[ICE_DTLS_PKT_NUM+1];
    int num;
 } dtls_bio_filter;
 
 
-typedef struct dtls_ctx dtls_ctx_t;
 struct dtls_ctx {
    void *component;             
    SSL *ssl;

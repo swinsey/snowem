@@ -12,6 +12,7 @@ typedef struct snw_ice_session snw_ice_session_t;
 typedef struct snw_ice_stream snw_ice_stream_t;
 typedef struct snw_ice_component snw_ice_component_t;
 typedef struct snw_ice_context snw_ice_context_t;
+typedef struct dtls_ctx dtls_ctx_t;
 
 #define ICE_SESSION_SHM_KEY   0x091001
 #define ICE_SESSION_HASHTIME  10
