@@ -36,6 +36,7 @@ enum {
 /* Helper struct to keep the filter state */
 #define ICE_DTLS_PKT_NUM 10
 typedef struct dtls_bio_filter {
+   snw_ice_context_t *ctx;
    int pkts[ICE_DTLS_PKT_NUM+1];
    int num;
 } dtls_bio_filter;

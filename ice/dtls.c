@@ -118,6 +118,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    memset(dtls,0,sizeof(dtls_ctx_t));
 
    /* Create SSL context */
+   dtls->bio_pending_state.ctx = ice_ctx;
    dtls->is_valid = 0;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
@@ -355,6 +356,7 @@ done:
    if (dtls->is_valid) {
       ice_srtp_handshake_done(session, component);
    } else {
+      //FIXME: no need to call
       srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
    }
    
@@ -523,6 +525,7 @@ void srtp_bio_filter_set_mtu(int start_mtu) {
 
 /* Filter implementation */
 int dtls_bio_filter_write(BIO *h, const char *buf,int num);
+int dtls_bio_filter_read(BIO *h, char *buf, int len);
 long dtls_bio_filter_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 int dtls_bio_filter_new(BIO *h);
 int dtls_bio_filter_free(BIO *data);
@@ -531,7 +534,8 @@ static BIO_METHOD dtls_bio_filter_methods = {
    BIO_TYPE_FILTER,
    "srtp filter",
    dtls_bio_filter_write,
-   NULL,
+   dtls_bio_filter_read,
+   //NULL,
    NULL,
    NULL,
    dtls_bio_filter_ctrl,
@@ -650,16 +654,33 @@ int dtls_bio_filter_free(BIO *bio) {
 }
    
 int dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
-   long ret = BIO_write(bio->next_bio, in, inl);
+   snw_log_t *log = 0;
+   dtls_bio_filter *filter = 0;
+   long ret = 0;
 
-   ICE_DEBUG2("dtls_bio_filter_write, len=%d, written_len=%ld", inl, ret);
+   ret = BIO_write(bio->next_bio, in, inl);
+   filter = (dtls_bio_filter *)bio->ptr;
+   log = filter->ctx->log;
+
+   DEBUG(log, "dtls_bio_filter_write, len=%d, written_len=%ld", inl, ret);
    
-   dtls_bio_filter *filter = (dtls_bio_filter *)bio->ptr;
    if(filter != NULL) {
       ice_dtls_append_pkt(filter, ret);
       //ice_dtls_print_pkt_list(filter,"append");
    }
    return ret;
+}
+
+int dtls_bio_filter_read(BIO *bio, char *buf, int len) {
+   snw_log_t *log = 0;
+   dtls_bio_filter *filter = 0;
+
+   filter = (dtls_bio_filter *)bio->ptr;
+   log = filter->ctx->log;
+
+   DEBUG(log, "dtls_bio_filter_read, len=%d", len);
+
+   return 0;
 }
 
 long dtls_bio_filter_ctrl(BIO *bio, int cmd, long num, void *ptr) {
