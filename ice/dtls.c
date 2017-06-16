@@ -357,11 +357,8 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
 done:
    if (dtls->is_valid) {
       ice_srtp_handshake_done(session, component);
-   } else {
-      //FIXME: no need to call
-      srtp_callback(dtls->ssl, SSL_CB_ALERT, 0);
    }
-   
+      
    if (rcert) X509_free(rcert);
 
    return 0;
@@ -369,10 +366,10 @@ done:
 
 int
 srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
-   char data[1500];
+   char data[DTLS_BUFFER_SIZE];
    snw_log_t *log = 0;
    snw_ice_component_t *component = 0;
-   int read = 0;
+   int ret = 0;
    int written = 0;
 
    if (!dtls || !dtls->ssl || !dtls->read_bio) {
@@ -390,15 +387,14 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
       DEBUG(log, "bio write, written=%u", written);
    }
 
-   /* Try to read data */
-   memset(&data, 0, 1500);
-   read = SSL_read(dtls->ssl, &data, 1500);
-   if (read < 0) {
-      unsigned long err = SSL_get_error(dtls->ssl, read);
+   /* XXX: read to push data on bio chain? */
+   ret = SSL_read(dtls->ssl, &data, DTLS_BUFFER_SIZE);
+   if (ret < 0) {
+      unsigned long err = SSL_get_error(dtls->ssl, ret);
       if (err == SSL_ERROR_SSL) {
-         char error[200];
-         ERR_error_string_n(ERR_get_error(), error, 200);
-         ERROR(log,"Handshake error: read=%d, s=%s", read, error);
+         char error[256];
+         ERR_error_string_n(ERR_get_error(), error, 256);
+         ERROR(log,"ssl read error: ret=%d, err=%s", read, error);
          return -9;
       }
    }
@@ -408,10 +404,7 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    }
 
    if (dtls->ready) {
-      DEBUG(log,"data available, read=%u",read);
-      if(read > 0) {
-         DEBUG(log,"Data available but Data Channels support disabled...");
-      }
+      WARN(log,"dtls data not supported, ret=%u",ret);
    } else {
       DEBUG(log,"DTLS established");
       srtp_dtls_setup(dtls);
@@ -425,13 +418,13 @@ void srtp_context_free(dtls_ctx_t *dtls) {
    if(dtls == NULL)
       return;
    dtls->ready = 0;
-   /* Destroy DTLS stack and free resources */
+   
    dtls->component = NULL;
    if(dtls->ssl != NULL) {
       SSL_free(dtls->ssl);
       dtls->ssl = NULL;
    }
-   /* BIOs are destroyed by SSL_free */
+   
    dtls->read_bio = NULL;
    dtls->write_bio = NULL;
    dtls->filter_bio = NULL;
@@ -444,7 +437,7 @@ void srtp_context_free(dtls_ctx_t *dtls) {
          srtp_dealloc(dtls->srtp_out);
          dtls->srtp_out = NULL;
       }
-      /* FIXME What about dtls->remote_policy and dtls->local_policy? */
+      
    }
    free(dtls);
    dtls = NULL;
