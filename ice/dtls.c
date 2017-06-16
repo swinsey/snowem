@@ -118,8 +118,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    memset(dtls,0,sizeof(dtls_ctx_t));
 
    /* Create SSL context */
-   dtls->bio_pending_state.ctx = ice_ctx;
-   dtls->bio_pending_state.dtls = dtls;
+   dtls->ctx = ice_ctx;
    dtls->is_valid = 0;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
@@ -154,7 +153,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
       srtp_context_free(dtls);
       return 0;
    }
-   dtls->filter_bio->ptr = &dtls->bio_pending_state;
+   dtls->filter_bio->ptr = dtls;
 
    /* Chain filter and write BIOs */
    BIO_push(dtls->filter_bio, dtls->write_bio);
@@ -461,18 +460,6 @@ int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
    return 1;
 }
 
-/* Starting MTU value for the DTLS BIO filter */
-static int mtu = 1472;
-void srtp_bio_filter_set_mtu(int start_mtu) {
-   if (start_mtu < 0) {
-      ICE_ERROR2("Invalid MTU, mtu=%d",start_mtu);
-      return;
-   }
-   ICE_DEBUG2("Setting starting MTU in the DTLS BIO filter: %d", start_mtu);
-   mtu = start_mtu;
-   return;
-}
-
 /* Filter implementation */
 int dtls_bio_filter_write(BIO *h, const char *buf,int num);
 int dtls_bio_filter_read(BIO *h, char *buf, int len);
@@ -485,7 +472,6 @@ static BIO_METHOD dtls_bio_filter_methods = {
    "srtp filter",
    dtls_bio_filter_write,
    dtls_bio_filter_read,
-   //NULL,
    NULL,
    NULL,
    dtls_bio_filter_ctrl,
@@ -498,111 +484,29 @@ BIO_METHOD *BIO_ice_dtls_filter(void) {
    return(&dtls_bio_filter_methods);
 }
 
-
-/* Helper struct to keep the filter state */
-//#define ICE_DTLS_PKT_NUM 10
-//typedef struct dtls_bio_filter {
-//   int pkts[ICE_DTLS_PKT_NUM+1];
-//   int num;
-//} dtls_bio_filter;
-
 int
-ice_dtls_append_pkt(dtls_bio_filter *filter, int pkt) {
-   snw_log_t *log = 0;
-   log = filter->ctx->log;
-
-   ERROR(log, "dtls append, pkt=%d",pkt);
-   for (int i=0; i<ICE_DTLS_PKT_NUM; i++) {
-      if ( filter->pkts[i] == 0 ) {
-         filter->pkts[i] = pkt;
-         filter->num++;
-         return 0;
-      }
-   }
-
-   ICE_ERROR2("no more space, pkt=%d",pkt);
-   return -1;
-}
-
-int
-ice_dtls_get_pkt(dtls_bio_filter *filter) {
-   snw_log_t *log = 0;
-   log = filter->ctx->log;
-   
-   for (int i=0; i<ICE_DTLS_PKT_NUM; i++) {
-      if ( filter->pkts[i] != 0 ) {
-         DEBUG(log, "dtls get pkt, len=%u", filter->pkts[i]);
-         return filter->pkts[i];
-      }
-   }
-
-   return 0;
-}
-
-int
-ice_dtls_remove_pkt(dtls_bio_filter *filter) {
-   
-   if ( filter->num < 1 )
-      return -1; 
-
-   for (int i=1; i<filter->num; i++) {
-      filter->pkts[i-1] = filter->pkts[i];
-   }
-   filter->num--;
-   filter->pkts[filter->num] = 0;
-
-   /*for (int i=0; i<filter->num; i++) {
-      ICE_ERROR2("after remove, pkt=%d",filter->pkts[i]);
-      if ( filter->pkts[i] == 0 ) {
-         break;
-      }
-   }*/
-
-   return 0;
-}
-
-void
-ice_dtls_print_pkt_list(dtls_bio_filter *filter, const char *type) {
-   
-   ICE_DEBUG2("type=%s, num=%u",type,filter->num);
-   for (int i=0; i<filter->num; i++) {
-      ICE_DEBUG2("new list: %u",filter->pkts[i]);
-   }
-
-   return;
-}
-
-int dtls_bio_filter_new(BIO *bio) {
-   /* Create a filter state struct */
-   ICE_DEBUG2("dtls bio filter new");
-   //dtls_bio_filter *filter = (dtls_bio_filter *)malloc(sizeof(dtls_bio_filter));
-   //memset(filter,0,sizeof(dtls_bio_filter));
-   //filter->num = 0;
-   //bio->ptr = filter;
-   
-   /* Set the BIO as initialized */
+dtls_bio_filter_new(BIO *bio) {
+  
    bio->init = 1;
    bio->flags = 0;
    
    return 1;
 }
 
-int dtls_bio_filter_free(BIO *bio) {
-   if(bio == NULL)
+int
+dtls_bio_filter_free(BIO *bio) {
+
+   if (bio == NULL)
       return 0;
       
-   /* Get rid of the filter state */
-   //dtls_bio_filter *filter = (dtls_bio_filter *)bio->ptr;
-   //if(filter != NULL) {
-   //   free(filter);
-   //}
    bio->ptr = NULL;
    bio->init = 0;
    bio->flags = 0;
    return 1;
 }
 
-int srtp_send_data(dtls_ctx_t *dtls, int len) {
+int
+srtp_send_data(dtls_ctx_t *dtls, int len) {
    snw_ice_session_t *session = 0;
    snw_ice_component_t *component = 0;
    snw_ice_stream_t *stream = 0;
@@ -641,66 +545,50 @@ int srtp_send_data(dtls_ctx_t *dtls, int len) {
    return 0;
 }
 
-  
-int dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
+int
+dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
    snw_log_t *log = 0;
-   dtls_bio_filter *filter = 0;
+   dtls_ctx_t *dtls = 0;
    int ret = 0;
 
    ret = BIO_write(bio->next_bio, in, inl);
-   filter = (dtls_bio_filter *)bio->ptr;
-   log = filter->ctx->log;
+   dtls = (dtls_ctx_t *)bio->ptr;
+   log = dtls->ctx->log;
 
-   DEBUG(log, "dtls_bio_filter_write, len=%d, written_len=%ld", inl, ret);
-   
-   srtp_send_data(filter->dtls,ret); 
-
-   //FIXME: test the above line.
-   /*if (filter != NULL) {
-      ice_dtls_append_pkt(filter, ret);
-      //ice_dtls_print_pkt_list(filter,"append");
-   }*/
+   DEBUG(log, "write dtls msg to filter, len=%d, written_len=%ld", inl, ret);
+   srtp_send_data(dtls,ret); 
 
    return ret;
 }
 
-int dtls_bio_filter_read(BIO *bio, char *buf, int len) {
+int
+dtls_bio_filter_read(BIO *bio, char *buf, int len) {
    snw_log_t *log = 0;
-   dtls_bio_filter *filter = 0;
+   dtls_ctx_t *dtls = 0;
 
-   filter = (dtls_bio_filter *)bio->ptr;
-   log = filter->ctx->log;
+   dtls = (dtls_ctx_t *)bio->ptr;
+   log = dtls->ctx->log;
 
-   DEBUG(log, "dtls_bio_filter_read, len=%d", len);
+   DEBUG(log, "dtls read, len=%d", len);
 
    return 0;
 }
 
-long dtls_bio_filter_ctrl(BIO *bio, int cmd, long num, void *ptr) {
+long
+dtls_bio_filter_ctrl(BIO *bio, int cmd, long num, void *ptr) {
+
    switch(cmd) {
       case BIO_CTRL_FLUSH:
-         /* The OpenSSL library needs this */
          return 1;
       case BIO_CTRL_DGRAM_QUERY_MTU:
-         /* Let's force the MTU that was configured */
-         ICE_DEBUG2("Advertizing MTU: %d", mtu);
-         return mtu;
+         return DTLS_MTU_SIZE;
       case BIO_CTRL_WPENDING:
          return 0L;
       case BIO_CTRL_PENDING: {
-         /* We only advertize one packet at a time, as they may be fragmented */
-         dtls_bio_filter *filter = (dtls_bio_filter *)bio->ptr;
-         if(filter == NULL)
-            return 0;
-
-         if ( filter->num == 0 )
-            return 0;
-         int pending = ice_dtls_get_pkt(filter);
-         ice_dtls_remove_pkt(filter);
-         return pending;
+         return 0;
       }
       default:
-         ICE_DEBUG2("dtls_bio_filter_ctrl: %d", cmd);
+         ;
    }
    return 0;
 }
@@ -711,3 +599,4 @@ srtp_destroy(dtls_ctx_t *dtls) {
    //FIXME: impl
    return;
 }
+

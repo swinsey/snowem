@@ -34,17 +34,15 @@ enum {
    DTLS_STATE_CONNECTED,
 };
 
-/* Helper struct to keep the filter state */
-#define ICE_DTLS_PKT_NUM 10
-typedef struct dtls_bio_filter {
+typedef struct dtls_bio_context dtls_bio_context_t;
+struct dtls_bio_context {
    snw_ice_context_t *ctx;
    dtls_ctx_t    *dtls;
-   int pkts[ICE_DTLS_PKT_NUM+1];
-   int num;
-} dtls_bio_filter;
+};
 
 
 struct dtls_ctx {
+   snw_ice_context_t *ctx;
    void *component;             
    SSL *ssl;
    BIO *read_bio;               /* incoming DTLS data */
@@ -60,7 +58,7 @@ struct dtls_ctx {
    int state;                   /* DTLS state */
    int is_valid;              
    int ready;                   
-   dtls_bio_filter bio_pending_state;
+   //dtls_bio_context_t  bio_ctx;
 };
 
 int
