@@ -9,6 +9,19 @@
 #include "types.h"
 #include "utils.h"
 
+void
+dtls_callback(const SSL *ssl, int where, int ret) {
+   //FIXME: check useful ssl events
+   return;
+}
+
+int
+dtls_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
+   //FIXME: do real verification
+   return 1;
+}
+
+
 int
 dtls_bio_handshake_new(BIO *bio) {
   
@@ -31,7 +44,7 @@ dtls_bio_handshake_free(BIO *bio) {
 }
 
 int
-srtp_send_data(dtls_ctx_t *dtls, int len) {
+dtls_send_data(dtls_ctx_t *dtls, int len) {
    snw_ice_session_t *session = 0;
    snw_ice_component_t *component = 0;
    snw_ice_stream_t *stream = 0;
@@ -52,7 +65,7 @@ srtp_send_data(dtls_ctx_t *dtls, int len) {
       return -3;
    }
 
-   //FIXME: a loop is needed to read all data?
+   //FIXME: a loop is needed to read and send all data?
    sent = BIO_read(dtls->out_bio, data, DTLS_MTU_SIZE);
    if (sent <= 0) {
       DEBUG(log, "failed to read dtls data, sent=%d", sent);
@@ -83,7 +96,7 @@ dtls_bio_handshake_write(BIO *bio, const char *in, int inl) {
    ret = BIO_write(bio->next_bio, in, inl);
 
    DEBUG(log, "write dtls msg to filter, len=%d, written_len=%ld", inl, ret);
-   srtp_send_data(dtls,ret); 
+   dtls_send_data(dtls,ret); 
 
    return ret;
 }
@@ -109,11 +122,6 @@ dtls_bio_handshake_ctrl(BIO *bio, int cmd, long num, void *ptr) {
          return 1;
       case BIO_CTRL_DGRAM_QUERY_MTU:
          return DTLS_MTU_SIZE;
-      case BIO_CTRL_WPENDING:
-         return 0L;
-      case BIO_CTRL_PENDING: {
-         return 0;
-      }
       default:
          ;
    }
@@ -150,7 +158,7 @@ srtp_print_fingerprint(char *buf, unsigned int len,
 }
 
 int
-srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
+dtls_init(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
    unsigned char fingerprint[EVP_MAX_MD_SIZE];
    snw_log_t *log = 0;
    BIO *certbio = 0;
@@ -163,45 +171,44 @@ srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
       return -1;
    }
 
-   SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, srtp_verify_cb);
+   SSL_CTX_set_verify(ctx->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, dtls_verify_cb);
    SSL_CTX_set_tlsext_use_srtp(ctx->ssl_ctx, "SRTP_AES128_CM_SHA1_80");
    if (!server_pem || !SSL_CTX_use_certificate_file(ctx->ssl_ctx, server_pem, SSL_FILETYPE_PEM)) {
-      ERROR(log, "certificate error, err=%s", SRTP_ERR_STR);
+      ERROR(log, "certificate error, err=%s", DTLS_ERR_STR);
       return -2;
    }
 
    if (!server_key || !SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, server_key, SSL_FILETYPE_PEM)) {
-      ERROR(log, "certificate key error, err=%s", SRTP_ERR_STR);
+      ERROR(log, "certificate key error, err=%s", DTLS_ERR_STR);
       return -3;
    }
 
    if (!SSL_CTX_check_private_key(ctx->ssl_ctx)) {
-      ERROR(log, "certificate check error,err-%s", SRTP_ERR_STR);
+      ERROR(log, "certificate check error,err-%s", DTLS_ERR_STR);
       return -4;
    }
 
    SSL_CTX_set_read_ahead(ctx->ssl_ctx,1);
    certbio = BIO_new(BIO_s_file());
    if (!certbio) {
-      ERROR(log, "certificate BIO error");
       return -5;
    }
 
    if (BIO_read_filename(certbio, server_pem) == 0) {
-      ERROR(log, "failed to read certificate, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to read certificate, err=%s", DTLS_ERR_STR);
       BIO_free_all(certbio);
       return -6;
    }
 
    cert = PEM_read_bio_X509(certbio, NULL, 0, NULL);
    if (!cert) {
-      ERROR(log, "failed to read certificate, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to read certificate, err=%s", DTLS_ERR_STR);
       BIO_free_all(certbio);
       return -7;
    }
 
    if (X509_digest(cert, EVP_sha256(), (unsigned char *)fingerprint, &size) == 0) {
-      ERROR(log, "failed to convert X509 structure, err=%s", SRTP_ERR_STR);
+      ERROR(log, "failed to convert X509 structure, err=%s", DTLS_ERR_STR);
       X509_free(cert);
       BIO_free_all(certbio);
       return -8;
@@ -215,7 +222,7 @@ srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
 
    /* Initialize libsrtp */
    if(srtp_init() != err_status_ok) {
-      ERROR(log, "failed to set up libsrtp");
+      ERROR(log, "failed to init srtp");
       return -9;
    }
 
@@ -223,54 +230,37 @@ srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
 }
 
 dtls_ctx_t *
-srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int type) {
+dtls_create(snw_ice_context_t *ice_ctx, void *component, int type) {
    snw_log_t *log = 0;
    dtls_ctx_t *dtls = 0;
-   EC_KEY* ecdh = 0;
 
    if (!ice_ctx) return 0;
    log = ice_ctx->log;
 
    dtls = (dtls_ctx_t*)malloc(sizeof(dtls_ctx_t));
-   if (!dtls) {
-      ERROR(log, "not enough mem");
-      return 0;
-   }
+   if (!dtls) return 0;
+   
    memset(dtls,0,sizeof(dtls_ctx_t));
    dtls->ctx = ice_ctx;
    dtls->component = component;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
-   if (!dtls->ssl) {
-      ERROR(log, "failed to create DTLS session, err=%s",
-         ERR_reason_error_string(ERR_get_error()));
-      srtp_context_free(dtls);
-      return 0;
-   }
+   if (!dtls->ssl) goto fail;
 
    SSL_set_ex_data(dtls->ssl, 0, dtls);
-   SSL_set_info_callback(dtls->ssl, srtp_callback);
+   SSL_set_info_callback(dtls->ssl, dtls_callback);
    dtls->in_bio = BIO_new(BIO_s_mem());
-   if (!dtls->in_bio) {
-      ERROR(log, "failed to create read_BIO, err=%s", SRTP_ERR_STR);
-      srtp_context_free(dtls);
-      return 0;
-   }
+   if (!dtls->in_bio) goto fail;
+
    BIO_set_mem_eof_return(dtls->in_bio, -1);
 
    dtls->out_bio = BIO_new(BIO_s_mem());
-   if (!dtls->out_bio) {
-      ICE_ERROR2("failed to create write_BIO, err=%s", SRTP_ERR_STR);
-      srtp_context_free(dtls);
-      return 0;
-   }
+   if (!dtls->out_bio)  goto fail;
+   
    BIO_set_mem_eof_return(dtls->out_bio, -1);
 
    dtls->dtls_bio = BIO_new(&dtls_bio_handshake_methods);
-   if (!dtls->dtls_bio) {
-      ERROR(log, "failed to create filter_BIO, err=%s", SRTP_ERR_STR);
-      srtp_context_free(dtls);
-      return 0;
-   }
+   if (!dtls->dtls_bio)  goto fail;
+   
    dtls->dtls_bio->ptr = dtls;
 
    BIO_push(dtls->dtls_bio, dtls->out_bio);
@@ -283,21 +273,16 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int type) {
       SSL_set_accept_state(dtls->ssl);
    }
 
-   ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-   if (!ecdh) {
-      ERROR(log, "failed to create ECDH group, err=%s",
-         ERR_reason_error_string(ERR_get_error()));
-      srtp_context_free(dtls);
-      return 0;
-   }
-   SSL_set_options(dtls->ssl, SSL_OP_SINGLE_ECDH_USE);
-   SSL_set_tmp_ecdh(dtls->ssl, ecdh);
-
-   if (ecdh) EC_KEY_free(ecdh);
    return dtls;
+
+fail:
+   ERROR(log, "failed to create dtls ctx, err=%s", DTLS_ERR_STR);
+   dtls_free(dtls);
+   return 0;
 }
 
-void srtp_do_handshake(dtls_ctx_t *dtls) {
+void
+dtls_do_handshake(dtls_ctx_t *dtls) {
    snw_log_t *log;
    snw_ice_component_t *c = (snw_ice_component_t*)dtls->component;
 
@@ -305,12 +290,14 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
       return;
    log = c->stream->session->ice_ctx->log;
 
+   DEBUG(log, "start dtls handshake, flowid=%u", 
+         c->stream->session->flowid);
    SSL_do_handshake(dtls->ssl);
    return;
 }
 
 void
-ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *component) {
+ice_dtls_handshake_done(snw_ice_session_t *session, snw_ice_component_t *component) {
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
 
@@ -452,16 +439,15 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
    }
 done:
    if (dtls->state == DTLS_STATE_CONNECTED) {
-      ice_srtp_handshake_done(session, component);
+      ice_dtls_handshake_done(session, component);
    }
       
    if (rcert) X509_free(rcert);
-
    return 0;
 }
 
 int
-srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
+dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    char data[DTLS_BUFFER_SIZE];
    snw_log_t *log = 0;
    snw_ice_component_t *component = 0;
@@ -509,20 +495,21 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    return 0;
 }
 
-void srtp_context_free(dtls_ctx_t *dtls) {
+void
+dtls_free(dtls_ctx_t *dtls) {
 
-   if(dtls == NULL)
+   if(!dtls)
       return;
    
-   dtls->component = NULL;
-   if(dtls->ssl != NULL) {
+   if(!dtls->ssl) {
       SSL_free(dtls->ssl);
-      dtls->ssl = NULL;
    }
-   
-   dtls->in_bio = NULL;
-   dtls->out_bio = NULL;
-   dtls->dtls_bio = NULL;
+  
+   //FIXME: free bio structs
+   dtls->in_bio = 0;
+   dtls->out_bio = 0;
+   dtls->dtls_bio = 0;
+
    if (dtls->state == DTLS_STATE_CONNECTED) {
       if(dtls->srtp_in) {
          srtp_dealloc(dtls->srtp_in);
@@ -534,23 +521,8 @@ void srtp_context_free(dtls_ctx_t *dtls) {
       }
       
    }
+
    free(dtls);
-   dtls = NULL;
-}
-
-void srtp_callback(const SSL *ssl, int where, int ret) {
-   //FIXME: do real verification
-   return;
-}
-
-int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
-   //FIXME: do real verification
-   return 1;
-}
-
-void
-srtp_destroy(dtls_ctx_t *dtls) {
-   //FIXME: impl
    return;
 }
 

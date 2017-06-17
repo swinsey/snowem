@@ -8,18 +8,16 @@
 
 #include "ice.h"
 
-/* DTLS stuff */
+/* dtls stuff */
 #define DTLS_CIPHERS "ALL:NULL:eNULL:aNULL"
+#define DTLS_BUFFER_SIZE 1500
+#define DTLS_MTU_SIZE 1472
+#define DTLS_ERR_STR ERR_reason_error_string(ERR_get_error())
 
-/* SRTP stuff (http://tools.ietf.org/html/rfc3711) */
+/* srtp stuff */
 #define SRTP_MASTER_KEY_LENGTH   16
 #define SRTP_MASTER_SALT_LENGTH  14
 #define SRTP_MASTER_LENGTH (SRTP_MASTER_KEY_LENGTH + SRTP_MASTER_SALT_LENGTH)
-
-#define SRTP_ERR_STR ERR_reason_error_string(ERR_get_error())
-
-#define DTLS_BUFFER_SIZE 1500
-#define DTLS_MTU_SIZE 1472
 
 /* dtls type */
 enum  {
@@ -55,20 +53,19 @@ struct dtls_ctx {
 };
 
 int
-srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key);
+dtls_init(snw_ice_context_t *ctx, char *server_pem, char *server_key);
 
 dtls_ctx_t*
-srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role);
+dtls_create(snw_ice_context_t *ice_ctx, void *component, int role);
 
 void
-srtp_destroy(dtls_ctx_t *dtls);
+dtls_free(dtls_ctx_t *dtls);
 
-void srtp_do_handshake(dtls_ctx_t *dtls);
-int srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len);
-void srtp_context_free(dtls_ctx_t *dtls);
-void srtp_callback(const SSL *ssl, int where, int ret);
-int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx);
-int srtp_send_data(dtls_ctx_t *dtls);
+void
+dtls_do_handshake(dtls_ctx_t *dtls);
+
+int
+dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len);
 
 #endif
 

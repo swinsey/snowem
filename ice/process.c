@@ -396,13 +396,13 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
    }
 
    component->fir_latest = get_monotonic_time();
-   component->dtls = srtp_context_new(session->ice_ctx, component, stream->dtls_type);
+   component->dtls = dtls_create(session->ice_ctx, component, stream->dtls_type);
    if (!component->dtls) {
       ERROR(log, "no dtls context");
       return;
    }
 
-   srtp_do_handshake(component->dtls);
+   dtls_do_handshake(component->dtls);
 
    //FIXME: set timeout to call dtls_retry
    return;
@@ -1105,7 +1105,7 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    }
 
    if (pt == DTLS_PT) {
-      srtp_process_incoming_msg(component->dtls, buf, len);
+      dtls_process_incoming_msg(component->dtls, buf, len);
       return;
    }
 
@@ -1408,14 +1408,11 @@ ice_component_cleanup(snw_ice_context_t *ice_ctx, snw_ice_component_t *component
    log = ice_ctx->log;
 
    if (component->dtls != 0) {
-      //FIXME: clean srtp object
-      srtp_destroy(component->dtls);
+      dtls_free(component->dtls);
       component->dtls = 0;
    }
    
-   DEBUG(log, "clean component, cid=%u", component->id);
    snw_component_deallocate(ice_ctx, component);
-
    return;
 }
 
