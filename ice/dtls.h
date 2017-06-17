@@ -45,9 +45,11 @@ struct dtls_ctx {
    snw_ice_context_t *ctx;
    void *component;             
    SSL *ssl;
-   BIO *read_bio;               /* incoming DTLS data */
-   BIO *write_bio;              /* outgoing DTLS data */
-   BIO *filter_bio;             /* to fix MTU fragmentation on outgoing DTLS data */
+
+   /* handshake stuff */
+   BIO *in_bio;
+   BIO *out_bio;
+   BIO *dtls_bio;
 
    srtp_t srtp_in;              /* libsrtp context for incoming SRTP packets */
    srtp_t srtp_out;             /* libsrtp context for outgoing SRTP packets */

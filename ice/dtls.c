@@ -10,6 +10,137 @@
 #include "utils.h"
 
 int
+dtls_bio_handshake_new(BIO *bio) {
+  
+   bio->init = 1;
+   bio->flags = 0;
+   
+   return 1;
+}
+
+int
+dtls_bio_handshake_free(BIO *bio) {
+
+   if (bio == NULL)
+      return 0;
+      
+   bio->ptr = NULL;
+   bio->init = 0;
+   bio->flags = 0;
+   return 1;
+}
+
+int
+srtp_send_data(dtls_ctx_t *dtls, int len) {
+   snw_ice_session_t *session = 0;
+   snw_ice_component_t *component = 0;
+   snw_ice_stream_t *stream = 0;
+   snw_log_t *log = 0;
+   char data[DTLS_BUFFER_SIZE];
+   int sent, bytes;
+
+   if (!dtls) return -1;
+
+   component = (snw_ice_component_t *)dtls->component;
+   if (!component || !component->stream || !component->stream->session) 
+      return -2;
+
+   stream = component->stream;
+   session = stream->session;
+   log = session->ice_ctx->log;
+   if (!session || !session->agent || !dtls->out_bio) {
+      return -3;
+   }
+
+   //FIXME: a loop is needed to read all data?
+   sent = BIO_read(dtls->out_bio, data, DTLS_MTU_SIZE);
+   if (sent <= 0) {
+      DEBUG(log, "failed to read dtls data, sent=%d", sent);
+      return -1;
+   }
+
+   DEBUG(log, "sending dtls msg, p=%p, len=%u, sent=%u", dtls->out_bio, len, sent);
+   bytes = ice_agent_send(session->agent, component->stream->id, 
+                          component->id, data, sent);
+
+   if (bytes < sent) {
+      ERROR(log, "failed to send dtls message, cid=%u, sid=%u, len=%d", 
+            component->id, stream->id, bytes);
+   } 
+
+   return 0;
+}
+
+int
+dtls_bio_handshake_write(BIO *bio, const char *in, int inl) {
+   snw_log_t *log = 0;
+   dtls_ctx_t *dtls = 0;
+   int ret = 0;
+
+   dtls = (dtls_ctx_t *)bio->ptr;
+   log = dtls->ctx->log;
+
+   ret = BIO_write(bio->next_bio, in, inl);
+
+   DEBUG(log, "write dtls msg to filter, len=%d, written_len=%ld", inl, ret);
+   srtp_send_data(dtls,ret); 
+
+   return ret;
+}
+
+int
+dtls_bio_handshake_read(BIO *bio, char *buf, int len) {
+   snw_log_t *log = 0;
+   dtls_ctx_t *dtls = 0;
+
+   dtls = (dtls_ctx_t *)bio->ptr;
+   log = dtls->ctx->log;
+
+   DEBUG(log, "dtls read, len=%d", len);
+
+   return 0;
+}
+
+long
+dtls_bio_handshake_ctrl(BIO *bio, int cmd, long num, void *ptr) {
+
+   switch(cmd) {
+      case BIO_CTRL_FLUSH:
+         return 1;
+      case BIO_CTRL_DGRAM_QUERY_MTU:
+         return DTLS_MTU_SIZE;
+      case BIO_CTRL_WPENDING:
+         return 0L;
+      case BIO_CTRL_PENDING: {
+         return 0;
+      }
+      default:
+         ;
+   }
+   return 0;
+}
+
+
+
+static BIO_METHOD dtls_bio_handshake_methods = {
+   BIO_TYPE_FILTER,
+   "dtls handshake",
+   dtls_bio_handshake_write,
+   dtls_bio_handshake_read,
+   NULL,
+   NULL,
+   dtls_bio_handshake_ctrl,
+   dtls_bio_handshake_new,
+   dtls_bio_handshake_free,
+   NULL
+};
+
+//BIO_METHOD *BIO_ice_dtls_filter(void) {
+//   return(&dtls_bio_handshake_methods);
+//}
+
+
+int
 srtp_print_fingerprint(char *buf, unsigned int len, 
       unsigned char *rfingerprint, unsigned int rsize) {
    unsigned int i = 0;
@@ -32,8 +163,6 @@ srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
    BIO *certbio = 0;
    X509 *cert = 0;
    unsigned int size;
-   //char *tempbuf = 0;
-   //unsigned int i = 0;
 
    ctx->ssl_ctx = SSL_CTX_new(DTLSv1_method());
    if (!ctx->ssl_ctx) {
@@ -104,6 +233,7 @@ dtls_ctx_t *
 srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    snw_log_t *log = 0;
    dtls_ctx_t *dtls = 0;
+   EC_KEY* ecdh = 0;
 
    if (!ice_ctx) return 0;
    log = ice_ctx->log;
@@ -112,14 +242,14 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
 
    dtls = (dtls_ctx_t*)malloc(sizeof(dtls_ctx_t));
    if (!dtls) {
-      ERROR(log, "getting dtls failed");
+      ERROR(log, "not enough mem");
       return 0;
    }
    memset(dtls,0,sizeof(dtls_ctx_t));
-
-   /* Create SSL context */
    dtls->ctx = ice_ctx;
+   dtls->component = component;
    dtls->is_valid = 0;
+   dtls->ready = 0;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
       ERROR(log, "failed to create DTLS session, err=%s",
@@ -130,35 +260,32 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
 
    SSL_set_ex_data(dtls->ssl, 0, dtls);
    SSL_set_info_callback(dtls->ssl, srtp_callback);
-   dtls->read_bio = BIO_new(BIO_s_mem());
-   if (!dtls->read_bio) {
+   dtls->in_bio = BIO_new(BIO_s_mem());
+   if (!dtls->in_bio) {
       ERROR(log, "failed to create read_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
       return 0;
    }
+   BIO_set_mem_eof_return(dtls->in_bio, -1);
 
-   BIO_set_mem_eof_return(dtls->read_bio, -1);
-   dtls->write_bio = BIO_new(BIO_s_mem());
-   if (!dtls->write_bio) {
+   dtls->out_bio = BIO_new(BIO_s_mem());
+   if (!dtls->out_bio) {
       ICE_ERROR2("failed to create write_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
       return 0;
    }
-   BIO_set_mem_eof_return(dtls->write_bio, -1);
+   BIO_set_mem_eof_return(dtls->out_bio, -1);
 
-   /* The write BIO needs our custom filter, or fragmentation won't work */
-   dtls->filter_bio = BIO_new(BIO_ice_dtls_filter()); //call: dtls_bio_filter_ctrl
-   if (!dtls->filter_bio) {
+   dtls->dtls_bio = BIO_new(&dtls_bio_handshake_methods); //call: dtls_bio_handshake_ctrl
+   if (!dtls->dtls_bio) {
       ERROR(log, "failed to create filter_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
       return 0;
    }
-   dtls->filter_bio->ptr = dtls;
+   dtls->dtls_bio->ptr = dtls;
 
-   /* Chain filter and write BIOs */
-   BIO_push(dtls->filter_bio, dtls->write_bio);
-   /* Set the filter as the BIO to use for outgoing data */
-   SSL_set_bio(dtls->ssl, dtls->read_bio, dtls->filter_bio);
+   BIO_push(dtls->dtls_bio, dtls->out_bio);
+   SSL_set_bio(dtls->ssl, dtls->in_bio, dtls->dtls_bio);
    dtls->role = role;
    if (dtls->role == DTLS_ROLE_CLIENT) {
       SSL_set_connect_state(dtls->ssl);
@@ -166,12 +293,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
       SSL_set_accept_state(dtls->ssl);
    }
 
-   /* https://code.google.com/p/chromium/issues/detail?id=406458 
-    * Specify an ECDH group for ECDHE ciphers, otherwise they cannot be
-    * negotiated when acting as the server. Use NIST's P-256 which is
-    * commonly supported.
-    */
-   EC_KEY* ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+   ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
    if (!ecdh) {
       ERROR(log, "failed to create ECDH group, err=%s",
          ERR_reason_error_string(ERR_get_error()));
@@ -180,10 +302,8 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    }
    SSL_set_options(dtls->ssl, SSL_OP_SINGLE_ECDH_USE);
    SSL_set_tmp_ecdh(dtls->ssl, ecdh);
-   EC_KEY_free(ecdh);
-   dtls->ready = 0;
-   dtls->component = component;
 
+   if (ecdh) EC_KEY_free(ecdh);
    return dtls;
 }
 
@@ -277,9 +397,6 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
    }
 
    srtp_print_fingerprint(remote_fingerprint,160,rfingerprint,rsize);
-
-   DEBUG(log, "remote fingerprint, remote_hashing=%s, remote_fingerprint=%s",
-      stream->remote_hashing ? stream->remote_hashing : "sha-256", remote_fingerprint);
    if (!strcasecmp(remote_fingerprint, stream->remote_fingerprint)) {
       dtls->state = DTLS_STATE_CONNECTED;
    } else {
@@ -290,68 +407,63 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
    }
 
    if (dtls->state == DTLS_STATE_CONNECTED) {
-      //FIX: 28-05 jackiedinh
-      if (component->stream->id == session->audio_stream->id 
-          || component->stream->id == session->video_stream->id) {
-         unsigned char material[SRTP_MASTER_LENGTH*2];
-         unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
-         if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, 
-                  "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
-            ERROR(log, "exporting SRTP keying material failed, cid=%u, sid=%u, err=%s",
-               component->id, component->stream->id, ERR_reason_error_string(ERR_get_error()));
-            goto done;
-         }
-         // Key derivation (http://tools.ietf.org/html/rfc5764#section-4.2)
-         if(dtls->role == DTLS_ROLE_CLIENT) {
-            local_key = material;
-            remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
-            local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
-            remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
-         } else {
-            remote_key = material;
-            local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
-            remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
-            local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
-         }
-         // Build master keys and set SRTP policies
-         // Remote (inbound)
-         crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
-         crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
-         dtls->remote_policy.ssrc.type = ssrc_any_inbound;
-         unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
-         dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
-         memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
-         memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
-
-         dtls->remote_policy.next = NULL;
-         // Local (outbound)
-         crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
-         crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
-         dtls->local_policy.ssrc.type = ssrc_any_outbound;
-         unsigned char local_policy_key[SRTP_MASTER_LENGTH];
-         dtls->local_policy.key = (unsigned char *)&local_policy_key;
-         memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
-         memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
-         dtls->local_policy.next = NULL;
-         // Create SRTP sessions
-         err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
-         if(ret != err_status_ok) {
-            ICE_ERROR2("failed to create inbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                   component->id, stream->stream_id, ret);
-            goto done;
-         }
-         ICE_DEBUG2("Created inbound SRTP session, cid=%u, sid=%u", 
-               component->id, stream->stream_id);
-         ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
-         if(ret != err_status_ok) {
-            ICE_ERROR2("failed to create outbound SRTP session, cid=%u, sid=%u, ret=%d", 
-                   component->id, stream->stream_id, ret);
-            goto done;
-         }
-         dtls->is_valid = 1;
-         ICE_DEBUG2("Created outbound SRTP session for component %d in stream %d", 
-               component->id, stream->stream_id);
+      unsigned char material[SRTP_MASTER_LENGTH*2];
+      unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
+      if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, 
+               "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
+         ERROR(log, "exporting SRTP keying material failed, cid=%u, sid=%u, err=%s",
+            component->id, component->stream->id, ERR_reason_error_string(ERR_get_error()));
+         goto done;
       }
+
+      if (dtls->role == DTLS_ROLE_CLIENT) {
+         local_key = material;
+         remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
+         local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
+         remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
+      } else {
+         remote_key = material;
+         local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
+         remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
+         local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
+      }
+      // Build master keys and set SRTP policies
+      // Remote (inbound)
+      crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
+      crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
+      dtls->remote_policy.ssrc.type = ssrc_any_inbound;
+
+      unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
+      dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
+      memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
+      memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
+
+      dtls->remote_policy.next = NULL;
+      // Local (outbound)
+      crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
+      crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
+      dtls->local_policy.ssrc.type = ssrc_any_outbound;
+
+      unsigned char local_policy_key[SRTP_MASTER_LENGTH];
+      dtls->local_policy.key = (unsigned char *)&local_policy_key;
+      memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
+      memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
+      dtls->local_policy.next = NULL;
+      // Create SRTP sessions
+      err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
+      if (ret != err_status_ok) {
+         ERROR(log, "failed to create srtp_in session, cid=%u, sid=%u, ret=%d", 
+                component->id, stream->id, ret);
+         goto done;
+      }
+
+      ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
+      if (ret != err_status_ok) {
+         ERROR(log, "failed to create srtp_out session, cid=%u, sid=%u, ret=%d", 
+                component->id, stream->id, ret);
+         goto done;
+      }
+      dtls->is_valid = 1;
       dtls->ready = 1;
    }
 done:
@@ -372,7 +484,7 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    int ret = 0;
    int written = 0;
 
-   if (!dtls || !dtls->ssl || !dtls->read_bio) {
+   if (!dtls || !dtls->ssl || !dtls->in_bio) {
       return -1;
    }
    component = (snw_ice_component_t*)dtls->component;
@@ -380,7 +492,7 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    
    DEBUG(log, "dtls message, len=%u",len);
 
-   written = BIO_write(dtls->read_bio, buf, len);
+   written = BIO_write(dtls->in_bio, buf, len);
    if (written != len) {
       ERROR(log, "failed to write, written=%u, len=%u", written, len);
    } else {
@@ -425,9 +537,9 @@ void srtp_context_free(dtls_ctx_t *dtls) {
       dtls->ssl = NULL;
    }
    
-   dtls->read_bio = NULL;
-   dtls->write_bio = NULL;
-   dtls->filter_bio = NULL;
+   dtls->in_bio = NULL;
+   dtls->out_bio = NULL;
+   dtls->dtls_bio = NULL;
    if(dtls->is_valid) {
       if(dtls->srtp_in) {
          srtp_dealloc(dtls->srtp_in);
@@ -452,140 +564,6 @@ int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx) {
    //FIXME: do real verification
    return 1;
 }
-
-/* Filter implementation */
-int dtls_bio_filter_write(BIO *h, const char *buf,int num);
-int dtls_bio_filter_read(BIO *h, char *buf, int len);
-long dtls_bio_filter_ctrl(BIO *h, int cmd, long arg1, void *arg2);
-int dtls_bio_filter_new(BIO *h);
-int dtls_bio_filter_free(BIO *data);
-
-static BIO_METHOD dtls_bio_filter_methods = {
-   BIO_TYPE_FILTER,
-   "srtp filter",
-   dtls_bio_filter_write,
-   dtls_bio_filter_read,
-   NULL,
-   NULL,
-   dtls_bio_filter_ctrl,
-   dtls_bio_filter_new,
-   dtls_bio_filter_free,
-   NULL
-};
-
-BIO_METHOD *BIO_ice_dtls_filter(void) {
-   return(&dtls_bio_filter_methods);
-}
-
-int
-dtls_bio_filter_new(BIO *bio) {
-  
-   bio->init = 1;
-   bio->flags = 0;
-   
-   return 1;
-}
-
-int
-dtls_bio_filter_free(BIO *bio) {
-
-   if (bio == NULL)
-      return 0;
-      
-   bio->ptr = NULL;
-   bio->init = 0;
-   bio->flags = 0;
-   return 1;
-}
-
-int
-srtp_send_data(dtls_ctx_t *dtls, int len) {
-   snw_ice_session_t *session = 0;
-   snw_ice_component_t *component = 0;
-   snw_ice_stream_t *stream = 0;
-   snw_log_t *log = 0;
-   char data[DTLS_BUFFER_SIZE];
-   int sent, bytes;
-
-   if (!dtls) return -1;
-
-   component = (snw_ice_component_t *)dtls->component;
-   if (!component || !component->stream || !component->stream->session) 
-      return -2;
-
-   stream = component->stream;
-   session = stream->session;
-   log = session->ice_ctx->log;
-   if (!session || !session->agent || !dtls->write_bio) {
-      return -3;
-   }
-
-   //FIXME: a loop is needed to read all data?
-   sent = BIO_read(dtls->write_bio, data, DTLS_MTU_SIZE);
-   if (sent <= 0) {
-      DEBUG(log, "failed to read dtls data, sent=%d", sent);
-      return -1;
-   }
-   DEBUG(log, "sending dtls msg, len=%u, sent=%u", len, sent);
-   bytes = ice_agent_send(session->agent, component->stream->id, 
-                          component->id, data, sent);
-
-   if(bytes < sent) {
-      ERROR(log, "failed to send dtls message, cid=%u, sid=%u, len=%d", 
-            component->id, stream->id, bytes);
-   } 
-
-   return 0;
-}
-
-int
-dtls_bio_filter_write(BIO *bio, const char *in, int inl) {
-   snw_log_t *log = 0;
-   dtls_ctx_t *dtls = 0;
-   int ret = 0;
-
-   ret = BIO_write(bio->next_bio, in, inl);
-   dtls = (dtls_ctx_t *)bio->ptr;
-   log = dtls->ctx->log;
-
-   DEBUG(log, "write dtls msg to filter, len=%d, written_len=%ld", inl, ret);
-   srtp_send_data(dtls,ret); 
-
-   return ret;
-}
-
-int
-dtls_bio_filter_read(BIO *bio, char *buf, int len) {
-   snw_log_t *log = 0;
-   dtls_ctx_t *dtls = 0;
-
-   dtls = (dtls_ctx_t *)bio->ptr;
-   log = dtls->ctx->log;
-
-   DEBUG(log, "dtls read, len=%d", len);
-
-   return 0;
-}
-
-long
-dtls_bio_filter_ctrl(BIO *bio, int cmd, long num, void *ptr) {
-
-   switch(cmd) {
-      case BIO_CTRL_FLUSH:
-         return 1;
-      case BIO_CTRL_DGRAM_QUERY_MTU:
-         return DTLS_MTU_SIZE;
-      case BIO_CTRL_WPENDING:
-         return 0L;
-      case BIO_CTRL_PENDING: {
-         return 0;
-      }
-      default:
-         ;
-   }
-   return 0;
-}
-
 
 void
 srtp_destroy(dtls_ctx_t *dtls) {
