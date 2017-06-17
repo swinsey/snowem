@@ -22,7 +22,7 @@ struct snw_ice_stream {
    uint32_t remote_audio_ssrc;
    uint32_t remote_video_ssrc;
 
-   int dtls_mode;
+   int dtls_type;
 
    char remote_hashing[16];
    char remote_fingerprint[256];

@@ -278,14 +278,14 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
    ice_agent_get_local_credentials(session->agent, stream->id, &ufrag, &password);
    memset(buffer, 0, 512);
 
-   switch(stream->dtls_mode) {
-      case DTLS_ROLE_ACTPASS:
+   switch(stream->dtls_type) {
+      case DTLS_TYPE_ACTPASS:
          dtls_mode = "actpass";
          break;
-      case DTLS_ROLE_SERVER:
+      case DTLS_TYPE_SERVER:
          dtls_mode = "passive";
          break;
-      case DTLS_ROLE_CLIENT:
+      case DTLS_TYPE_CLIENT:
          dtls_mode = "active";
          break;
       default:
@@ -846,9 +846,9 @@ snw_ice_sdp_get_local_credentials(snw_ice_session_t *session, snw_ice_stream_t *
             }
          } else if(!strcasecmp(a->a_name, "setup")) {
             if(!strcasecmp(a->a_value, "actpass") || !strcasecmp(a->a_value, "passive"))
-               stream->dtls_mode = DTLS_ROLE_CLIENT;
+               stream->dtls_type = DTLS_TYPE_CLIENT;
             else if(!strcasecmp(a->a_value, "active"))
-               stream->dtls_mode = DTLS_ROLE_SERVER;
+               stream->dtls_type = DTLS_TYPE_SERVER;
          } else if(!strcasecmp(a->a_name, "ice-ufrag")) {
             remote_user = a->a_value;
          } else if(!strcasecmp(a->a_name, "ice-pwd")) {

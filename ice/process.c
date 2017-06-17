@@ -381,7 +381,7 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
                 component_id, stream_id, local, remote);
    stream = snw_stream_find(&session->streams, stream_id);
    if (!stream) {
-      ERROR(log, "No stream %d", stream_id);
+      ERROR(log, "stream not found, sid=%d", stream_id);
       return;
    }
 
@@ -391,25 +391,20 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
       return;
    }
 
-   WARN(log, "starting DTLS handshake, dtls=%p",component->dtls);
    if (component->dtls != 0) {
       return;
    }
 
    component->fir_latest = get_monotonic_time();
-   component->dtls = srtp_context_new(session->ice_ctx, component, stream->dtls_mode);
+   component->dtls = srtp_context_new(session->ice_ctx, component, stream->dtls_type);
    if (!component->dtls) {
-      ERROR(log, "No component DTLS-SRTP session");
+      ERROR(log, "no dtls context");
       return;
    }
 
-   DEBUG(log, "Start DTLS handshake");
    srtp_do_handshake(component->dtls);
 
-
-   DEBUG(log, "FIXME: Creating retransmission timer");
-   //FIXME: timeout to call dtls_retry
-
+   //FIXME: set timeout to call dtls_retry
    return;
 }
 
@@ -424,13 +419,7 @@ snw_ice_cb_component_state_changed(agent_t *agent,
    if (!session) return;
    log = session->ice_ctx->log;
 
-   if (component_id > 1 && IS_FLAG(session, WEBRTC_RTCPMUX)) {
-      DEBUG(log,"Ignoring state, cid=%d, sid=%d, state=%u",
-             component_id, stream_id, state);
-      return;
-   }
-
-   DEBUG(log, "Component state changed, cid=%u, sid=%u, state=%d",
+   DEBUG(log, "component state changed, cid=%u, sid=%u, state=%d",
          component_id, stream_id, state);
 
    stream = snw_stream_find(&session->streams, stream_id);
@@ -653,7 +642,9 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
       return;
    }
 
-   if (!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
+   if (!component->dtls 
+       || component->dtls->state != DTLS_STATE_CONNECTED 
+       || !component->dtls->srtp_out) {
       return;
    }
 
@@ -701,7 +692,9 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
 
    component = stream->rtp_component;
    if (!component || !stream->gathering_done) return;
-   if (!component->dtls || !component->dtls->is_valid || !component->dtls->srtp_out) {
+   if (!component->dtls 
+       || component->dtls->state != DTLS_STATE_CONNECTED
+       || !component->dtls->srtp_out) {
       return;
    }
 
@@ -1116,7 +1109,8 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
       return;
    }
 
-   if (!component->dtls || !component->dtls->is_valid 
+   if (!component->dtls 
+       || component->dtls->state != DTLS_STATE_CONNECTED
        || !component->dtls->srtp_in) {
       WARN(log, "dtls not setup yet, flowid=%u", session->flowid);
    } else {
@@ -1177,7 +1171,7 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
    stream->gathering_done = 0;
    stream->is_disable = 0;
    stream->is_video = video;
-   stream->dtls_mode = DTLS_ROLE_ACTPASS;
+   stream->dtls_type = DTLS_TYPE_ACTPASS;
    INIT_LIST_HEAD(&stream->components.list);
    snw_stream_insert(&session->streams,stream);
       

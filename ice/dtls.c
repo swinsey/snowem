@@ -120,8 +120,6 @@ dtls_bio_handshake_ctrl(BIO *bio, int cmd, long num, void *ptr) {
    return 0;
 }
 
-
-
 static BIO_METHOD dtls_bio_handshake_methods = {
    BIO_TYPE_FILTER,
    "dtls handshake",
@@ -134,11 +132,6 @@ static BIO_METHOD dtls_bio_handshake_methods = {
    dtls_bio_handshake_free,
    NULL
 };
-
-//BIO_METHOD *BIO_ice_dtls_filter(void) {
-//   return(&dtls_bio_handshake_methods);
-//}
-
 
 int
 srtp_print_fingerprint(char *buf, unsigned int len, 
@@ -230,15 +223,13 @@ srtp_setup(snw_ice_context_t *ctx, char *server_pem, char *server_key) {
 }
 
 dtls_ctx_t *
-srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
+srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int type) {
    snw_log_t *log = 0;
    dtls_ctx_t *dtls = 0;
    EC_KEY* ecdh = 0;
 
    if (!ice_ctx) return 0;
    log = ice_ctx->log;
-
-   DEBUG(log, "create DTLS/SRTP, role=%d", role);
 
    dtls = (dtls_ctx_t*)malloc(sizeof(dtls_ctx_t));
    if (!dtls) {
@@ -248,8 +239,6 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    memset(dtls,0,sizeof(dtls_ctx_t));
    dtls->ctx = ice_ctx;
    dtls->component = component;
-   dtls->is_valid = 0;
-   dtls->ready = 0;
    dtls->ssl = SSL_new(ice_ctx->ssl_ctx);
    if (!dtls->ssl) {
       ERROR(log, "failed to create DTLS session, err=%s",
@@ -276,7 +265,7 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
    }
    BIO_set_mem_eof_return(dtls->out_bio, -1);
 
-   dtls->dtls_bio = BIO_new(&dtls_bio_handshake_methods); //call: dtls_bio_handshake_ctrl
+   dtls->dtls_bio = BIO_new(&dtls_bio_handshake_methods);
    if (!dtls->dtls_bio) {
       ERROR(log, "failed to create filter_BIO, err=%s", SRTP_ERR_STR);
       srtp_context_free(dtls);
@@ -286,8 +275,9 @@ srtp_context_new(snw_ice_context_t *ice_ctx, void *component, int role) {
 
    BIO_push(dtls->dtls_bio, dtls->out_bio);
    SSL_set_bio(dtls->ssl, dtls->in_bio, dtls->dtls_bio);
-   dtls->role = role;
-   if (dtls->role == DTLS_ROLE_CLIENT) {
+
+   dtls->type = type;
+   if (dtls->type == DTLS_TYPE_CLIENT) {
       SSL_set_connect_state(dtls->ssl);
    } else {
       SSL_set_accept_state(dtls->ssl);
@@ -315,13 +305,7 @@ void srtp_do_handshake(dtls_ctx_t *dtls) {
       return;
    log = c->stream->session->ice_ctx->log;
 
-   //FIXME: state not used?
-   if (dtls->state == DTLS_STATE_CREATED)
-      dtls->state = DTLS_STATE_TRYING;
-
    SSL_do_handshake(dtls->ssl);
-   DEBUG(log, "Start DTLS handshake");
-
    return;
 }
 
@@ -346,7 +330,7 @@ ice_srtp_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
       list_for_each(p,&s->components.list) {
          snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
          DEBUG(log, "checking component, sid=%u, cid=%u",s->id, c->id);
-         if (!c->dtls || !c->dtls->is_valid) {
+         if (!c->dtls || c->dtls->state != DTLS_STATE_CONNECTED) {
             DEBUG(log, "component not ready, sid=%u, cid=%u",s->id, c->id);
             return;
          }    
@@ -402,7 +386,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
    } else {
       ERROR(log, "fingerprint mismatch, got=%s, expected=%s", 
             remote_fingerprint, stream->remote_fingerprint);
-      dtls->state = DTLS_STATE_FAILED;
+      dtls->state = DTLS_STATE_ERROR;
       goto done;
    }
 
@@ -416,7 +400,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          goto done;
       }
 
-      if (dtls->role == DTLS_ROLE_CLIENT) {
+      if (dtls->type == DTLS_TYPE_CLIENT) {
          local_key = material;
          remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
          local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
@@ -427,6 +411,7 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
          remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
          local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
       }
+
       // Build master keys and set SRTP policies
       // Remote (inbound)
       crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
@@ -463,11 +448,10 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
                 component->id, stream->id, ret);
          goto done;
       }
-      dtls->is_valid = 1;
-      dtls->ready = 1;
+      dtls->state = DTLS_STATE_CONNECTED;
    }
 done:
-   if (dtls->is_valid) {
+   if (dtls->state == DTLS_STATE_CONNECTED) {
       ice_srtp_handshake_done(session, component);
    }
       
@@ -499,7 +483,7 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
       DEBUG(log, "bio write, written=%u", written);
    }
 
-   /* XXX: read to push data on bio chain? */
+   // http://net-snmp.sourceforge.net/wiki/index.php/DTLS_Implementation_Notes
    ret = SSL_read(dtls->ssl, &data, DTLS_BUFFER_SIZE);
    if (ret < 0) {
       unsigned long err = SSL_get_error(dtls->ssl, ret);
@@ -507,15 +491,15 @@ srtp_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
          char error[256];
          ERR_error_string_n(ERR_get_error(), error, 256);
          ERROR(log,"ssl read error: ret=%d, err=%s", read, error);
-         return -9;
+         return -2;
       }
    }
 
    if (!SSL_is_init_finished(dtls->ssl)) {
-      return -8;
+      return -3;
    }
 
-   if (dtls->ready) {
+   if (dtls->state == DTLS_STATE_CONNECTED) {
       WARN(log,"dtls data not supported, ret=%u",ret);
    } else {
       DEBUG(log,"DTLS established");
@@ -529,7 +513,6 @@ void srtp_context_free(dtls_ctx_t *dtls) {
 
    if(dtls == NULL)
       return;
-   dtls->ready = 0;
    
    dtls->component = NULL;
    if(dtls->ssl != NULL) {
@@ -540,7 +523,7 @@ void srtp_context_free(dtls_ctx_t *dtls) {
    dtls->in_bio = NULL;
    dtls->out_bio = NULL;
    dtls->dtls_bio = NULL;
-   if(dtls->is_valid) {
+   if (dtls->state == DTLS_STATE_CONNECTED) {
       if(dtls->srtp_in) {
          srtp_dealloc(dtls->srtp_in);
          dtls->srtp_in = NULL;

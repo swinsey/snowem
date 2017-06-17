@@ -21,46 +21,37 @@
 #define DTLS_BUFFER_SIZE 1500
 #define DTLS_MTU_SIZE 1472
 
+/* dtls type */
 enum  {
-   DTLS_ROLE_ACTPASS = 0,
-   DTLS_ROLE_SERVER,
-   DTLS_ROLE_CLIENT,
+   DTLS_TYPE_ACTPASS = 0,
+   DTLS_TYPE_SERVER,
+   DTLS_TYPE_CLIENT,
 };
 
 enum {
-   DTLS_STATE_FAILED = 0,
-   DTLS_STATE_CREATED,
-   DTLS_STATE_TRYING,
+   DTLS_STATE_CONNECTING = 0,
    DTLS_STATE_CONNECTED,
+   DTLS_STATE_ERROR,
 };
-
-typedef struct dtls_bio_context dtls_bio_context_t;
-struct dtls_bio_context {
-   snw_ice_context_t *ctx;
-   dtls_ctx_t    *dtls;
-};
-
 
 struct dtls_ctx {
    snw_ice_context_t *ctx;
-   void *component;             
-   SSL *ssl;
+   void              *component;             
+
+   int    type;
+   int    state;
 
    /* handshake stuff */
+   SSL *ssl;
    BIO *in_bio;
    BIO *out_bio;
    BIO *dtls_bio;
 
-   srtp_t srtp_in;              /* libsrtp context for incoming SRTP packets */
-   srtp_t srtp_out;             /* libsrtp context for outgoing SRTP packets */
-   srtp_policy_t remote_policy; /* libsrtp policy for incoming SRTP packets */
-   srtp_policy_t local_policy;  /* libsrtp policy for outgoing SRTP packets */
-
-   int role;                    /* DTLS role */
-   int state;                   /* DTLS state */
-   int is_valid;              
-   int ready;                   
-   //dtls_bio_context_t  bio_ctx;
+   /* srtp contect */
+   srtp_t srtp_in;
+   srtp_t srtp_out;
+   srtp_policy_t remote_policy;
+   srtp_policy_t local_policy;
 };
 
 int
@@ -78,12 +69,6 @@ void srtp_context_free(dtls_ctx_t *dtls);
 void srtp_callback(const SSL *ssl, int where, int ret);
 int srtp_verify_cb(int preverify_ok, X509_STORE_CTX *ctx);
 int srtp_send_data(dtls_ctx_t *dtls);
-
-
-/* Handle dtls fragmentation */
-BIO_METHOD *BIO_ice_dtls_filter(void);
-void srtp_bio_filter_set_mtu(int start_mtu);
-
 
 #endif
 
