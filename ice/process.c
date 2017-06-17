@@ -1402,10 +1402,8 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
 
 void 
 ice_component_cleanup(snw_ice_context_t *ice_ctx, snw_ice_component_t *component) {
-   snw_log_t *log = 0;
 
    if (!component) return;
-   log = ice_ctx->log;
 
    if (component->dtls != 0) {
       dtls_free(component->dtls);

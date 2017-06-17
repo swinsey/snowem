@@ -330,14 +330,106 @@ ice_dtls_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
 }
 
 int
-srtp_dtls_setup(dtls_ctx_t *dtls) {
-   unsigned char rfingerprint[EVP_MAX_MD_SIZE];
-   char remote_fingerprint[160];
+dtls_srtp_setup(dtls_ctx_t *dtls, snw_ice_session_t *session, snw_ice_component_t *component) {
+   unsigned char material[SRTP_MASTER_LENGTH*2];
+   unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
+   unsigned char local_policy_key[SRTP_MASTER_LENGTH];
+   unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
+   srtp_policy_t remote_policy;
+   srtp_policy_t local_policy;
+   snw_log_t *log = 0;
+
+   if (!dtls || !session || !component) return -1;
+   log = session->ice_ctx->log;
+
+   if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, 
+            "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
+      ERROR(log, "exporting SRTP keying material failed, cid=%u, sid=%u, err=%s",
+         component->id, component->stream->id, ERR_reason_error_string(ERR_get_error()));
+      return -3;
+   }
+
+   if (dtls->type == DTLS_TYPE_CLIENT) {
+      local_key = material;
+      remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
+      local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
+      remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
+   } else {
+      remote_key = material;
+      local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
+      remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
+      local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
+   }
+
+   // Build master keys and set SRTP policies
+   // Remote (inbound)
+   crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
+   crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
+   dtls->remote_policy.ssrc.type = ssrc_any_inbound;
+   dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
+   memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
+   memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
+   dtls->remote_policy.next = NULL;
+
+   /*crypto_policy_set_rtp_default(&(remote_policy.rtp));
+   crypto_policy_set_rtcp_default(&(remote_policy.rtcp));
+   remote_policy.ssrc.type = ssrc_any_inbound;
+   remote_policy.key = (unsigned char *)&remote_policy_key;
+   memcpy(remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
+   memcpy(remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
+   remote_policy.next = NULL;*/
+
+   // Local (outbound)
+   crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
+   crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
+   dtls->local_policy.ssrc.type = ssrc_any_outbound;
+   dtls->local_policy.key = (unsigned char *)&local_policy_key;
+   memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
+   memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
+   dtls->local_policy.next = NULL;
+
+   /*crypto_policy_set_rtp_default(&(local_policy.rtp));
+   crypto_policy_set_rtcp_default(&(local_policy.rtcp));
+   local_policy.ssrc.type = ssrc_any_outbound;
+   local_policy.key = (unsigned char *)&local_policy_key;
+   memcpy(local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
+   memcpy(local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
+   local_policy.next = NULL;*/
+
+   // Create SRTP sessions
+   err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
+   //err_status_t ret = srtp_create(&(dtls->srtp_in), &(remote_policy));
+   if (ret != err_status_ok) {
+      ERROR(log, "failed to create srtp_in session, cid=%u, sid=%u, ret=%d", 
+             component->id, component->stream->id, ret);
+      return -4;
+   }
+
+   ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
+   //ret = srtp_create(&(dtls->srtp_out), &(local_policy));
+   if (ret != err_status_ok) {
+      ERROR(log, "failed to create srtp_out session, cid=%u, sid=%u, ret=%d", 
+             component->id, component->stream->id, ret);
+      return -5;
+   }
+
+   DEBUG(log,"dtls connected");
+   dtls->state = DTLS_STATE_CONNECTED;
+   ice_dtls_handshake_done(session, component);
+     
+   return 0;
+}
+
+int
+dtls_established(dtls_ctx_t *dtls) {
+   unsigned char data[EVP_MAX_MD_SIZE];
+   char fingerprint[160];
    snw_ice_component_t *component = 0;
    snw_ice_stream_t *stream = 0;
    snw_ice_session_t *session = 0;
    snw_log_t *log = 0;
-   unsigned int rsize;
+   X509 *rcert = 0;
+   unsigned int len = 0;
 
    if (!dtls) return -1;
 
@@ -355,93 +447,27 @@ srtp_dtls_setup(dtls_ctx_t *dtls) {
       return -4;
    }
 
-   X509 *rcert = SSL_get_peer_certificate(dtls->ssl);
+   rcert = SSL_get_peer_certificate(dtls->ssl);
    if (!rcert) {
       ERROR(log,"no remote certificate, s=%s", ERR_reason_error_string(ERR_get_error()));
       return -3;
    } 
 
    if (stream->remote_hashing && !strcasecmp(stream->remote_hashing, "sha-1")) {
-      X509_digest(rcert, EVP_sha1(), (unsigned char *)rfingerprint, &rsize);
+      X509_digest(rcert, EVP_sha1(), (unsigned char *)data, &len);
    } else {
-      X509_digest(rcert, EVP_sha256(), (unsigned char *)rfingerprint, &rsize);
+      X509_digest(rcert, EVP_sha256(), (unsigned char *)data, &len);
    }
 
-   srtp_print_fingerprint(remote_fingerprint,160,rfingerprint,rsize);
-   if (!strcasecmp(remote_fingerprint, stream->remote_fingerprint)) {
-      dtls->state = DTLS_STATE_CONNECTED;
+   srtp_print_fingerprint(fingerprint,160,data,len);
+   if (!strcasecmp(fingerprint, stream->remote_fingerprint)) {
+      dtls_srtp_setup(dtls,session,component);
    } else {
       ERROR(log, "fingerprint mismatch, got=%s, expected=%s", 
-            remote_fingerprint, stream->remote_fingerprint);
+            fingerprint, stream->remote_fingerprint);
       dtls->state = DTLS_STATE_ERROR;
-      goto done;
    }
 
-   if (dtls->state == DTLS_STATE_CONNECTED) {
-      unsigned char material[SRTP_MASTER_LENGTH*2];
-      unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
-      if (!SSL_export_keying_material(dtls->ssl, material, SRTP_MASTER_LENGTH*2, 
-               "EXTRACTOR-dtls_srtp", 19, NULL, 0, 0)) {
-         ERROR(log, "exporting SRTP keying material failed, cid=%u, sid=%u, err=%s",
-            component->id, component->stream->id, ERR_reason_error_string(ERR_get_error()));
-         goto done;
-      }
-
-      if (dtls->type == DTLS_TYPE_CLIENT) {
-         local_key = material;
-         remote_key = local_key + SRTP_MASTER_KEY_LENGTH;
-         local_salt = remote_key + SRTP_MASTER_KEY_LENGTH;
-         remote_salt = local_salt + SRTP_MASTER_SALT_LENGTH;
-      } else {
-         remote_key = material;
-         local_key = remote_key + SRTP_MASTER_KEY_LENGTH;
-         remote_salt = local_key + SRTP_MASTER_KEY_LENGTH;
-         local_salt = remote_salt + SRTP_MASTER_SALT_LENGTH;
-      }
-
-      // Build master keys and set SRTP policies
-      // Remote (inbound)
-      crypto_policy_set_rtp_default(&(dtls->remote_policy.rtp));
-      crypto_policy_set_rtcp_default(&(dtls->remote_policy.rtcp));
-      dtls->remote_policy.ssrc.type = ssrc_any_inbound;
-
-      unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
-      dtls->remote_policy.key = (unsigned char *)&remote_policy_key;
-      memcpy(dtls->remote_policy.key, remote_key, SRTP_MASTER_KEY_LENGTH);
-      memcpy(dtls->remote_policy.key + SRTP_MASTER_KEY_LENGTH, remote_salt, SRTP_MASTER_SALT_LENGTH);
-
-      dtls->remote_policy.next = NULL;
-      // Local (outbound)
-      crypto_policy_set_rtp_default(&(dtls->local_policy.rtp));
-      crypto_policy_set_rtcp_default(&(dtls->local_policy.rtcp));
-      dtls->local_policy.ssrc.type = ssrc_any_outbound;
-
-      unsigned char local_policy_key[SRTP_MASTER_LENGTH];
-      dtls->local_policy.key = (unsigned char *)&local_policy_key;
-      memcpy(dtls->local_policy.key, local_key, SRTP_MASTER_KEY_LENGTH);
-      memcpy(dtls->local_policy.key + SRTP_MASTER_KEY_LENGTH, local_salt, SRTP_MASTER_SALT_LENGTH);
-      dtls->local_policy.next = NULL;
-      // Create SRTP sessions
-      err_status_t ret = srtp_create(&(dtls->srtp_in), &(dtls->remote_policy));
-      if (ret != err_status_ok) {
-         ERROR(log, "failed to create srtp_in session, cid=%u, sid=%u, ret=%d", 
-                component->id, stream->id, ret);
-         goto done;
-      }
-
-      ret = srtp_create(&(dtls->srtp_out), &(dtls->local_policy));
-      if (ret != err_status_ok) {
-         ERROR(log, "failed to create srtp_out session, cid=%u, sid=%u, ret=%d", 
-                component->id, stream->id, ret);
-         goto done;
-      }
-      dtls->state = DTLS_STATE_CONNECTED;
-   }
-done:
-   if (dtls->state == DTLS_STATE_CONNECTED) {
-      ice_dtls_handshake_done(session, component);
-   }
-      
    if (rcert) X509_free(rcert);
    return 0;
 }
@@ -488,8 +514,7 @@ dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    if (dtls->state == DTLS_STATE_CONNECTED) {
       WARN(log,"dtls data not supported, ret=%u",ret);
    } else {
-      DEBUG(log,"DTLS established");
-      srtp_dtls_setup(dtls);
+      dtls_established(dtls);
    }
 
    return 0;

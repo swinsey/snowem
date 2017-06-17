@@ -45,7 +45,7 @@ struct dtls_ctx {
    BIO *out_bio;
    BIO *dtls_bio;
 
-   /* srtp contect */
+   /* srtp context */
    srtp_t srtp_in;
    srtp_t srtp_out;
    srtp_policy_t remote_policy;
