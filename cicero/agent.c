@@ -164,6 +164,28 @@ ice_agent_new(struct event_base *base, IceCompatibility compat, int control_mode
    return agent;
 }
 
+void
+ice_agent_free(agent_t *agent) {
+   struct list_head *n,*p;
+   
+   discovery_free(agent);
+   refresh_free(agent);
+   conn_check_free(agent);
+   
+   list_for_each_safe(n,p,&agent->streams.list) {
+      stream_t *s = list_entry(n,stream_t,list);
+      list_del(&s->list);
+      ice_stream_close(s);
+   }
+   
+   if (agent->keepalive_timer_ev) {
+      event_del(agent->keepalive_timer_ev);
+      agent->keepalive_timer_ev = 0;
+   }
+
+   return;
+}
+
 int
 ice_agent_add_stream(agent_t *agent, uint32_t n_components) {
    stream_t *stream = NULL;
@@ -222,7 +244,7 @@ ice_agent_attach_recv (agent_t *agent, uint32_t stream_id, uint32_t component_id
    component->io_data = data;
 
    /* Init pseudo_tcp if needed */
-   if ( agent->reliable && func ) {
+   if (agent->reliable && func) {
       /* TODO: init pseudo_tcp */
    }
    
@@ -288,8 +310,9 @@ agent_gathering_done (agent_t *agent) {
                      break;
                   }
                }
-               ICE_DEBUG("add candidate pair, found_pair=%u",found_pair);
                if (!found_pair) {
+                 ICE_ERROR("add candidate pair, found_pair=%u, foundation=%s(%p)",
+                           found_pair,remote_candidate->foundation, remote_candidate);
                  conn_check_add_for_candidate_pair(agent, stream->id, component,
                      local_candidate, remote_candidate);
                }
@@ -571,10 +594,13 @@ ice_agent_init_stun_agent (agent_t *agent, struct stun_agent_t *stun_agent) {
 
 uint64_t
 agent_candidate_pair_priority(agent_t *agent, candidate_t *local, candidate_t *remote) {
+  uint64_t prio = 0;
   if (agent->controlling_mode)
-    return candidate_pair_priority(local->priority, remote->priority);
+    prio = candidate_pair_priority(local->priority, remote->priority);
   else
-    return candidate_pair_priority(remote->priority, local->priority);
+    prio = candidate_pair_priority(remote->priority, local->priority);
+
+  return prio;
 }
 
 const char*
@@ -764,22 +790,32 @@ priv_add_remote_candidate( agent_t *agent, uint32_t stream_id,
     return ICE_ERR;
 
   candidate = component_find_remote_candidate(component, addr, transport);
-  if (candidate) {
+
+  if (candidate && candidate->type == ICE_CANDIDATE_TYPE_PEER_REFLEXIVE && 
+      candidate->priority == priority ) {
+     ICE_ERROR("updating existing peer-rfx remote candidate, type=%u, foundation=%s(%p)", 
+               type, candidate->foundation, candidate);
+     candidate->type = type;
+  }
+
+  if (candidate && candidate->type == type) {
     {
-      char tmpbuf[INET6_ADDRSTRLEN];
+      char tmpbuf[INET6_ADDRSTRLEN] = {0};
       address_to_string (addr, tmpbuf);
-      ICE_DEBUG("remote candidate exists, addr=%s:%u, sid=%u, cid=%u,"
-          " username=%s, pass=%s prio=%u", agent, tmpbuf,
+      ICE_ERROR("remote candidate exists, addr=%s:%u, sid=%u, cid=%u,"
+          " username=%s, pass=%s prio=%u, foundation=%s", tmpbuf,
           address_get_port (addr), stream_id, component_id,
-          username, password, priority);
+          username, password, priority, foundation);
     }
     /* an existing candidate, update the attributes */
     candidate->type = type;
     if (base_addr)
        candidate->base_addr = *base_addr;
     candidate->priority = priority;
-    if (foundation)
+    if (foundation) {
+       ICE_ERROR("new foundation, old=%s, new=%s(%p)", candidate->foundation, foundation, candidate);
        strncpy(candidate->foundation, foundation, ICE_CANDIDATE_MAX_FOUNDATION);
+    }
     if (username) {
        free(candidate->username);
        candidate->username = strdup(username);
@@ -852,8 +888,8 @@ _set_remote_candidates_locked(agent_t *agent, stream_t *stream,
      {
       char tmpbuf[INET6_ADDRSTRLEN];
       address_to_string (&d->addr, tmpbuf);
-      ICE_DEBUG("remote candidate, addr:%s, port:%u", 
-                tmpbuf, address_get_port(&d->addr));
+      ICE_DEBUG("remote candidate, addr:%s, port:%u, foundation=%s(%p)", 
+                tmpbuf, address_get_port(&d->addr), d->foundation, d);
      }
 
      if (address_is_valid(&d->addr)) {
@@ -1338,15 +1374,15 @@ ice_agent_remove_stream(agent_t *agent, uint32_t stream_id)
         ICE_DEBUG("stream info, sid=%u",s->id);
      }
   }
+  ice_stream_close(stream);
+
   if ( !list_empty(&agent->streams.list) ) {
      /* FIXME: priv_remove_keepalive_timer */
      //priv_remove_keepalive_timer (agent);
   }
-  /* FIXME: stream_free */
-  //stream_free(stream);
 
-  /*agent->streams = g_slist_remove (agent->streams, stream);
-  stream_close (stream);
+
+  /*
   if (!agent->streams)
     priv_remove_keepalive_timer (agent);
   agent_queue_signal (agent, signals[SIGNAL_STREAMS_REMOVED],
@@ -1406,8 +1442,10 @@ ice_agent_set_selected_remote_candidate( agent_t *agent, uint32_t stream_id,
   }*/
 
   /* step: change component state */
-  agent_signal_component_state_change(agent, stream_id, component_id, ICE_COMPONENT_STATE_READY);
+  ICE_ERROR("component state changed, sid=%u, cid=%u, state=%u",
+            stream_id, component_id, ICE_COMPONENT_STATE_READY);
 
+  agent_signal_component_state_change(agent, stream_id, component_id, ICE_COMPONENT_STATE_READY);
   agent_signal_new_selected_pair (agent, stream_id, component_id,
       lcandidate, candidate);
 
@@ -1443,7 +1481,6 @@ ice_agent_get_remote_candidates(agent_t *agent, uint32_t stream_id, uint32_t com
   list_for_each(item,&component->remote_candidates.list) {
      candidate_t *c = list_entry(item,candidate_t,list);
      candidate_t *copy = candidate_copy(c); 
-     print_candidate(c);
      if ( copy != NULL ) {
         list_add(&copy->list,&ret->list);
      } else {

@@ -71,8 +71,12 @@ snw_log_init(const char* filename, uint32_t level, uint32_t rotate_num, long siz
 void 
 snw_log_write(snw_log_t *log, uint32_t level, const char* sourcefilename, int line, const char* msg, ...);
 
+void 
+snw_log_write_pure(snw_log_t *log, uint32_t level, const char* msg, ...);
+
 #define LOG(_log_,_level_,fmt, ...) \
 { snw_log_write(_log_,_level_,__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
+//{ snw_log_write(_log_,_level_,__FUNCTION__, __LINE__,fmt, ##__VA_ARGS__); }
 
 #define TRACE(_log_,_fmt, ...) do {} while(0)
 #define INFO(_log_,_fmt, ...)  do {} while(0)

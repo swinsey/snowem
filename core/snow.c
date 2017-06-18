@@ -6,8 +6,7 @@
 
 #include <json/json.h>
 
-#include "base_str.h"
-#include "config_file.h"
+#include "conf.h"
 #include "connection.h"
 #include "core.h"
 #include "log.h"
@@ -15,50 +14,6 @@
 #include "snow.h"
 #include "snw_event.h"
 #include "utils.h"
-
-using namespace mqf::base;
-
-int
-snw_conf_init(snw_context_t *ctx, const char *file) {
-   snw_module_t *module;
-   CFileConfig &page = * new CFileConfig();
-
-   printf("config file: %s\n",file);
-
-   page.Init(file);
-   ctx->config_file = file;
-   ctx->ice_cert_file = strdup(page["root\\ice\\cert_file"].c_str());
-   ctx->ice_key_file = strdup(page["root\\ice\\key_file"].c_str());
-
-   ctx->wss_cert_file = strdup(page["root\\websocket\\cert_file"].c_str());
-   ctx->wss_key_file = strdup(page["root\\websocket\\key_file"].c_str());
-   ctx->wss_port = from_str<uint16_t>(page["root\\websocket\\bind_port"]);
-   ctx->wss_ip = strdup(page["root\\websocket\\bind_ip"].c_str());
-
-   const vector<string> &module_list = page.GetDomains("root\\modules");
-   unsigned int module_num = module_list.size();
-   for ( unsigned int i = 0; i < module_num; i++) {
-      std::string module_path = "root\\" + module_list[i]; 
-      module = (snw_module_t*)malloc(sizeof(snw_module_t));
-      if (!module) return -1;
-      INIT_LIST_HEAD(&module->list);
-      module->name = strdup(page[module_path + "\\name"].c_str());
-      module->type = from_str<uint32_t>(page[module_path + "\\type"]);
-      module->sofile = strdup(page[module_path + "\\sofile"].c_str());
-      list_add_tail(&module->list,&ctx->modules.list);
-   }
-
-   /*{//DEBUG
-      struct list_head *p;
-      list_for_each(p,&ctx->modules.list) {
-         snw_module_t *m = list_entry(p,snw_module_t,list);
-         printf("module info, name=%s, type=%0x, sofile=%s\n", 
-             m->name, m->type, m->sofile);
-      }
-   }*/
-
-   return 0;
-}
 
 int
 snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
@@ -117,7 +72,6 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
    } catch (...) {
       ERROR(log, "json format error, data=%s", data);
    }
-
 
    return 0;
 }
@@ -186,9 +140,7 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
        len,
        len - sizeof(snw_event_t));
 
-
    snw_core_process_msg(ctx,&conn,buffer+sizeof(snw_event_t),len-sizeof(snw_event_t));
-
    return 0;
 }
 
@@ -275,14 +227,13 @@ snw_main_process(snw_context_t *ctx) {
    if (ctx == 0)
       return;
 
-
    ctx->ev_base = event_base_new();
    if (ctx->ev_base == 0) {
       exit(-2);
    }
 
    /*initialize main log*/
-   ctx->log = snw_log_init("./main.log",0,0,0);
+   ctx->log = snw_log_init("./main.log",ctx->log_level,0,0);
    if (ctx->log == 0) {
       exit(-1);   
    }
@@ -372,11 +323,10 @@ main(int argc, char** argv) {
    if (argc < 2)
       exit(-2);
 
-   snw_conf_init(ctx,argv[1]);
+   snw_config_init(ctx,argv[1]);
    daemonize();
 
-   //FIXME: setup ice component
-   /*pid = fork();
+   pid = fork();
    if (pid < 0) {
       printf("error");
    } else if (pid == 0) {//child
@@ -384,13 +334,12 @@ main(int argc, char** argv) {
       return 0;
    } else {
       //continue 
-   }*/
+   }
 
    pid = fork();
    if (pid < 0) {
       printf("error");
    } else if (pid == 0) {
-      printf("setup net component");
       snw_net_setup(ctx);
       return 0;
    } else {

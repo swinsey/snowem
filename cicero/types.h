@@ -97,7 +97,7 @@ typedef void (*agent_recv_func) (agent_t *agent, uint32_t stream_id,
 #define ICE_MEMZERO(p_,type_) memset(p_,0,sizeof(type_))
 
 #define ICE_FALSE (0)
-#define ICE_TRUE (1)
+#define ICE_TRUE (1 == 1)
 
 #define ICE_OK (0)
 #define ICE_ERR (-1)

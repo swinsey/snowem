@@ -310,6 +310,7 @@ discovery_add_local_host_candidate (
   /* _priv_set_socket_tos (agent, nicesock, stream->tos);
   component_attach_socket(component, nicesock); */
   nicesock->component = component;
+  component->sock = nicesock;
   *outcandidate = candidate;
 
   return HOST_CANDIDATE_SUCCESS;
@@ -400,7 +401,6 @@ static void priv_assign_remote_foundation (agent_t *agent, candidate_t *candidat
     next_remote_id = priv_highest_remote_foundation (component);
     snprintf (candidate->foundation, ICE_CANDIDATE_MAX_FOUNDATION,
         "remote-%u", next_remote_id);
-    ICE_DEBUG("assign remote foundation, foundation=%s",candidate->foundation);
   }
 }
 
@@ -420,8 +420,8 @@ candidate_t *discovery_learn_remote_peer_reflexive_candidate(
 {
   candidate_t *candidate;
 
-  ICE_DEBUG("create peer reflexive candidate");
   print_address(remote_address);
+  print_candidate(remote, "find candidate");
 
   candidate = candidate_new(ICE_CANDIDATE_TYPE_PEER_REFLEXIVE);
   if ( candidate == NULL )
@@ -764,6 +764,45 @@ void refresh_prune_stream(agent_t *agent, uint32_t stream_id)
 
 }
 
+void 
+discovery_free_item(candidate_discovery_t *cand)
+{
+   if (cand) free(cand);
+   return;
+}
+
+void
+discovery_free(agent_t *agent) 
+{
+  struct list_head *i, *n;
+
+  list_for_each_safe(i,n,&agent->discovery_list.list) {
+    candidate_discovery_t *cand = list_entry(i,candidate_discovery_t,list);
+    list_del(&cand->list);
+    discovery_free_item (cand);
+  }
 
 
+   return;
+}
 
+void
+refresh_free_item(candidate_refresh_t *cand) 
+{
+   //FIXME: free item
+   return;
+}
+
+void
+refresh_free(agent_t *agent) 
+{
+  struct list_head *i, *n;
+
+  list_for_each_safe(i,n,&agent->refresh_list.list) {
+    candidate_refresh_t *cand = list_entry(i,candidate_refresh_t,list);
+    list_del(&cand->list);
+    refresh_free_item (cand);
+  }
+
+   return;
+}

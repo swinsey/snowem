@@ -16,6 +16,7 @@
 #include "mq.h"
 #include "module.h"
 #include "types.h"
+#include "ice.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,6 +44,11 @@ struct snw_context {
    const char         *wss_key_file;
    const char         *wss_ip;
    uint16_t            wss_port;
+
+   const char         *log_file;
+   uint32_t            log_file_maxsize;
+   uint32_t            log_rotate_num;
+   uint32_t            log_level;
 
    /* message queues */
    snw_shmmq_t  *snw_ice2core_mq;

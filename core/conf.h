@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jackie Dinh <jackiedinh8@gmail.com>
+ * Copyright (c) 2017 Jackie Dinh <jackiedinh8@gmail.com>
  *
  * All rights reserved.
  *
@@ -25,65 +25,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @(#)log.h
+ * @(#)cache.h
  */
 
-#ifndef _ICE_LOG_H_
-#define _ICE_LOG_H_
+#ifndef _SNOW_CONFIG_H_
+#define _SNOW_CONFIG_H_
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <string.h>
-#include <dirent.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdio.h>
-#include <sys/time.h>
 
-enum {           
-	ICE_LOG_INFO = 0,
-   ICE_LOG_DEBUG = 1,
-   ICE_LOG_WARN = 2,
-   ICE_LOG_ERROR = 3,
-   ICE_LOG_FATAL = 4
-};
+#include "types.h"
 
-/*#ifdef ICE_LIB
-
-#define FUNCLINE "%s:%u: "
-#define DEBUG(fmt, ...) \
-{  printf("[DEBUG]" FUNCLINE fmt "\n", __FUNCTION__,__LINE__, ##__VA_ARGS__); }
-
-#define ERROR(fmt, ...) \
-{  printf("[ERROR]" FUNCLINE fmt "\n", __FUNCTION__,__LINE__, ##__VA_ARGS__); }
-
-#else
-
-#include "../log.h"
-
-#endif*/
-
-#define ICE_FUNCLINE "%s:%u"
-#define ICE_INFO(fmt, ...) \
-{  ice_log(ICE_LOG_INFO, ICE_FUNCLINE "[ICE_INFO]: " fmt , __FUNCTION__,__LINE__, ##__VA_ARGS__); }
-#define ICE_DEBUG(fmt, ...) \
-{  ice_log(ICE_LOG_DEBUG, ICE_FUNCLINE "[ICE_DEBUG]: " fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
-#define ICE_ERROR(fmt, ...) \
-{  ice_log(ICE_LOG_ERROR, ICE_FUNCLINE "[ICE_ERROR]: " fmt, __FUNCTION__,__LINE__, ##__VA_ARGS__); }
-
-
-typedef void (*ice_log_cb)(int severity, const char *msg, void *data);
-void ice_set_log_callback(ice_log_cb cb, void *data);
-void ice_log(int severity, const char* msg, ...);
+void
+snw_config_init(snw_context_t *ctx, const char *file);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _ICE_LOG_H_
-
-
+#endif // _SNOW_CONFIG_H_

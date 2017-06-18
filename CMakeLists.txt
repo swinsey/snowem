@@ -8,7 +8,8 @@ include(CheckTypeSize)
 
 add_subdirectory(cicero)
 add_subdirectory(wslay)
-add_subdirectory(modules/democall)
+add_subdirectory(modules/videocall)
+#add_subdirectory(modules/democall)
 
 SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 
@@ -16,6 +17,8 @@ SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 #file(GLOB sources_include include/*.h)
 file(GLOB sources 
        core/*.c core/*.cpp core/*.h 
+       ice/*.c ice/*.h 
+       #modules/*.c modules/*.h 
        jsoncpp/*.cpp jsoncpp/json/*.h
        websocket/*.c websocket/*.h)
 file(GLOB c_sources core/*.c ice/*.c websocket/*.c)
@@ -27,6 +30,7 @@ add_executable(snowsvr ${sources})
 
 # Just for example add some compiler flags.
 target_compile_options(snowsvr PUBLIC -g -Wall)
+#add_definitions(-DBASE_FILE_NAME="$(<F)")
 
 # This allows to include files relative to the root of the src directory with a <> pair
 target_include_directories(snowsvr PUBLIC . jsoncpp core ice modules)
@@ -34,8 +38,8 @@ target_include_directories(snowsvr PUBLIC . jsoncpp core ice modules)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindDL.cmake)
 if (${DL_FOUND})
    target_include_directories(snowsvr PUBLIC ${DL_INCLUDE_DIRS})
-   MESSAGE(STATUS DLDir ${DL_INCLUDE_DIRS})
-   MESSAGE(STATUS DLLib ${DL_LIBRARIES})
+   MESSAGE(STATUS "dl include: ${DL_INCLUDE_DIRS}")
+   MESSAGE(STATUS "dl lib: ${DL_LIBRARIES}")
 else ()
    MESSAGE(FATAL_ERROR "DL not found")
 endif ()
@@ -50,8 +54,8 @@ endif (${OPENSSL_FOUND})
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindLibEvent.cmake)
 if (${EVENT_FOUND})
    target_include_directories(snowsvr PUBLIC ${EVENT_INCLUDE_DIRS})
-   MESSAGE(STATUS EVENTDir ${EVENT_INCLUDE_DIRS})
-   MESSAGE(STATUS EVENTLib ${EVENT_LIBRARIES})
+   MESSAGE(STATUS "libevent include: ${EVENT_INCLUDE_DIRS}")
+   MESSAGE(STATUS "libevent lib:  ${EVENT_LIBRARIES}")
 else ()
    MESSAGE(FATAL_ERROR EVENT not found)
 endif ()
@@ -69,8 +73,8 @@ endif (${SOFIASIPUA_FOUND})
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindSRTP.cmake)
 if (${SRTP_FOUND})
    target_include_directories(snowsvr PUBLIC ${SRTP_INCLUDE_DIRS})
-   MESSAGE(STATUS SRTPDir ${SRTP_INCLUDE_DIRS})
-   MESSAGE(STATUS SRTPLib ${SRTP_LIBRARIES})
+   MESSAGE(STATUS "srtp include: ${SRTP_INCLUDE_DIRS}")
+   MESSAGE(STATUS "srtp lib: ${SRTP_LIBRARIES}")
 else ()
    MESSAGE(FATAL_ERROR SRTP not found)
 endif ()
@@ -78,8 +82,8 @@ endif ()
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindJansson.cmake)
 if (${JANSSON_FOUND})
    target_include_directories(snowsvr PUBLIC ${JANSSON_INCLUDE_DIRS})
-   MESSAGE(STATUS JANSSONDir ${JANSSON_INCLUDE_DIRS})
-   MESSAGE(STATUS JANSSONLib ${JANSSON_LIBRARIES})
+   MESSAGE(STATUS "jansson include: ${JANSSON_INCLUDE_DIRS}")
+   MESSAGE(STATUS "jansson lib:  ${JANSSON_LIBRARIES}")
 else ()
    MESSAGE(FATAL_ERROR JANSSON not found)
 endif ()
@@ -87,11 +91,22 @@ endif ()
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindNettle.cmake)
 if (${NETTLE_FOUND})
    target_include_directories(snowsvr PUBLIC ${NETTLE_INCLUDE_DIRS})
-   MESSAGE(STATUS NETTLEDir ${NETTLE_INCLUDE_DIRS})
-   MESSAGE(STATUS NETTLELib ${NETTLE_LIBRARIES})
+   MESSAGE(STATUS "nettle include: ${NETTLE_INCLUDE_DIRS}")
+   MESSAGE(STATUS "nettle lib: ${NETTLE_LIBRARIES}")
 else ()
    MESSAGE(FATAL_ERROR NETTLE not found)
 endif ()
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindConfig.cmake)
+if (${CONFIG_FOUND})
+   target_include_directories(snowsvr PUBLIC ${CONFIG_INCLUDE_DIRS})
+   MESSAGE(STATUS "libconfig include: ${CONFIG_INCLUDE_DIRS}")
+   MESSAGE(STATUS "libconfig lib: ${CONFIG_LIBRARIES}")
+else ()
+   MESSAGE(FATAL_ERROR LIBCONFIG not found)
+endif ()
+
+
 
 
 #include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindFFmpeg.cmake)
@@ -113,6 +128,7 @@ target_link_libraries(snowsvr PUBLIC
   ${SRTP_LIBRARIES}
   ${JANSSON_LIBRARIES}
   ${NETTLE_LIBRARIES}
+  ${CONFIG_LIBRARIES}
 )
 
 ## packaging ##################################################################
