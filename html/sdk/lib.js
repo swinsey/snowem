@@ -33,15 +33,19 @@
         this.SNW_EVENT = 3;
         this.SNW_VIDEOCALL = 5653571; //'VDC'
 
-        // ICE API
+        // ICE PUBLIC API
         this.SNW_ICE_CREATE = 1;
         this.SNW_ICE_CONNECT = 2;
-        this.SNW_ICE_STOP = 3;
-        this.SNW_ICE_SDP = 4;
-        this.SNW_ICE_CANDIDATE = 5;
-        this.SNW_ICE_PUBLISH = 6;
-        this.SNW_ICE_PLAY = 7;
-        this.SNW_ICE_FIR = 8;
+        this.SNW_ICE_PUBLISH = 3;
+        this.SNW_ICE_PLAY = 4;
+        this.SNW_ICE_STOP = 5;
+        this.SNW_ICE_CONTROL = 6;
+        this.SNW_ICE_AUTH = 7;
+
+        // ICE INTERNAL API
+        this.SNW_ICE_SDP = 128; 
+        this.SNW_ICE_CANDIDATE = 129;
+        this.SNW_ICE_FIR = 130;
 
         // EVENT API
         this.SNW_EVENT_ICE_CONNECTED = 1;
@@ -585,6 +589,8 @@ PeerCall.wsClient = wsClient;
          agent.start_stream(stream);
          agent.localStream = stream;
          agent.localVideoElm.srcObject = stream;
+         //XXX: temporarily mute
+         //agent.localVideoElm.muted = false;
          agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CONNECT, 
                      'channelid': agent.channelId, 'publish': agent.is_publisher, 'name': agent.name,
                      'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': agent.roomId});
