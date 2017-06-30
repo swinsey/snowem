@@ -10,37 +10,42 @@
 
 window.snowAsyncInit = function() {
      function onSuccess() {
-        var is_publisher = 0;
+        var isPublisher = 0;
         var roomid = 0;
+        var peer = null;
 
-        SnowSDK.listen('onCreate', function(agent) {
-           console.log("onCreate: agent=" + JSON.stringify(agent));
-           document.getElementById("yourId").innerHTML = agent.peerId;
-           agent.connect({name: "demo"});
-        });
+        function onCreate() {
+           console.log("onCreate: peer=" + JSON.stringify(peer));
+           document.getElementById("yourId").innerHTML = peer.peerId;
+           peer.connect({name: "demo"});
+        }
 
-        SnowSDK.listen('onIceConnected', function(agent) {
-           console.log("ice connected: agent=" + JSON.stringify(agent));
-           if (is_publisher) {
-              agent.publish({'name': "demo", 'channelid': roomid});
+        //TODO: remove this
+        function onIceConnected() {
+           console.log("ice connected: peer=" + JSON.stringify(peer));
+           if (isPublisher) {
+              peer.publish({'name': "demo", 'channelid': roomid});
            } else {
-              agent.play({'name': "demo", 'channelid': roomid});
+              peer.play({'name': "demo", 'channelid': roomid});
            }
-        });
+        }
 
         //API calls go here.
         document.getElementById("publishBtn").addEventListener("click", function() {
            //var channelId = SnowSDK.getAvailableChannel();
-           //SnowSDK.publish({channel_id: channelId});
-           is_publisher = 1;
-           SnowSDK.create();
+           isPublisher = 1;
+           peer = SnowSDK.createPeer();
+           peer.listen('onCreate',onCreate);
+           peer.listen('onIceConnected',onIceConnected);
+           peer.create({name: "demo"});
         });
 
         document.getElementById("subscribeBtn").addEventListener("click", function() {
            //var channelId = SnowSDK.getAvailableChannel();
-           //SnowSDK.publish({channel_id: channelId});
            roomid = parseInt(document.getElementById("subscribeRoomId").value);
-           SnowSDK.create();
+           peer = SnowSDK.createPeer();//create peer peer
+           peer.listen('onCreate',onCreate);
+           peer.create('onIceConnected',onIceConnected);
         });
      }
 

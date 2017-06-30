@@ -249,7 +249,7 @@
    SnowSDK.Config = Config;
 })(this);
 
-
+/*
 // websocket service
 (function(window, undefined) {
 var wsClient = {};
@@ -297,11 +297,81 @@ wsClient.send = function(message) {
 var SnowSDK = window.SnowSDK;
 SnowSDK.wsClient = wsClient;
 })(this);
+*/
+
+// ws client
+(function(window, undefined) {
+   function WsClient(){
+      this.ipaddr = null;
+      this.port = 0;
+      this.websocket = null;
+      this.onmessage = null;
+      this.isReady = false;
+      this.msgs = [];
+   }
+
+   WsClient.prototype.connect = function(ipaddr, port, onsuccess) {
+      var self = this;
+      self.ipaddr = ipaddr;
+      self.port = port;
+      if ("WebSocket" in window) {
+         //console.log("WebSocket is supported by your Browser!");
+         // Let us open a web socket
+         self.websocket = new WebSocket("wss://"+ipaddr+":"+port,"default");
+         self.websocket.binaryType = 'blob';
+         self.websocket.onopen = function(e) {
+            console.log("onopen: web socket is opened");
+            self.isReady = true;
+            for (var i = 0; i < self.msgs.length; i++) {
+               var msg = JSON.stringify(self.msgs[i]);
+               console.log("sending queued msg, msg=" + msg);
+               self.websocket.send(msg);
+            }
+            self.msgs = []; //reset it.
+            if (onsuccess) onsuccess();
+         };
+         self.websocket.onmessage = function (evt) {
+           if (self.onmessage != null) {
+              self.onmessage(evt);
+           } else {
+              var msg = JSON.parse(evt.data);
+              console.log("have not defined onmessage: ", evt.data);
+           }
+         };
+      }
+   }
+
+   WsClient.prototype.setOnMessageCB = function(callback) {
+      this.onmessage = callback;
+   }
+
+   WsClient.prototype.send = function(message) {
+      if (!this.isReady) {
+         console.log('[wss] store message: ', message);
+         this.msgs.push(message);
+         return;
+      }
+      if (this.websocket) {
+         console.log('[wss] sending message: ', message);
+         if (typeof message === 'object') {
+            message = JSON.stringify(message);
+         }
+         this.websocket.send(message);
+      } else {
+         console.log("websocket not ready");
+      }
+   }
+
+   SnowSDK.WsClient = WsClient;
+})(this);
+// end of ws client
 
 // peer agent
 (function(window, undefined) {
    var SnowSDK = window.SnowSDK;
    var globals = SnowSDK.Globals();
+
+
    function PeerAgent(){
       this.peerId = 0; 
       this.name = "";
@@ -312,11 +382,14 @@ SnowSDK.wsClient = wsClient;
       this.remoteVideoEl = null;
       this.pc = null;
       this.state = "disconnected";
-      this.is_publisher = 0;
+      this.isPublisher = 0;
+      this.wsClient = null;
+      this.listeners = [];
    }
 
    PeerAgent.prototype.init = function(config) {
       console.log("init peer agent, id=" + config.peerId);
+      var self = this;
       this.peerId = config.peerId;
       this.roomId = config.roomId;
       this.channelId = 0;
@@ -326,7 +399,51 @@ SnowSDK.wsClient = wsClient;
       this.remoteVideoElm = config.remoteVideoElm;
       this.state = "disconnected";
       this.pc = config.pc;
-      this.send = config.send;
+      //this.send = config.send;
+
+      function onmessage(evt) {
+         var msg = JSON.parse(evt.data);
+         console.log("onmessage: ", evt.data);
+         //SnowSDK.broadcast("onmessage",msg);
+         self.receive(msg);
+         return;
+      };
+      this.wsClient = new SnowSDK.WsClient();
+      this.wsClient.setOnMessageCB(onmessage)
+      this.wsClient.connect(globals.MEDIA_IPADDR,globals.MEDIA_PORT, function() {
+         console.log("wsclient is connected");
+      });
+   }
+   
+   PeerAgent.prototype.listen = function(eventName, handler) {
+      if (typeof this.listeners[eventName] === 'undefined') {
+         this.listeners[eventName] = [];
+      }
+      this.listeners[eventName].push(handler);
+   }
+
+   
+   PeerAgent.prototype.unlisten = function(eventName, handler) {
+      if (!this.listeners[eventName]) {
+         return; 
+      }
+      for (var i = 0; i < this.listeners[eventName].length; i++) {
+         if (this.listeners[eventName][i] === handler) {
+            this.listeners[eventName].splice(i, 1);
+            break; 
+         }
+      }
+   };
+
+   PeerAgent.prototype.broadcast = function(eventName,msg) {
+      console.log("broadcast, event=" + eventName + ", msg=" + JSON.stringify(msg));
+      if (!this.listeners[eventName]) {
+         console.log("no handler for event, name=" + JSON.stringify(eventName));
+         return; 
+      }
+      for (var i = 0; i < this.listeners[eventName].length; i++) {
+         this.listeners[eventName][i](msg);
+      } 
    }
 
    PeerAgent.prototype.do_answer = function(msg) {
@@ -369,6 +486,10 @@ SnowSDK.wsClient = wsClient;
       }
    }
 
+   PeerAgent.prototype.send = function(msg) {
+      this.wsClient.send(msg);
+   }
+
    PeerAgent.prototype.receive = function(msg) {
       if (msg.rc != null) {
          console.log("response from server: " + JSON.stringify(msg));
@@ -376,7 +497,7 @@ SnowSDK.wsClient = wsClient;
             if (msg.api == globals.SNW_ICE_CREATE) {
                this.peerId = msg.id;
                this.channelId = msg.channelid;
-               SnowSDK.broadcast('onCreate',this);
+               this.broadcast('onCreate',this);
                return;
             }
          }
@@ -396,7 +517,7 @@ SnowSDK.wsClient = wsClient;
       if (msg.msgtype == globals.SNW_EVENT) {
          if (msg.api == globals.SNW_EVENT_ICE_CONNECTED) {
             this.state = 'connected';
-            SnowSDK.broadcast('onIceConnected',this);
+            this.broadcast('onIceConnected',this);
             return;
          }
          return;
@@ -470,7 +591,7 @@ SnowSDK.wsClient = wsClient;
          //XXX: temporarily mute
          //agent.localVideoElm.muted = false;
          agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CONNECT, 
-                     'channelid': agent.channelId, 'publish': agent.is_publisher, 'name': agent.name,
+                     'channelid': agent.channelId, 'publish': agent.isPublisher, 'name': agent.name,
                      'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': agent.roomId});
          //onready();
          //subscribe();
@@ -481,9 +602,18 @@ SnowSDK.wsClient = wsClient;
       });
    } 
 
+   PeerAgent.prototype.create =function(config) {
+      this.isPublisher = 1; 
+      this.name = config.name;
+      this.roomId = this.peerId;//XXX: roomid is the same as peerid!
+      this.send({'msgtype':globals.SNW_ICE,
+                 'api':globals.SNW_ICE_CREATE, 
+                 'uuid': SnowSDK.Utils.uuid()});//TODO: store it in PeerAgent obj.
+   }
+
    PeerAgent.prototype.connect = function(config) {
       console.log("publish config info, config="+JSON.stringify(config));
-      this.is_publisher = 1; 
+      this.isPublisher = 1; 
       this.name = config.name;
       this.roomId = this.peerId;//XXX: roomid is the same as peerid!
       getusermedia(this);
@@ -498,7 +628,7 @@ SnowSDK.wsClient = wsClient;
       console.log("playing, config="+JSON.stringify(config));
       this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PLAY, 
                  'channelid': config.channelid, 'id': this.peerId, 'roomid': this.roomId});
-      //this.is_publisher = 0; 
+      //this.isPublisher = 0; 
       //this.name = config.name;
       //this.roomId = config.roomid
       //getusermedia(this);
@@ -548,7 +678,7 @@ SnowSDK.wsClient = wsClient;
    /* ----------------  end of SnowSDK events ---------------------------------*/
 
    /* ----------------  SnowSDK networking ------------------------------------*/
-   var isWsReady = false;
+   /*var isWsReady = false;
    function onmessage(evt) {
       var msg = JSON.parse(evt.data);
       console.log("onmessage: ", evt.data);
@@ -559,17 +689,17 @@ SnowSDK.wsClient = wsClient;
    SnowSDK.wsClient.initWebSocket(globals.MEDIA_IPADDR,globals.MEDIA_PORT, function() {
       console.log("wsclient is connected");
       isWsReady = true;
-   });
+   });*/
    /* ----------------  end of SnowSDK networking ------------------------------*/
 
    /* ----------------  SnowSDK API --------------------------------------------*/
-   var agents = {};
+   var agents = [];
    SnowSDK.getAvailableChannel = function() {
       return 28093368;
    }
 
    function getPeerAgent(channel_id) {
-      if ( channel_id === null )
+      if (channel_id === null)
          channel_id = 0;
       // check if agent exists, otherwise create one.
       var agent = agents[channel_id] || (function(channel_id) {
@@ -582,46 +712,27 @@ SnowSDK.wsClient = wsClient;
             localVideoElm : document.getElementById('localVideo'),
             remoteVideoElm : document.getElementById('remoteVideo'),
             state : "disconnected",
-            pc : null,
-            send : function(msg) {
-               SnowSDK.wsClient.send(msg);
-            }
+            pc : null
+            //send : function(msg) {
+            //   SnowSDK.wsClient.send(msg);
+            //}
          };
          agent.init(config);
-         SnowSDK.listen("onmessage",function(msg) {
-            agent.receive(msg);
-         });
+         //SnowSDK.listen("onmessage",function(msg) {
+         //   agent.receive(msg);
+         //});
          return agent;
       })(channel_id);
       return agent;
    }
 
-
-   /*SnowSDK.publish = function(config) {
-      console.log("publish: " + config.channel_id);
-      console.log("uuid: " + SnowSDK.Utils.uuid());
-      var agent = getPeerAgent(config.channel_id);
-      console.log("agent=" + agent);
-      agent.send({'msgtype':globals.SNW_VIDEOCALL,'api':globals.SNW_VIDEOCALL_CREATE, 'uuid': SnowSDK.Utils.uuid()});
-      //getusermedia(agent);
-   }*/
-
    // @config: {channel_id: channel_id, }
-   SnowSDK.create = function(config) {
+   SnowSDK.createPeer = function(config) {
       var agent = getPeerAgent();
       console.log("creating agent=" + JSON.stringify(agent));
-      agent.send({'msgtype':globals.SNW_ICE,
-                  'api':globals.SNW_ICE_CREATE, 
-                  'uuid': SnowSDK.Utils.uuid()});
+      return agent;
    }
 
-   /*SnowSDK.publish = function(agent) {
-      console.log("agent=" + agent);
-      //getusermedia(agent);
-   }
-
-   SnowSDK.subscribe = function(config) {
-   }*/
    /* ----------------  end of SnowSDK API --------------------------------------*/
 
    // sdk initiatlized
