@@ -1,54 +1,49 @@
 (function(){
-     var script = document.createElement('script');
-     script.src = window.location.protocol+ '//' 
+   var script = document.createElement('script');
+   script.src = window.location.protocol+ '//' 
                 + window.location.hostname 
                 + '/videocall/js/snowsdk.js';
-     script.async = true;
-     var entry = document.getElementsByTagName('script')[0];
-     entry.parentNode.insertBefore(script, entry);
+   script.async = true;
+   var entry = document.getElementsByTagName('script')[0];
+   entry.parentNode.insertBefore(script, entry);
 })();
 
 window.snowAsyncInit = function() {
-     function onSuccess() {
-        var isPublisher = 0;
-        var roomid = 0;
-        var peer = null;
+   SnowSDK.init({api_key: "demo", version: "version"}, onSuccess);
+   function onSuccess() {
+      var isPublisher = 0;
+      var channelid = 0;
+      var peer = null;
 
-        function onCreate() {
-           console.log("onCreate: peer=" + JSON.stringify(peer));
-           document.getElementById("yourId").innerHTML = peer.peerId;
-           peer.connect({name: "demo"});
-        }
+      function onCreateChannel(peer) {
+         console.log("onCreate: peer=" + JSON.stringify(peer));
+         document.getElementById("yourId").innerHTML = peer.peerId;
+         var config = {
+            'channelid': channelid,
+            'localVideoId': document.getElementById('localVideo'),
+            'remoteVideoId': document.getElementById('remoteVideo')
+         };
 
-        //TODO: remove this
-        function onIceConnected() {
-           console.log("ice connected: peer=" + JSON.stringify(peer));
-           if (isPublisher) {
-              peer.publish({'name': "demo", 'channelid': roomid});
-           } else {
-              peer.play({'name': "demo", 'channelid': roomid});
-           }
-        }
+         if (isPublisher) {
+            peer.publish(config);
+         } else {
+            peer.play(config);
+         }
+      }
 
-        //API calls go here.
-        document.getElementById("publishBtn").addEventListener("click", function() {
-           //var channelId = SnowSDK.getAvailableChannel();
-           isPublisher = 1;
-           peer = SnowSDK.createPeer();
-           peer.listen('onCreate',onCreate);
-           peer.listen('onIceConnected',onIceConnected);
-           peer.create({name: "demo"});
-        });
+      //API calls go here.
+      document.getElementById("publishBtn").addEventListener("click", function() {
+         isPublisher = 1;
+         peer = SnowSDK.createPeer();
+         peer.createChannel({name: "demo"},onCreateChannel);
+      });
 
-        document.getElementById("subscribeBtn").addEventListener("click", function() {
-           //var channelId = SnowSDK.getAvailableChannel();
-           roomid = parseInt(document.getElementById("subscribeRoomId").value);
-           peer = SnowSDK.createPeer();//create peer peer
-           peer.listen('onCreate',onCreate);
-           peer.create('onIceConnected',onIceConnected);
-        });
-     }
-
-     SnowSDK.init({api_key: "demo", version: "version"}, onSuccess);
+      document.getElementById("subscribeBtn").addEventListener("click", function() {
+         channelid = parseInt(document.getElementById("subscribeChannelId").value);
+         isPublisher = 0;
+         peer = SnowSDK.createPeer();//create peer peer
+         peer.createChannel({name: "demo"},onCreateChannel);
+      });
+   }
 }
 
