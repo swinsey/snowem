@@ -237,7 +237,6 @@
 // SDK configurations
 (function(window, undefined) {
    function Config() {
-      this.roomid = 0;
       this.name = "";
       this.email = "";
    }
@@ -248,56 +247,6 @@
    var SnowSDK = window.SnowSDK;
    SnowSDK.Config = Config;
 })(this);
-
-/*
-// websocket service
-(function(window, undefined) {
-var wsClient = {};
-
-wsClient.initWebSocket = function(ipaddr, port, onsuccess) {
-   var websocket = null;
-   if ("WebSocket" in window) {
-      //console.log("WebSocket is supported by your Browser!");
-      // Let us open a web socket
-      websocket = new WebSocket("wss://"+ipaddr+":"+port,"default");
-      websocket.binaryType = 'blob';
-      websocket.onopen = function(e) {
-         console.log("onopen: web socket is opened");
-         if (onsuccess) onsuccess();
-      };
-      websocket.onmessage = function (evt) {
-        wsClient.onMessage(evt);
-      };
-   }
-   wsClient.websocket = websocket;
-}
-
-wsClient.onMessage = function(evt) {
-   var msg = JSON.parse(evt.data);
-   console.log("have not defined onmessage: ", evt.data);
-   return;
-}
-
-wsClient.setOnMessageCB = function(callback) {
-   wsClient.onMessage = callback;
-}
-
-wsClient.send = function(message) {
-   if (wsClient.websocket) {
-      console.log('[wss] sending message: ', message);
-      if (typeof message === 'object') {
-         message = JSON.stringify(message);
-      }
-      wsClient.websocket.send(message);
-   } else {
-      console.log("websocket not ready");
-   }
-}
-
-var SnowSDK = window.SnowSDK;
-SnowSDK.wsClient = wsClient;
-})(this);
-*/
 
 // ws client
 (function(window, undefined) {
@@ -375,7 +324,6 @@ SnowSDK.wsClient = wsClient;
    function PeerAgent(){
       this.peerId = 0; 
       this.name = "";
-      this.roomId = 0; 
       this.localStream = {};
       this.remoteStream = {};
       this.localVideoEl = null;
@@ -387,24 +335,12 @@ SnowSDK.wsClient = wsClient;
       this.listeners = [];
    }
 
-   PeerAgent.prototype.init = function(config) {
-      console.log("init peer agent, id=" + config.peerId);
+   PeerAgent.prototype.init = function() {
+      //set up network
       var self = this;
-      this.peerId = config.peerId;
-      this.roomId = config.roomId;
-      this.channelId = 0;
-      this.localStream = config.localStream;
-      this.remoteStream = config.remoteStream;
-      this.localVideoElm = config.localVideoElm;
-      this.remoteVideoElm = config.remoteVideoElm;
-      this.state = "disconnected";
-      this.pc = config.pc;
-      //this.send = config.send;
-
       function onmessage(evt) {
          var msg = JSON.parse(evt.data);
          console.log("onmessage: ", evt.data);
-         //SnowSDK.broadcast("onmessage",msg);
          self.receive(msg);
          return;
       };
@@ -421,7 +357,6 @@ SnowSDK.wsClient = wsClient;
       }
       this.listeners[eventName].push(handler);
    }
-
    
    PeerAgent.prototype.unlisten = function(eventName, handler) {
       if (!this.listeners[eventName]) {
@@ -453,7 +388,7 @@ SnowSDK.wsClient = wsClient;
         console.log("setLocalAndSendMessage: " + self.pc);
         self.pc.setLocalDescription(sessionDescription);
         self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_SDP,
-                   'roomid': 1443712566, 'sdp':sessionDescription});
+                   'sdp':sessionDescription});
       }   
       function onError(e) {
          console.log("failed to create sdp answer: " + e);
@@ -518,23 +453,12 @@ SnowSDK.wsClient = wsClient;
          if (msg.api == globals.SNW_EVENT_ICE_CONNECTED) {
             this.state = 'connected';
             this.broadcast('onIceConnected',this);
+            this.onIceConnected();
             return;
          }
          return;
       }
 
-      /*if (msg.cmd == globals.SGN_VIDEO ) {
-         if (msg.subcmd == globals.SGN_VIDEO_SDP) {
-            this.on_remote_sdp(msg.sdp);
-            return;
-         }
-         if (msg.subcmd == globals.SGN_VIDEO_CANDIDATE) {
-            this.on_remote_candidate(msg.candidate);
-            return;
-         }
-         console.log("[ERROR] unknown submsg: " + JSON.stringify(msg));
-         return;
-      }*/
       console.log("[ERROR] unknown msg: " + JSON.stringify(msg));
       return;
    }
@@ -549,22 +473,21 @@ SnowSDK.wsClient = wsClient;
            console.log("send relay address, sdpMid=", event.candidate.sdpMid);
            console.log("send relay address, sdpMlineIndex=", event.candidate.sdpMLineIndex);
 
-           self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CANDIDATE,'roomid': 1443712566,
-                        'callid':'xxxyyyzzz', 'candidate':{
-                                    type: 'candidate',
-                                    label: event.candidate.sdpMLineIndex,
-                                    id: event.candidate.sdpMid,
-                                    candidate: event.candidate.candidate}});
+           self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CANDIDATE, 'id': this.peerId, 
+                      'candidate':{
+                           type: 'candidate',
+                           label: event.candidate.sdpMLineIndex,
+                           id: event.candidate.sdpMid,
+                           candidate: event.candidate.candidate}});
         } else {
            console.log('End of candidates.');
-           self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CANDIDATE,'roomid': 1443712566,
-                       'callid':'xxxyyyzzz', 'candidate':{ done: true }});
+           self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CANDIDATE,
+                       'id': this.peerId, 'candidate':{ done: true }});
         }
       }   
 
       function onaddstream(event) {
          console.log('Remote stream added');
-         //attachMediaStream(mStream.peerVideo, event.stream);
          self.remoteVideoElm.srcObject = event.stream;
          self.remoteStream = event.stream;
       }   
@@ -591,8 +514,8 @@ SnowSDK.wsClient = wsClient;
          //XXX: temporarily mute
          //agent.localVideoElm.muted = false;
          agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CONNECT, 
-                     'channelid': agent.channelId, 'publish': agent.isPublisher, 'name': agent.name,
-                     'callid':"xxxyyyzzz", 'id': agent.peerId, 'roomid': agent.roomId});
+                     'channelid': agent.channelId, 'publish': agent.isPublisher, 
+                     'name': agent.name, 'id': agent.peerId});
          //onready();
          //subscribe();
       }, function(info) {
@@ -602,36 +525,47 @@ SnowSDK.wsClient = wsClient;
       });
    } 
 
-   PeerAgent.prototype.create =function(config) {
-      this.isPublisher = 1; 
+   PeerAgent.prototype.createChannel =function(config,onsuccess) {
       this.name = config.name;
-      this.roomId = this.peerId;//XXX: roomid is the same as peerid!
       this.send({'msgtype':globals.SNW_ICE,
                  'api':globals.SNW_ICE_CREATE, 
                  'uuid': SnowSDK.Utils.uuid()});//TODO: store it in PeerAgent obj.
+      this.listen('onCreate',onsuccess);
    }
 
    PeerAgent.prototype.connect = function(config) {
-      console.log("publish config info, config="+JSON.stringify(config));
-      this.isPublisher = 1; 
-      this.name = config.name;
-      this.roomId = this.peerId;//XXX: roomid is the same as peerid!
+      console.log("connect config info, config="+JSON.stringify(config));
+      this.remoteChannelId = config.channelid;
+
+      this.localVideoElm = config.localVideoId;
+      this.remoteVideoElm = config.remoteVideoId;
+
       getusermedia(this);
+   }
+
+   PeerAgent.prototype.onIceConnected = function() {
+      console.log("onIceConnected: stream mode, isPublisher=" + this.isPublisher);
+      if (this.isPublisher == 1) {
+         console.log("publishing a stream");
+         this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PUBLISH, 
+                 'channelid': this.channelId, 'id': this.peerId});
+      } else {
+         console.log("playing a stream");
+         this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PLAY, 
+                 'channelid': this.remoteChannelId, 'id': this.peerId});
+      }
    }
 
    PeerAgent.prototype.publish = function(config) {
       console.log("publishing, config="+JSON.stringify(config));
-      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PUBLISH, 
-                 'channelid': this.channelId, 'id': this.peerId, 'roomid': this.roomId});
+      this.isPublisher = 1; 
+      this.connect(config);
    }
+
    PeerAgent.prototype.play = function(config) {
       console.log("playing, config="+JSON.stringify(config));
-      this.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_PLAY, 
-                 'channelid': config.channelid, 'id': this.peerId, 'roomid': this.roomId});
-      //this.isPublisher = 0; 
-      //this.name = config.name;
-      //this.roomId = config.roomid
-      //getusermedia(this);
+      this.isPublisher = 0; 
+      this.connect(config);
    }
 
    SnowSDK.PeerAgent = PeerAgent;
@@ -677,59 +611,12 @@ SnowSDK.wsClient = wsClient;
    }
    /* ----------------  end of SnowSDK events ---------------------------------*/
 
-   /* ----------------  SnowSDK networking ------------------------------------*/
-   /*var isWsReady = false;
-   function onmessage(evt) {
-      var msg = JSON.parse(evt.data);
-      console.log("onmessage: ", evt.data);
-      SnowSDK.broadcast("onmessage",msg);
-      return;
-   };
-   SnowSDK.wsClient.setOnMessageCB(onmessage)
-   SnowSDK.wsClient.initWebSocket(globals.MEDIA_IPADDR,globals.MEDIA_PORT, function() {
-      console.log("wsclient is connected");
-      isWsReady = true;
-   });*/
-   /* ----------------  end of SnowSDK networking ------------------------------*/
-
    /* ----------------  SnowSDK API --------------------------------------------*/
-   var agents = [];
-   SnowSDK.getAvailableChannel = function() {
-      return 28093368;
-   }
 
-   function getPeerAgent(channel_id) {
-      if (channel_id === null)
-         channel_id = 0;
-      // check if agent exists, otherwise create one.
-      var agent = agents[channel_id] || (function(channel_id) {
-         var agent = new SnowSDK.PeerAgent();
-         var config = {
-            peerId : 0,
-            roomId : 28093368,
-            localStream : {},
-            remoteStream : {},
-            localVideoElm : document.getElementById('localVideo'),
-            remoteVideoElm : document.getElementById('remoteVideo'),
-            state : "disconnected",
-            pc : null
-            //send : function(msg) {
-            //   SnowSDK.wsClient.send(msg);
-            //}
-         };
-         agent.init(config);
-         //SnowSDK.listen("onmessage",function(msg) {
-         //   agent.receive(msg);
-         //});
-         return agent;
-      })(channel_id);
-      return agent;
-   }
+   SnowSDK.createPeer = function() {
+      var agent = new SnowSDK.PeerAgent();
+      agent.init();
 
-   // @config: {channel_id: channel_id, }
-   SnowSDK.createPeer = function(config) {
-      var agent = getPeerAgent();
-      console.log("creating agent=" + JSON.stringify(agent));
       return agent;
    }
 
