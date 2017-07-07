@@ -23,10 +23,10 @@
       // EVENT API
       this.SNW_EVENT_ICE_CONNECTED = 1;
 
-      this.MEDIA_IPADDR = "media.peercall.vn";
-      this.MEDIA_PORT = 443;
+      this.SNOW_SERVERNAME = "media.peercall.vn";
+      this.SNOW_PORT = 443;
 
-      this.replay_constraints = { audio: true, 
+      this.media_constraints = { audio: true, 
                                 video: {
                                   mandatory:{
                                      maxWidth: 480,
@@ -35,29 +35,14 @@
                                      minHeight: 270
                               }}};
 
-      this.pc_config = {'iceServers':[{'urls':'stun:peercall.vn:8478'},
-                                      {'urls':'turn:peercall.vn:8479','credential':'webrtc', 'username':'webrtc'}],
-                        'iceTransports': 'relay'};
+      this.peerconnection_config = {'iceServers':[{'urls':'stun:stun.l.google.com:19302',
+                                                   'urls':'stun:stun1.l.google.com:19302',
+                                                   'urls':'stun:stun2.l.google.com:19302',
+                                                   'urls':'stun:stun3.l.google.com:19302',
+                                                   'urls':'stun:stun4.l.google.com:19302'}],
+                                    'iceTransports': 'all'};
 
-      this.replay_pc_config = {'iceServers':[{'urls':'stun:peercall.vn:8478'},
-                                             {'urls':'turn:peercall.vn:8479','credential':'webrtc', 'username':'webrtc'}],
-                               'iceTransports': 'all'};
-
-      this.pc_constraints = {
-        'optional': [
-          {'DtlsSrtpKeyAgreement': true},
-          {'RtpDataChannels': true}
-      ]};
-
-      this.sdpConstraints = {'mandatory': {
-         'OfferToReceiveAudio':true,
-         'OfferToReceiveVideo':true }};
-
-      this.video_sdpConstraints = {'mandatory': {
-         'OfferToReceiveAudio':true,
-         'OfferToReceiveVideo':true }}; 
-
-      this.view_sdpConstraints = {'mandatory': {
+      this.sdp_constraints = {'mandatory': {
          'OfferToReceiveAudio':true,
          'OfferToReceiveVideo':true }}; 
 
@@ -346,8 +331,8 @@
       };
       this.wsClient = new SnowSDK.WsClient();
       this.wsClient.setOnMessageCB(onmessage)
-      this.wsClient.connect(globals.MEDIA_IPADDR,globals.MEDIA_PORT, function() {
-         console.log("wsclient is connected");
+      this.wsClient.connect(globals.SNOW_SERVERNAME,globals.SNOW_PORT, function() {
+         console.log("websocket is connected");
       });
    }
    
@@ -393,15 +378,14 @@
       function onError(e) {
          console.log("failed to create sdp answer: " + e);
       }
-      console.log("remote sdp: " + JSON.stringify(msg));
+      //console.log("remote sdp: " + JSON.stringify(msg));
       this.pc.setRemoteDescription(new RTCSessionDescription(msg));
-      console.log("create answer " + JSON.stringify(globals.video_sdpConstraints));
-      this.pc.createAnswer(setLocalAndSendMessage, onError, globals.video_sdpConstraints);
+      this.pc.createAnswer(setLocalAndSendMessage, onError, globals.sdp_constraints);
    }
 
    PeerAgent.prototype.on_remote_sdp = function(msg) {
       if (msg.type === 'offer') {
-         console.log("received offer: " + JSON.stringify(msg));
+         //console.log("received offer: " + JSON.stringify(msg));
          this.do_answer(msg);
       } else if (msg.type === 'answer') {
          console.log("[ERROR] received answer, not handled");
@@ -411,7 +395,7 @@
    }
 
    PeerAgent.prototype.on_remote_candidate = function(msg) {
-      console.log("received candidate: " + JSON.stringify(msg));
+      //console.log("received candidate: " + JSON.stringify(msg));
       if (msg.type === 'candidate') {
          var candidate = new RTCIceCandidate({sdpMLineIndex:msg.label, candidate:msg.candidate});
          console.log("received candidate, label=" + msg.label);
@@ -465,13 +449,13 @@
 
    PeerAgent.prototype.start_stream = function(stream) {
       var self = this;
-      this.pc = new RTCPeerConnection(globals.replay_pc_config, globals.pc_constraints)
+      this.pc = new RTCPeerConnection(globals.peerconnection_config, globals.pc_constraints)
       function onicecandidate(event) {
         console.log('onicecandidate event: ', event);
         if (event.candidate) {
            var candidate = event.candidate.candidate;
-           console.log("send relay address, sdpMid=", event.candidate.sdpMid);
-           console.log("send relay address, sdpMlineIndex=", event.candidate.sdpMLineIndex);
+           //console.log("send relay address, sdpMid=", event.candidate.sdpMid);
+           //console.log("send relay address, sdpMlineIndex=", event.candidate.sdpMLineIndex);
 
            self.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CANDIDATE, 'id': this.peerId, 
                       'candidate':{
@@ -503,7 +487,7 @@
    }
 
    function getusermedia(agent) {
-      navigator.getUserMedia(globals.replay_constraints, function(stream) {
+      navigator.getUserMedia(globals.media_constraints, function(stream) {
          console.log("get media sucessfully, id=" + agent.peerId);
          if (!stream) {
             return;
@@ -516,12 +500,8 @@
          agent.send({'msgtype':globals.SNW_ICE,'api':globals.SNW_ICE_CONNECT, 
                      'channelid': agent.channelId, 'publish': agent.isPublisher, 
                      'name': agent.name, 'id': agent.peerId});
-         //onready();
-         //subscribe();
       }, function(info) {
          console.log("failed to get media sucessfully");
-         //debugcb(info);
-         //return unablecb(info);
       });
    } 
 
@@ -612,14 +592,12 @@
    /* ----------------  end of SnowSDK events ---------------------------------*/
 
    /* ----------------  SnowSDK API --------------------------------------------*/
-
    SnowSDK.createPeer = function() {
       var agent = new SnowSDK.PeerAgent();
       agent.init();
 
       return agent;
    }
-
    /* ----------------  end of SnowSDK API --------------------------------------*/
 
    // sdk initiatlized
