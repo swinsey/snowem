@@ -28,9 +28,7 @@
       //}, false);
    }
 
-   SnowSDK.init = function(config, callback) {
-      console.log("api_key: " + config.api_key);
-      console.log("version: " + config.version);
+   SnowSDK.init = function(callback) {
       loadScript(window.location.protocol + '//' + window.location.hostname +
                  '/videocall/js/snowcore.js', callback);
    }

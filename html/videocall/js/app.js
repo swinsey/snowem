@@ -9,13 +9,16 @@
 })();
 
 window.snowAsyncInit = function() {
-   SnowSDK.init({api_key: "demo", version: "version"}, onSuccess);
-   function onSuccess() {
+   SnowSDK.init(function (){
       var isPublisher = 0;
       var channelid = 0;
       var peer = null;
+      var config = {
+         'servername': "media.peercall.vn",
+         'port': 443
+      };
 
-      function onCreateChannel(peer) {
+      function onChannelCreated(peer) {
          console.log("onCreate: peer=" + JSON.stringify(peer));
          document.getElementById("yourId").innerHTML = peer.peerId;
          var config = {
@@ -34,16 +37,16 @@ window.snowAsyncInit = function() {
       //API calls go here.
       document.getElementById("publishBtn").addEventListener("click", function() {
          isPublisher = 1;
-         peer = SnowSDK.createPeer();
-         peer.createChannel({name: "demo"},onCreateChannel);
+         peer = SnowSDK.createPeer(config);
+         peer.createChannel({name: "demo"},onChannelCreated);
       });
 
       document.getElementById("subscribeBtn").addEventListener("click", function() {
          channelid = parseInt(document.getElementById("subscribeChannelId").value);
          isPublisher = 0;
-         peer = SnowSDK.createPeer();//create peer peer
-         peer.createChannel({name: "demo"},onCreateChannel);
+         peer = SnowSDK.createPeer(config);//create peer peer
+         peer.createChannel({name: "demo"},onChannelCreated);
       });
-   }
+   })
 }
 

@@ -23,29 +23,6 @@
       // EVENT API
       this.SNW_EVENT_ICE_CONNECTED = 1;
 
-      this.SNOW_SERVERNAME = "media.peercall.vn";
-      this.SNOW_PORT = 443;
-
-      this.media_constraints = { audio: true, 
-                                video: {
-                                  mandatory:{
-                                     maxWidth: 480,
-                                     maxHeight: 270,
-                                     minWidth: 480,
-                                     minHeight: 270
-                              }}};
-
-      this.peerconnection_config = {'iceServers':[{'urls':'stun:stun.l.google.com:19302',
-                                                   'urls':'stun:stun1.l.google.com:19302',
-                                                   'urls':'stun:stun2.l.google.com:19302',
-                                                   'urls':'stun:stun3.l.google.com:19302',
-                                                   'urls':'stun:stun4.l.google.com:19302'}],
-                                    'iceTransports': 'all'};
-
-      this.sdp_constraints = {'mandatory': {
-         'OfferToReceiveAudio':true,
-         'OfferToReceiveVideo':true }}; 
-
       function get_browser_info() {
          var unknown = '-';
          var screenSize = '';
@@ -123,31 +100,17 @@
          var os = unknown;
          var clientStrings = [
              {s:'Windows 10', r:/(Windows 10.0|Windows NT 10.0)/},
-             {s:'Windows 8.1', r:/(Windows 8.1|Windows NT 6.3)/},
-             {s:'Windows 8', r:/(Windows 8|Windows NT 6.2)/},
              {s:'Windows 7', r:/(Windows 7|Windows NT 6.1)/},
              {s:'Windows Vista', r:/Windows NT 6.0/},
-             {s:'Windows Server 2003', r:/Windows NT 5.2/},
              {s:'Windows XP', r:/(Windows NT 5.1|Windows XP)/},
-             {s:'Windows 2000', r:/(Windows NT 5.0|Windows 2000)/},
-             {s:'Windows ME', r:/(Win 9x 4.90|Windows ME)/},
-             {s:'Windows 98', r:/(Windows 98|Win98)/},
-             {s:'Windows 95', r:/(Windows 95|Win95|Windows_95)/},
-             {s:'Windows NT 4.0', r:/(Windows NT 4.0|WinNT4.0|WinNT|Windows NT)/},
-             {s:'Windows CE', r:/Windows CE/},
-             {s:'Windows 3.11', r:/Win16/},
              {s:'Android', r:/Android/},
-             {s:'Open BSD', r:/OpenBSD/},
-             {s:'Sun OS', r:/SunOS/},
+             {s:'OpenBSD', r:/OpenBSD/},
+             {s:'SunOS', r:/SunOS/},
              {s:'Linux', r:/(Linux|X11)/},
              {s:'iOS', r:/(iPhone|iPad|iPod)/},
-             {s:'Mac OS X', r:/Mac OS X/},
-             {s:'Mac OS', r:/(MacPPC|MacIntel|Mac_PowerPC|Macintosh)/},
+             {s:'MacOS', r:/Mac OS X/},
              {s:'QNX', r:/QNX/},
              {s:'UNIX', r:/UNIX/},
-             {s:'BeOS', r:/BeOS/},
-             {s:'OS/2', r:/OS\/2/},
-             {s:'Search Bot', r:/(nuhk|Googlebot|Yammybot|Openbot|Slurp|MSNBot|Ask Jeeves\/Teoma|ia_archiver)/}
          ];
          for (var id in clientStrings) {
              var cs = clientStrings[id];
@@ -222,11 +185,30 @@
 // SDK configurations
 (function(window, undefined) {
    function Config() {
-      this.name = "";
-      this.email = "";
+      this.servername = "";
+      this.port = 0;
+      this.media_constraints = { audio: true, 
+                                video: {
+                                  mandatory:{
+                                     maxWidth: 480,
+                                     maxHeight: 270,
+                                     minWidth: 480,
+                                     minHeight: 270
+                              }}};
+      this.peerconnection_config = {'iceServers':[{'urls':'stun:stun.l.google.com:19302',
+                                                   'urls':'stun:stun1.l.google.com:19302',
+                                                   'urls':'stun:stun2.l.google.com:19302',
+                                                   'urls':'stun:stun3.l.google.com:19302',
+                                                   'urls':'stun:stun4.l.google.com:19302'}],
+                                    'iceTransports': 'all'};
+      this.sdp_constraints = {'mandatory': {
+         'OfferToReceiveAudio':true,
+         'OfferToReceiveVideo':true }}; 
    }
 
    Config.prototype.init= function(config) {
+      this.servername = config.servername;
+      this.port = config.port;
    };
     
    var SnowSDK = window.SnowSDK;
@@ -318,11 +300,21 @@
       this.isPublisher = 0;
       this.wsClient = null;
       this.listeners = [];
+      this.config = new SnowSDK.Config();
    }
 
-   PeerAgent.prototype.init = function() {
-      //set up network
+   PeerAgent.prototype.init = function(config) {
       var self = this;
+
+      // set config
+      console.log("set config: " + JSON.stringify(config.servername));
+      if (typeof config.servername === 'undefined') {
+         console.error("undefined servername");
+         return;
+      }
+      this.config.init(config);
+
+      //set up network
       function onmessage(evt) {
          var msg = JSON.parse(evt.data);
          console.log("onmessage: ", evt.data);
@@ -330,8 +322,8 @@
          return;
       };
       this.wsClient = new SnowSDK.WsClient();
-      this.wsClient.setOnMessageCB(onmessage)
-      this.wsClient.connect(globals.SNOW_SERVERNAME,globals.SNOW_PORT, function() {
+      this.wsClient.setOnMessageCB(onmessage);
+      this.wsClient.connect(this.config.servername,this.config.port, function() {
          console.log("websocket is connected");
       });
    }
@@ -380,7 +372,7 @@
       }
       //console.log("remote sdp: " + JSON.stringify(msg));
       this.pc.setRemoteDescription(new RTCSessionDescription(msg));
-      this.pc.createAnswer(setLocalAndSendMessage, onError, globals.sdp_constraints);
+      this.pc.createAnswer(setLocalAndSendMessage, onError, this.config.sdp_constraints);
    }
 
    PeerAgent.prototype.on_remote_sdp = function(msg) {
@@ -449,7 +441,7 @@
 
    PeerAgent.prototype.start_stream = function(stream) {
       var self = this;
-      this.pc = new RTCPeerConnection(globals.peerconnection_config, globals.pc_constraints)
+      this.pc = new RTCPeerConnection(this.config.peerconnection_config, this.config.sdp_constraints)
       function onicecandidate(event) {
         console.log('onicecandidate event: ', event);
         if (event.candidate) {
@@ -487,7 +479,7 @@
    }
 
    function getusermedia(agent) {
-      navigator.getUserMedia(globals.media_constraints, function(stream) {
+      navigator.getUserMedia(agent.config.media_constraints, function(stream) {
          console.log("get media sucessfully, id=" + agent.peerId);
          if (!stream) {
             return;
@@ -556,7 +548,7 @@
 (function(window, undefined) {
    var SnowSDK = window.SnowSDK;
    var globals = SnowSDK.Globals();
-   var config = SnowSDK.Config();
+   //var config = SnowSDK.Config();
 
    /* ---------------- SnowSDK events ---------------------------------------*/
    var listeners = {};
@@ -592,10 +584,10 @@
    /* ----------------  end of SnowSDK events ---------------------------------*/
 
    /* ----------------  SnowSDK API --------------------------------------------*/
-   SnowSDK.createPeer = function() {
+   SnowSDK.createPeer = function(config) {
       var agent = new SnowSDK.PeerAgent();
-      agent.init();
-
+      console.log("agent config: " + JSON.stringify(config));
+      agent.init(config);
       return agent;
    }
    /* ----------------  end of SnowSDK API --------------------------------------*/
