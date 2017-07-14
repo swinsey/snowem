@@ -9,36 +9,104 @@
    <link rel="stylesheet" href="css/bootstrap.min.css">
    <link rel="stylesheet" href="css/snowsdk.css">
 
+   <script type="text/javascript" src="js/jquery.min.js"></script>
+   <script type="text/javascript" src="js/bootstrap.min.js"></script>
 </head>
 
 <body>
 
-<div>
-  <div class="snowbox">
-     <video id='localVideo' class="snowvideo" autoplay="none" preload="none"> </video> 
+<div class="container">
+ <div class="row" style="padding-top:10px">
+  <div class="col-md-12">
+    <p>Snowstorm is designed with concept of channel. A channel id is used to identify video streams. Basic actions on channels are:</p>
+      <ul>
+       <li><span>publish a channel when one sends media stream to Snowstorm server.</span></li>
+       <li><span>play a channel when one views remote media stream</span></li>
+      </ul>
+    <p>The following demos show these two basic actions.</p>
   </div>
-
-  <div>
-    <button id="publishBtn" type="button" class="btn btn-primary">Publish my webcam</button>
-    <span id="yourId"></span>
-  </div>
+ </div>
 </div>
 
-<div>
-  <p>List of remote stream</p>
-  <div class="snowbox">
-    <video id='playRemoteVideo' class="snowvideo" autoplay="none" preload="none"> </video>
+<div class="container">
+
+ <div id="publishDiv" class="row" style="padding-top:10px">
+  <div id="publishVideoDiv" class="col-md-6" text-center>
+   <div class="snowbox">
+    <div class="videobox">
+      <video id='localVideo' class="snowvideo" autoplay="none" preload="none"> </video> 
+      <div id="floatDiv" class="float-btn-div">
+        <button id="publishBtn" type="button" class="btn btn-success">Publish my webcam</button>
+      </div>
+    </div>
+   </div>
   </div>
-  <div>
-    <button id="subscribeBtn" type="button" class="btn btn-secondary">Play a remote stream</button>
-    <input type="text" id="subscribeChannelId">
+
+  <div class="col-md-6">
+    <p>Steps to broadcast your webcam:</p>
+    <ol>
+      <li><span>Click on "Publish my webcam" to obtain a channel id.</span></li>
+      <li><span>Enter id in one of the below video box, click on "Play".</span></li>
+      <li><span>Verify that  a video stream is mirror of the webcam.</span></li>
+      <li><span>Try to repeat step 2 and 3 in other boxes or browser tabs.</span></li>
+    </ol>
   </div>
+ </div>
+
+</div>
+
+<div class="container bottom">
+ <div class="row" style="padding-top:10px">
+  <div class="col-md-12 text-center">
+    <p>Enter channel id in one of the below video boxes to view remote stream.</p>
+  </div>
+ </div>
 </div>
 
 
-  <!-- Custom Scripts -->
-  <script type="text/javascript" src="js/adapter.js"></script> <!-- wrapper of webrtc api -->
-  <script type="text/javascript" src="js/app.js"></script>
+<div class="container">
+ <div id="playDiv" class="row" style="padding-top:10px">
+
+  <div id="playVideoDiv" class="col-md-4">
+   <div class="videobox">
+     <video id="playRemoteVideo" class="snowvideo" autoplay="none" preload="none"> </video>
+     <div id="playBtnDiv" class="float-btn-div">
+        <button id="playBtn" type="button" class="btn btn-info">Play</button>
+        <input type="text" id="playChannelId" style="width:100px;">
+     </div>
+   </div>
+  </div>
+
+  <div class="col-md-4">
+   <div class="videobox">
+     <video id="playRemoteVideo1" class="snowvideo" autoplay="none" preload="none"> </video>
+     <div id="playBtnDiv1" class="float-btn-div">
+        <button id="playBtn1" type="button" class="btn btn-info">Play</button>
+        <input type="text" id="playChannelId1" style="width:100px;">
+     </div>
+   </div>
+  </div>
+
+  <div class="col-md-4">
+   <div class="videobox">
+     <video id="playRemoteVideo2" class="snowvideo" autoplay="none" preload="none"> </video>
+     <div id="playBtnDiv2" class="float-btn-div">
+        <button id="playBtn2" type="button" class="btn btn-info">Play</button>
+        <input type="text" id="playChannelId2" style="width:100px;">
+     </div>
+   </div>
+  </div>
+
+
+
+ </div>
+</div>
+    
+<!--<a id="add_row" class="btn btn-default">Play</a>-->
+
+<!-- Custom Scripts -->
+<script type="text/javascript" src="js/adapter.js"></script> <!-- wrapper of webrtc api -->
+<script type="text/javascript" src="js/app.js"></script>
 		
 </body>
 </html>
