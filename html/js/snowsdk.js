@@ -23,9 +23,6 @@
             script.onreadystatechange = null;
          }
       }
-      //script.addEventListener("load",function() {
-      //   console.log("script loaded: " + url);
-      //}, false);
    }
 
    function getBaseUrl(filename) {

@@ -21,15 +21,20 @@ enum {
 
 /* ICE api code */
 enum {
+   // public api
    SNW_ICE_MIN = 1,
    SNW_ICE_CREATE = SNW_ICE_MIN,
    SNW_ICE_CONNECT = 2,
-   SNW_ICE_STOP = 3,
-   SNW_ICE_SDP = 4,
-   SNW_ICE_CANDIDATE = 5,
-   SNW_ICE_PUBLISH = 6,
-   SNW_ICE_PLAY = 7,
-   SNW_ICE_FIR = 8,
+   SNW_ICE_PUBLISH = 3,
+   SNW_ICE_PLAY = 4,
+   SNW_ICE_STOP = 5,
+   SNW_ICE_CONTROL = 6,
+   SNW_ICE_AUTH = 7,
+
+   // internal api
+   SNW_ICE_SDP = 128,
+   SNW_ICE_CANDIDATE = 129,
+   SNW_ICE_FIR = 130,
 
    /* reserved range */
    SNW_ICE_MAX = 255,

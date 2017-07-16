@@ -31,7 +31,7 @@ window.snowAsyncInit = function() {
       var channelid2 = 0;
       var peer = null;
       var config = {
-         'servername': "media.peercall.vn",
+         'servername': "media.snowem.io",
          'port': 443
       };
 
@@ -51,8 +51,8 @@ window.snowAsyncInit = function() {
       $("#publishBtn").click(function() {
          isPublisher = 1;
          $("#floatDiv").hide();
-         $("#publishVideoDiv").attr('class','col-md-6');
-         $("#publishDiv").append('<div class="col-md-3 text-left"> Your webcam\'s channel id: <span id="yourId"></span></div>');
+         //$("#publishVideoDiv").attr('class','col-md-6');
+         $("#publishDiv").append('<div class="text-center"> Your webcam\'s channel id: <span style="color:#FF0000" id="yourId"></span></div>');
          peer = SnowSDK.createPeer(config);
          peer.createChannel({name: "demo"},onPublishChannelCreated);
       });
