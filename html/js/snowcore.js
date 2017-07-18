@@ -290,6 +290,7 @@
 
    function PeerAgent(){
       this.peerId = 0; 
+      this.channelId = 0; 
       this.name = "";
       this.localStream = {};
       this.remoteStream = {};
