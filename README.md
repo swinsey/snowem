@@ -36,7 +36,7 @@ ice_key_file = "<path-to>/ice_privkey.pem"
 // TRACE: 0, INFO: 1, DEBUG: 2, WARN: 3, ERROR: 4, FATAL: 5
 log_level = 0
 ```
-Snowem has built-in websocket server that exchange information between clients in order to setup video streams. To configure them, one needs provide certificates throught wss_cert_file and wss_key_file options.ice_cert_file and ice_key_file options are used for establishing secure video streams.
+Snowem has built-in websocket server that exchange information between clients in order to setup video streams. To configure them, one needs provide certificates throught wss_cert_file and wss_key_file options. The ice_cert_file and ice_key_file options are used for establishing secure video streams.
 
 To run Snowem:
 ```shell
