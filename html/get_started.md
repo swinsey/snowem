@@ -26,9 +26,9 @@ Snowem depends on the following libraries to build:
  - libsrtp.  
  - libconfig.
 
-Notes: on Ubuntu system, install the following packages:
+Notes: on Ubuntu system, one may install the following packages:
 <pre><code class="language-shell">
-apt-get install 
+apt-get install libssl1.0.0 libssl-dev libevent-2.0-5 libevent-openssl-2.0-5 libevent-dev libsofia-sip-ua-dev libsofia-sip-ua0 libsrtp0 libsrtp0-dev libjansson-dev libjansson4 libnettle6 nettle-dev libconfig9 libconfig-dev
 </code></pre>
 
 To build Snowem, execute the following commands: 
