@@ -49,26 +49,33 @@
 
 <section class="section">
  <div class="row">
-  <div class="col-md-12">
-  <div class="well">
-    <h3 class="text-center">A demo on broadcasting your webcam</h3>
-    <p>Snowem is designed with concept of channel. A channel id is used to identify video streams. Basic actions on channels are:</p>
+    <h3 class="snow-highlight text-center">A demo on broadcasting your webcam</h3>
+  <div class="col-md-offset-1 col-md-6" style="margin-top:30px;">
+     <div class="well">
+      <h4 class="snow-highlight">QuickTake</h4>
+      <p>Snowem is designed with concept of channel. A channel id is used to identify video streams. Basic actions on channels are:</p>
       <ul>
        <li><span>publish a channel when one sends a media stream to Snowem server.</span></li>
        <li><span>play a channel when one views a remote media stream</span></li>
       </ul>
-    <p>The following demo shows two basic actions on channels</p>
-    <ol>
-      <li><span>Click on "Publish my webcam" to obtain a channel id.</span></li>
-      <li><span>Enter id in the right video box, click on "Play".</span></li>
-      <li><span>Verify that  a video stream is mirror of the webcam.</span></li>
-      <li><span>Try to repeat step 2 and 3 in browser windows.</span></li>
-    </ol>
- <div class="panel panel-default"> 
- <div class="panel-body">
+      <p>The following demo shows two basic actions on channels.</p>
+      <div class="well" style="margin-top:20px;background:#ffffff">
+      <h5 class="snow-highlight">Steps to run demo:</h5>
+      <ol>
+        <li><span>Click on "Publish my webcam" to obtain a channel id.</span></li>
+        <li><span>Enter id in the right video box, click on "Play".</span></li>
+        <li><span>Verify that  a video stream is mirror of the webcam.</span></li>
+        <li><span>Try to repeat step 2 and 3 in browser windows.</span></li>
+      </ol>
+      </div>
+      <p>For quick start, check <a href="get_started.html">here</a>.</p>
+      <p>For full documentation, check <a href="docs.html">here</a>.</p>
+    </div>
+  </div><!--col-md-6-->
 
-  <div id="publishVideoDiv" class="col-md-6" text-center>
-      <p>Publish a channel</p>
+  <div class="col-md-5" style="margin-top:30px;">
+   <div class="text-center" style="padding-top:30px;">
+    <div id="publishVideoDiv" text-center>
       <div id="publishDiv" class="snowbox">
        <div class="videobox">
          <video id='localVideo' class="snowvideo" autoplay="none" preload="none"> </video> 
@@ -77,10 +84,9 @@
          </div>
        </div>
       </div>
-  </div><!--/col-md-6-->
+    </div>
 
-  <div class="col-md-6">
-      <p>Play a channel</p>
+    <div>
       <div id="playDiv" class="snowbox">
        <div class="videobox">
          <video id="playRemoteVideo" class="snowvideo" autoplay="none" preload="none"> </video>
@@ -90,14 +96,11 @@
          </div>
        </div>
       </div>
-  </div><!--/col-md-6-->
+    </div>
+   </div>
+  </div><!--col-md-6-->
 
- </div>
- </div>
-
-  </div>
-  </div>
- </div>
+ </div><!--row-->
 </section>
 
 <footer class="footer">
