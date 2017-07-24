@@ -98,14 +98,14 @@ peer.publish(settings);
 ### Play A Channel
 
 _Function_  
-peer.publish(settings)  
+peer.play(settings)  
 _Settings Parameters_  
 Parameter | Default | Description  
 --------- | ------- | -----------  
 channelid | none | Channel ID of Peer object.  
 remoteVideoId | none | ID of video tag which remote stream will attach to.  
 
-> To publish a channel, use this code:
+> To play a channel, use this code:
 
 ```javascript
 
