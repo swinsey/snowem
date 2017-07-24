@@ -1,4 +1,5 @@
-Snowem is a lightweight live streaming server, based on webrtc technology. Its design mainly focuses on simplicity, scalability and high performance.
+Snowem is a lightweight live streaming server, based on webrtc technology. Its design mainly focuses on simplicity, scalability and high performance.  
+Visit official website [here](https://snowem.io).
 ### Prerequesite
 Snowem depends on the following libraries to build:
 * libopenssl.
