@@ -45,116 +45,68 @@
 
 int 
 snw_adapctl_init(snw_adapctl_t *ctl, 
-      const time_t uiCurTime, 
-      const unsigned int uiCheckTimeSpan)
-{
-    ctl->m_uiCheckTimeSpan = uiCheckTimeSpan;
-    ctl->m_uiMsgCount = 0;
-    ctl->m_uiLastCheckTime = uiCurTime;
-    ctl->m_uiFactor = 1;
+      const time_t cur_time, 
+      const uint32_t period_time) {
+    ctl->period_time = period_time;
+    ctl->msg_cnt = 0;
+    ctl->last_time = cur_time;
+    ctl->rate = 1;
     return 0;
 }
 
-int GenNotifyFactor(const unsigned int uiMsgCount)
-{
-    if (uiMsgCount <= 1000)
-    {
+int get_packet_rate(const uint32_t msg_cnt) {
+    if (msg_cnt <= 1000) {
         return 1;
-    }
-    else if (uiMsgCount <= 5000)
-    {
-        return 4;
-    }
-    else if (uiMsgCount <= 10000)
-    {
-        return 5;
-    }
-    else if (uiMsgCount <= 20000)
-    {
-        return 6;
-    }
-    else if (uiMsgCount <= 30000)
-    {
-        return 9;
-    }
-    else if (uiMsgCount <= 40000)
-    {
-        return 15;
-    }
-    else if (uiMsgCount <= 50000)
-    {
-        return 24;
-    }
-    else if (uiMsgCount <= 60000)
-    {
-        return 39;
-    }
-    else if (uiMsgCount <= 70000)
-    {
-        return 63;
-    }
-    else if (uiMsgCount <= 80000)
-    {
-        return 73;
-    }
-    else if (uiMsgCount <= 90000)
-    {
+    } else if (msg_cnt <= 10000) {
+        return 7;
+    } else if (msg_cnt <= 40000) {
+        return 17;
+    } else if (msg_cnt <= 70000) {
+        return 37;
+    } else if (msg_cnt <= 100000) {
         return 83;
     }
-    else if (uiMsgCount <= 100000)
-    {
-        return 93;
-    }
     return 100;
-
 }
+
 int 
 snw_adapctl_addload(snw_adapctl_t *ctl,
-      const time_t uiCurTime, 
-      const unsigned int uiMsgCount)
-{
-    if (uiCurTime < ctl->m_uiLastCheckTime + (int)ctl->m_uiCheckTimeSpan)
+      const time_t cur_time, const uint32_t msg_cnt) {
+    if (cur_time < ctl->last_time + (int)ctl->period_time)
     {
-        ctl->m_uiMsgCount = ctl->m_uiMsgCount + uiMsgCount;
+        ctl->msg_cnt = ctl->msg_cnt + msg_cnt;
     }
     else
     {
-        ctl->m_uiLastCheckTime = uiCurTime;
-        ctl->m_uiLastMsgCount = ctl->m_uiMsgCount;
-        ctl->m_uiMsgCount = uiMsgCount;
-        ctl->m_uiLastFactor = ctl->m_uiFactor;
-        ctl->m_uiFactor = GenNotifyFactor(ctl->m_uiLastMsgCount);
+        ctl->last_time = cur_time;
+        ctl->rate = get_packet_rate(ctl->msg_cnt);
+        ctl->msg_cnt = msg_cnt;
     }  
     return 0;
 }
 
-
 int 
 snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path, 
       int32_t wait_sec, int32_t wait_usec, 
-      int32_t shm_key, int32_t shm_size, int32_t sync)
-{
+      int32_t shm_key, int32_t shm_size) {
    int ret = 0;
    int val;
    char *mem_addr = NULL;
    int mode = 0666 | O_NONBLOCK | O_NDELAY;
 
    if ( mq == NULL )  {
-      //ERROR("null pointer, addr=%p",  mq); 
       return -1;
    }
 
 	errno = 0;
    if ((mkfifo(fifo_path, mode)) < 0)
 		if (errno != EEXIST) {
-         //ERROR("failed to make fifo, file=%s",  fifo_path); 
 			ret = -1;
          goto done;
       }
 
    if ((mq->_fd = open(fifo_path, O_RDWR)) < 0) {
 		ret = -2;
-      //ERROR("failed to open fifo, file=%s",  fifo_path); 
       goto done;
    }
 
@@ -162,7 +114,6 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
 	{
 		close(mq->_fd);
 		ret = -3;
-      //ERROR("fd is too small, fd=%d", mq->_fd); 
       goto done;
 	}
     
@@ -170,7 +121,6 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
 	
 	if (val == -1) {
 		ret = errno ? -errno : val;
-      //ERROR("failed to get fl, fd=%d", mq->_fd); 
       goto done;
    }
 
@@ -183,12 +133,11 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
 
 	if (ret < 0) {
       ret = errno ? -errno : ret;
-      //ERROR("failed to set fl, fd=%d, ret", mq->_fd, ret); 
       goto done;
    } else
       ret = 0;
 
-	assert(shm_size > SHM_HEAD_SIZE);
+	assert(shm_size > SHM_HEAD_SIZE * 2 + (int32_t)sizeof(*mq->_adaptive_ctrl));
 
 	mq->_shm = snw_shm_create(shm_key, shm_size);
 
@@ -196,7 +145,6 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
       mq->_shm = snw_shm_open(shm_key, shm_size);
       if ( mq->_shm == NULL ) {
 		   ret = -1;
-         //ERROR("failed to open shm, key=%d, size=%d", shm_key, shm_size);
          goto done;
    	}
       mem_addr = mq->_shm->addr;
@@ -209,12 +157,10 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
 
    // init adaptive control.
    mq->_adaptive_ctrl = (snw_adapctl_t *)mem_addr;
-   mq->_adaptive_ctrl->m_uiCheckTimeSpan = 1;
-   mq->_adaptive_ctrl->m_uiMsgCount = 0;
-   mq->_adaptive_ctrl->m_uiLastCheckTime = time(NULL);
-   mq->_adaptive_ctrl->m_uiLastFactor = 1;
-   mq->_adaptive_ctrl->m_uiFactor = 1;
-   mq->_adaptive_ctrl->m_uiSync = sync;
+   mq->_adaptive_ctrl->period_time = 1;
+   mq->_adaptive_ctrl->msg_cnt = 0;
+   mq->_adaptive_ctrl->last_time = time(NULL);
+   mq->_adaptive_ctrl->rate = 1;
 
 	mq->_wait_sec = wait_sec;
 	mq->_wait_usec = wait_usec;
@@ -229,7 +175,7 @@ setup:
 	mq->_head = (uint32_t*)mem_addr + 2;
 	mq->_tail = mq->_head+1;
 	mq->_block = (char*) (mq->_tail+1);
-	mq->_block_size = shm_size - ( SHM_HEAD_SIZE * 2 + sizeof(*mq->_adaptive_ctrl) );
+	mq->_block_size = shm_size - (SHM_HEAD_SIZE * 2 + sizeof(*mq->_adaptive_ctrl));
 
 	ret = 0;
 done:
@@ -237,24 +183,21 @@ done:
 }
 
 void 
-snw_release_shmmq(snw_shmmq_t *mq)
-{
+snw_release_shmmq(snw_shmmq_t *mq) {
    // TODO
 }
 
 int
-snw_write_mq(snw_shmmq_t *mq, const void* data, uint32_t data_len, uint32_t flow)
-{
-	uint32_t head;// = *_head;
-	uint32_t tail;// = *_tail;	
+snw_write_mq(snw_shmmq_t *mq, const void* data, uint32_t data_len, uint32_t flow) {
+	uint32_t head;
+	uint32_t tail;
 	uint32_t free_len;// = head>tail? head-tail: head+_block_size-tail;
 	uint32_t tail_len;// = _block_size - tail;
 	char sHead[SHM_HEAD_SIZE] = {0};
 	uint32_t total_len;// = data_len+SHM_HEAD_SIZE;
    int ret = 0;
 
-   if ( mq == NULL )
-      return -1;
+   if (mq == NULL) return -1;
 
    head = *mq->_head;
    tail = *mq->_tail;
@@ -262,12 +205,8 @@ snw_write_mq(snw_shmmq_t *mq, const void* data, uint32_t data_len, uint32_t flow
 	tail_len = mq->_block_size - tail;
 	total_len = data_len+SHM_HEAD_SIZE;
 
-   // get lock
-	//_sem->wait(mq->_sem_index);
-
 	//	first, if no enough space?
-	if (free_len <= total_len)
-	{
+	if (free_len <= total_len) {
 		//LOG(FATAL, "CShmMQ::enqueue: No more free shm mem, 
       //           free_len:%d, total_len:%d", free_len, total_len);
 		ret = -1;
@@ -279,43 +218,39 @@ snw_write_mq(snw_shmmq_t *mq, const void* data, uint32_t data_len, uint32_t flow
 
 	//	second, if tail space > 8+len
 	//	copy 8 byte, copy data
-	if (tail_len >= total_len)
-	{
+	if (tail_len >= total_len) {
 		memcpy(mq->_block+tail, sHead, SHM_HEAD_SIZE);
 		memcpy(mq->_block+tail+ SHM_HEAD_SIZE, data, data_len);
 		*mq->_tail += data_len + SHM_HEAD_SIZE;
 	}
 
 	//	third, if tail space > 8 && < 8+len
-	else if (tail_len >= SHM_HEAD_SIZE && tail_len < SHM_HEAD_SIZE+data_len)
-	{
+	else if (tail_len >= SHM_HEAD_SIZE && tail_len < SHM_HEAD_SIZE+data_len) {
+		uint32_t first_len = 0;
+		uint32_t second_len = 0;
+		int32_t wrapped_tail = 0;
 		//	copy 8 byte
 		memcpy(mq->_block+tail, sHead, SHM_HEAD_SIZE);
 
 		//	copy tail-8
-		uint32_t first_len = tail_len - SHM_HEAD_SIZE;
+		first_len = tail_len - SHM_HEAD_SIZE;
 		memcpy(mq->_block+tail+ SHM_HEAD_SIZE, data, first_len);
 
 		//	copy left
-		uint32_t second_len = data_len - first_len;
+		second_len = data_len - first_len;
 		memcpy(mq->_block, ((char*)data) + first_len, second_len);
 
-        // XXX
-		int32_t itmp = *mq->_tail + data_len + SHM_HEAD_SIZE - mq->_block_size;
-		*mq->_tail = itmp;
-
-		//*_tail += data_len + SHM_HEAD_SIZE;
-		//*_tail -= mq->_block_size;
+      // XXX
+		wrapped_tail = *mq->_tail + data_len + SHM_HEAD_SIZE - mq->_block_size;
+		*mq->_tail = wrapped_tail;
 	}
-
-	//	fourth, if tail space < 8
-	else
-	{
+	else {
+		uint32_t second_len = 0;
 		//	copy tail byte
 		memcpy(mq->_block+tail, sHead, tail_len);
 
 		//	copy 8-tail byte
-		uint32_t second_len = SHM_HEAD_SIZE - tail_len;
+		second_len = SHM_HEAD_SIZE - tail_len;
 		memcpy(mq->_block, sHead + tail_len, second_len);
 
 		//	copy data
@@ -329,31 +264,27 @@ snw_write_mq(snw_shmmq_t *mq, const void* data, uint32_t data_len, uint32_t flow
    else
       return 0;
 done:
-   // release lock
-	//_sem->post(mq->_sem_index);
    return ret;
 }
 
 int 
 snw_shmmq_enqueue(snw_shmmq_t *mq, 
-      const time_t uiCurTime, const void* data, 
-      uint32_t data_len, uint32_t flow)
-{
+      const time_t cur_time, const void* data, 
+      uint32_t data_len, uint32_t flow) {
    int ret = 0;
 
-   if ( mq == NULL )
+   if (mq == NULL)
       return -1;
 
    mq->_count++;
 
    ret = snw_write_mq(mq, data, data_len, flow);
-   if(ret < 0)
-      return ret;
+   if (ret < 0) return ret;
 
-   snw_adapctl_addload(mq->_adaptive_ctrl,uiCurTime, 1);
+   snw_adapctl_addload(mq->_adaptive_ctrl,cur_time, 1);
 
 #ifdef USE_ADAPTIVE_CONTROL
-   if (0 == mq->_count% mq->_adaptive_ctrl->m_uiFactor)
+   if (0 == mq->_count% mq->_adaptive_ctrl->rate)
 #endif 
    {
       errno = 0;
@@ -373,11 +304,7 @@ snw_read_mq(snw_shmmq_t *mq, void* buf, uint32_t buf_size,
 	uint32_t head = *mq->_head;
 	uint32_t tail = *mq->_tail;
 
-   // get lock
-	//_sem->wait(_sem_index);
-
-	if (head == tail)
-	{
+	if (head == tail) {
 		*data_len = 0;
 		ret = 0;
       goto done;
@@ -386,8 +313,7 @@ snw_read_mq(snw_shmmq_t *mq, void* buf, uint32_t buf_size,
 	used_len = tail>head ? tail-head : tail+mq->_block_size-head;
 	
 	//	if head + 8 > block_size
-	if (head+SHM_HEAD_SIZE > mq->_block_size)
-	{
+	if (head+SHM_HEAD_SIZE > mq->_block_size) {
 		uint32_t first_size = mq->_block_size - head;
 		uint32_t second_size = SHM_HEAD_SIZE - first_size;
 		memcpy(sHead, mq->_block + head, first_size);
@@ -408,28 +334,21 @@ snw_read_mq(snw_shmmq_t *mq, void* buf, uint32_t buf_size,
 	
 	*data_len = total_len-SHM_HEAD_SIZE;
 
-	if (*data_len > buf_size)
-   {
-      //ERROR("data_len is greater than buf_size, data_len=%d, buf_size=%d", *data_len, buf_size);
+	if (*data_len > buf_size) {
 		ret = -1;
       goto done;
     }
-	if (head+*data_len > mq->_block_size)	//	
-	{
+	if (head+*data_len > mq->_block_size) {
 		uint32_t first_size = mq->_block_size - head;
 		uint32_t second_size = *data_len - first_size;
 		memcpy(buf, mq->_block + head, first_size);
 		memcpy(((char*)buf) + first_size, mq->_block, second_size);
 		*mq->_head = second_size;
-	}
-	else
-	{
+	} else {
 		memcpy(buf, mq->_block + head, *data_len);
 		*mq->_head = head+*data_len;
 	}
 done:
-   // release lock
-	//_sem->post(_sem_index);
 	return ret;
 };
 
@@ -466,13 +385,11 @@ snw_shmmq_dequeue(snw_shmmq_t *mq, void* buf,
       uint32_t buf_size, uint32_t *data_len, uint32_t *flow) {
    int ret;
 
-   if (mq == NULL)
-      return -1;
+   if (mq == NULL) return -1;
 
 	//	first, try to get data from queue.
    ret = snw_read_mq(mq, buf, buf_size, data_len, flow); 
-	if (ret || *data_len)
-		return ret;
+	if (ret || *data_len) return ret;
 
 	//	second, if no data, wait on fifo.
 	ret = snw_shmmq_select_fifo(mq->_fd, mq->_wait_sec, mq->_wait_usec);
@@ -500,89 +417,5 @@ snw_shmmq_dequeue(snw_shmmq_t *mq, void* buf,
 
    return ret;
 }
-
-int snw_shmmq_select_fifo_wait(int _fd, unsigned _wait_sec, 
-      unsigned _wait_usec)
-{
-   errno = 0;
-   fd_set readfd;
-   FD_ZERO(&readfd);
-   FD_SET(_fd, &readfd);
-   struct timeval tv;
-   tv.tv_sec = _wait_sec;
-   tv.tv_usec = _wait_usec;
-    
-   //int ret = select(_fd+1, &readfd, NULL, NULL, &tv);
-   int ret = select(_fd+1, &readfd, NULL, NULL, 0); (void)tv;
-   if(ret > 0) {
-      if(FD_ISSET(_fd, &readfd))
-         return ret;
-      else
-         return -1;
-   } else if (ret == 0) {
-		return 0;
-	} else {
-		if (errno != EINTR) {
-			close(_fd);
-		}
-		return -1;
-	}
-}
-
-int 
-snw_shmmq_dequeue_wait(snw_shmmq_t *mq, void* buf, 
-      uint32_t buf_size, uint32_t *data_len, uint32_t *flow)
-{
-   int ret;
-
-   if ( mq == NULL )
-      return -1;
-
-	//	first, try to get data from queue.
-   //ret = snw_read_mq(mq, buf, buf_size, data_len, flow); 
-	//if (ret || *data_len)
-	//	return ret;
-
-	//	second, if no data, wait on fifo.
-	ret = snw_shmmq_select_fifo_wait(mq->_fd, 1, 0);
-	if (ret == 0) {
-		data_len = 0;
-		return ret;
-	}
-	else if (ret < 0) {
-		return -1;
-	}
-
-	// third, if fifo activated, read the signals.
-   {
-	   static const int32_t buf_len = 1;//<<10;
-   	u_char buffer[buf_len];
-   	ret = read(mq->_fd, buffer, buf_len);
-   	if (ret < 0 && errno != EAGAIN)
-      {
-         //ERROR("read error, ret=%d, errno=%d", ret, errno);
-         return -1;
-      }
-   }	
-
-	//	fourth, get data
-reread:
-	ret = snw_read_mq(mq, buf, buf_size, data_len, flow);
-   if ( *data_len == 0 ) {
-      usleep(500); // FIXME: config time_wait here.
-      goto reread;
-   }
-
-   return ret;
-}
-
-void 
-snw_shmmq_clear_flag(uint32_t _fd) 
-{
-    static u_char buffer[1];
-    read(_fd, buffer, 1);
-}
-
-
 
 

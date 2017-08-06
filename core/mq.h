@@ -37,18 +37,15 @@ extern "C" {
 
 #include "shm.h"
 
-//static const int E_DEQUEUE_BUF_NOT_ENOUGH = -13001;
+#define SHM_HEAD_SIZE 8
 
 typedef struct snw_adapctl snw_adapctl_t;
 struct snw_adapctl 
 {
-   unsigned int  m_uiCheckTimeSpan;
-   unsigned int  m_uiMsgCount;
-   unsigned int  m_uiLastMsgCount;
-   unsigned int  m_uiFactor;
-   unsigned int  m_uiLastFactor;
-   time_t        m_uiLastCheckTime;
-   unsigned int  m_uiSync;
+   uint32_t  period_time;
+   uint32_t  msg_cnt;
+   uint32_t  rate;
+   time_t    last_time;
 }__attribute__((packed));
 
 typedef struct snw_shmmq snw_shmmq_t;
@@ -67,7 +64,6 @@ struct snw_shmmq
 	uint32_t        _block_size;
    uint32_t*       _enqueued_msg_cnt;
    uint32_t*       _dequeued_msg_cnt;
-#define SHM_HEAD_SIZE 8
 }__attribute__((packed));
 
 void 
@@ -76,7 +72,7 @@ print_shmmq(snw_shmmq_t *mq);
 int 
 snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path, 
       int32_t wait_sec, int32_t wait_usec, 
-      int32_t shm_key, int32_t shm_size, int32_t sync);
+      int32_t shm_key, int32_t shm_size);
 
 void 
 snw_shmmq_release(snw_shmmq_t *mq);
@@ -90,14 +86,6 @@ int
 snw_shmmq_dequeue(snw_shmmq_t *mq, void* buf, 
       uint32_t buf_size, uint32_t *data_len, uint32_t *flow);
 
-int 
-snw_shmmq_dequeue_wait(snw_shmmq_t *mq, void* buf, 
-      uint32_t buf_size, uint32_t *data_len, uint32_t *flow);
-
-void 
-snw_shmmq_clear_flag(uint32_t _fd);
-
-	
 #ifdef __cplusplus
 }
 #endif
