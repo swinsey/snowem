@@ -4,8 +4,8 @@ window.snowAsyncInit = function() {
       var channelid = 0;
       var peer = null;
       var config = {
-         'servername': "media.snowem.io",
-         'port': 443
+         'servername': "wss.snowem.io",
+         'port': 8443
       };
 
       function onPublishChannelCreated(peer) {

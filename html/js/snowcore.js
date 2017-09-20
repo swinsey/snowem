@@ -292,6 +292,7 @@
       this.peerId = 0; 
       this.channelId = 0; 
       this.name = "";
+      this.isVideo = "on";
       this.localStream = {};
       this.remoteStream = {};
       this.localVideoEl = null;
@@ -442,7 +443,9 @@
 
    PeerAgent.prototype.start_stream = function(stream) {
       var self = this;
+
       this.pc = new RTCPeerConnection(this.config.peerconnection_config, this.config.sdp_constraints)
+
       function onicecandidate(event) {
         console.log('onicecandidate event: ', event);
         if (event.candidate) {
@@ -484,6 +487,9 @@
    }
 
    function getusermedia(agent) {
+      if (agent.isVideo === "off") 
+         agent.config.media_constraints.video = false;
+      console.log("set media constraint, info=" + JSON.stringify(agent.config.media_constraints));
       navigator.getUserMedia(agent.config.media_constraints, function(stream) {
          console.log("get media sucessfully, id=" + agent.peerId);
          if (!stream) {
@@ -516,6 +522,11 @@
 
    PeerAgent.prototype.connect = function(config) {
       console.log("connect config info, config="+JSON.stringify(config));
+      if (config.video) 
+        this.isVideo = config.video;
+      else
+        this.isVideo = "on";
+
       this.remoteChannelId = config.channelid;
 
       this.localVideoElm = config.localVideoId;
