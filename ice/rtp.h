@@ -46,40 +46,6 @@ struct rtp_hdr_ext {
 	uint16_t len;
 };
 
-#define DEFAULT_MAX_NACK_QUEUE   300
-#define MAX_NACK_IGNORE       100000 /* retransmission time (100ms) */
-#define SEQ_MISSING_WAIT 12000 /*  12ms */
-#define SEQ_NACKED_WAIT 155000 /* 155ms */
-#define LAST_SEQS_MAX_LEN 160
-
-typedef struct seq_info seq_info_t;
-struct seq_info {
-   int64_t ts;
-   uint16_t seq;
-   uint16_t state;
-   seq_info_t *next;
-   seq_info_t *prev;
-};
-
-enum {
-   SEQ_MISSING,
-   SEQ_NACKED,
-   SEQ_GIVEUP,
-   SEQ_RECVED
-};
-
-void
-snw_ice_seq_append(seq_info_t **head, seq_info_t *new_seq);
-
-seq_info_t *
-snw_ice_seq_pop_head(seq_info_t **head);
-
-void
-snw_ice_seq_list_free(seq_info_t **head);
-
-int
-snw_ice_seq_in_range(uint16_t seqn, uint16_t start, uint16_t len);
-
 #define RTP_SEQ_NUM_MAX   (1<<16)
 #define RTP_SLIDEWIN_SIZE 16
 #define RTP_SYNC_TIME_MAX 500000 //500ms
