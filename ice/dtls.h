@@ -49,8 +49,6 @@ struct dtls_ctx {
    unsigned char material[SRTP_MASTER_LENGTH*2];
    srtp_t srtp_in;
    srtp_t srtp_out;
-   srtp_policy_t remote_policy;
-   srtp_policy_t local_policy;
 };
 
 int

@@ -173,7 +173,7 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
       candidate_free(c);
    }
 
-   DEBUG(log, "FXIME: free list of candidates");
+   //FXIME: free list of candidates
    /*list_for_each_safe(i,n,&candidates->list) {
       candidate_t *c = list_entry(i,candidate_t,list);
       candidate_free(c);
@@ -735,7 +735,6 @@ send_rtp_pkt(snw_ice_session_t *session,
    ice_verify_stream_status(session);
 
    if (control) {
-      DEBUG(log,"never reach me");
       send_rtcp_pkt_internal(session,video,0,buf,len);
    } else {
       send_rtp_pkt_internal(session,video,0,buf,len);
@@ -751,8 +750,9 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
       return;
    log = session->ice_ctx->log;
 
-   DEBUG(log, "send rtcp packet, len=%u",len);
+   //FIXME: check stuff
    send_rtp_pkt(session,1,video,buf,len);
+   return;
 }
 
 void 
@@ -786,103 +786,6 @@ snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream
          send_rtcp_pkt_internal(session,video,0,rtcpbuf,RTCP_RTPFB_MSG_LEN);
    }
 
-   return;
-}
-
-void 
-snw_ice_rtp_nacks(snw_ice_session_t *session, snw_ice_component_t *component, rtp_hdr_t *header, int video) {
-   snw_log_t *log = 0; 
-   std::vector<int> nacklist;
-   seq_info_t **last_seqs = 0; 
-   seq_info_t *cur_seq = 0; 
-   int last_seqs_len = 0; 
-   int64_t now = get_monotonic_time();
-   uint16_t new_seqn = ntohs(header->seq);
-   uint16_t cur_seqn;
-
-   if (!session || !component) return;
-   log = session->ice_ctx->log;
-     
-   last_seqs = video ? &component->last_seqs_video : &component->last_seqs_audio;
-   cur_seq = *last_seqs;
-
-   if (cur_seq) {
-      cur_seq = cur_seq->prev;
-      cur_seqn = cur_seq->seq;
-   } else {
-      cur_seqn = new_seqn - (uint16_t)1; /* Can wrap */
-   }
-
-   // FIXME: check meaning of the second condition.
-   if (!snw_ice_seq_in_range(new_seqn, cur_seqn, LAST_SEQS_MAX_LEN) &&
-       !snw_ice_seq_in_range(cur_seqn, new_seqn, 1000)) {
-      /* Jump too big, start fresh */
-      ERROR(log, "big sequence number jump %hu -> %hu , video=%u", cur_seqn, new_seqn, video);
-      snw_ice_seq_list_free(last_seqs);
-      cur_seq = NULL;
-      cur_seqn = new_seqn - (uint16_t)1;
-   }
-   DEBUG(log, "current sequence number, video=%u, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
-         video, cur_seqn, new_seqn, last_seqs_len);
-
-   if (snw_ice_seq_in_range(new_seqn, cur_seqn, LAST_SEQS_MAX_LEN)) {
-      while(cur_seqn != new_seqn) {
-         cur_seqn += (uint16_t)1; /* can wrap */
-         seq_info_t *seq_obj = (seq_info_t*)malloc(sizeof(seq_info_t));
-         seq_obj->seq = cur_seqn;
-         seq_obj->ts = now;
-         seq_obj->state = (cur_seqn == new_seqn) ? SEQ_RECVED : SEQ_MISSING;
-         snw_ice_seq_append(last_seqs, seq_obj);
-         last_seqs_len++;
-         if ( seq_obj->state == SEQ_MISSING ) {
-            WARN(log, "missing packet, cur_seq=%u, new_seq=%u, last_seqs_len=%u",
-               cur_seqn,new_seqn,last_seqs_len);
-         }
-      }
-   }
-
-   if (cur_seq) {
-      for (;;) {
-         last_seqs_len++;
-         if(cur_seq->seq == new_seqn) {
-            WARN(log, "Recieved missed sequence number %u", cur_seq->seq);
-            cur_seq->state = SEQ_RECVED;
-         } else if(cur_seq->state == SEQ_MISSING && now - cur_seq->ts > SEQ_MISSING_WAIT) {
-            WARN(log, "Missed sequence number, sending 1st nack, seq=%u", cur_seq->seq);
-            nacklist.push_back(cur_seq->seq);
-            cur_seq->state = SEQ_NACKED;
-         } else if(cur_seq->state == SEQ_NACKED  && now - cur_seq->ts > SEQ_NACKED_WAIT) {
-            ERROR(log, "Missed sequence number, sending 2nd nack, seq=%u", cur_seq->seq);
-            nacklist.push_back(cur_seq->seq);
-            cur_seq->state = SEQ_GIVEUP;
-         }
-         if(cur_seq == *last_seqs) {
-            /* Just processed head */
-            break;
-         }
-         cur_seq = cur_seq->prev;
-      }
-   }
-
-   while (last_seqs_len > LAST_SEQS_MAX_LEN) {
-      seq_info_t *node = snw_ice_seq_pop_head(last_seqs);
-      free(node);
-      last_seqs_len--;
-   }
-
-   uint32_t nacks_count = nacklist.size();
-   if (nacks_count) {
-      char nackbuf[120];
-      int ret = snw_ice_rtcp_generate_nacks(nackbuf, sizeof(nackbuf), nacklist);
-
-      WARN(log, "nacks missed packets, flowid=%u, nacks_count=%u(%u), ret=%u",
-                 session->flowid, nacks_count, nacklist.size(), ret);
-      if (ret > 0) {
-         ice_relay_rtcp(session, video, nackbuf, ret);
-      }
-   }
-
-   /* FIXME: Update stats */
    return;
 }
 
@@ -980,26 +883,14 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       return;
    } 
 
-   /*if (IS_FLAG(session,ICE_PUBLISHER)) {
-      DEBUG(log, "sender save audio/video packet, video=%u, roomid: %u", 
-            video, session->roomid);
-      if (video) {
-         recorder_save_frame(handle->v_recorder, buf, buflen);// FIXME: impl
-      } else {
-         recorder_save_frame(handle->a_recorder, buf, buflen);
-      }
-   }*/
-
    if (IS_FLAG(session,ICE_PUBLISHER)) {
       snw_ice_broadcast_rtp_pkg(session,0,video,buf,buflen);
    } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
       //do nothing
    }
 
-   //ice_rtp_plugin(handle,stream,component,0,video,buf,buflen); //FIXME: impl
-
+   //ice_rtp_plugin(); //FIXME: impl
    if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_rtp_nacks(session,component,header,video);
       snw_ice_handle_lost_packets(session,stream,
           component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);

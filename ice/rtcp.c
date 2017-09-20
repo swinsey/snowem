@@ -80,7 +80,6 @@ snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c,
 
 	if (rtcp->hdr.v != RTCP_VERSION) return;
 
-   HEXDUMP(log,buf,len,"rtcp");
 	while (rtcp) {
 		if (rtcp->hdr.pt == RTCP_RTPFB && 
           rtcp->hdr.rc == RTCP_RTPFB_GENERIC_FMT) {
@@ -192,56 +191,6 @@ snw_rtcp_gen_nack(char *buf, int len,
    memcpy(rtcp->pkt.fb.fci.nack, &payload, 4);
 
 	return RTCP_PSFB_PLI_MSG_LEN;
-}
-
-
-int 
-snw_ice_rtcp_generate_nacks(char *packet, int len, std::vector<int> nacks) {
-   if(packet == NULL || len < 16 || nacks.size() == 0)
-      return -1; 
-   memset(packet, 0, len);
-   rtcp_hdr_t *rtcp = (rtcp_hdr_t *)packet;
-   /* Set header */
-   rtcp->v = 2;
-   rtcp->pt = RTCP_RTPFB;
-   rtcp->rc = 1;  /* FMT=1 */
-   /* Now set NACK stuff */
-   rtcp_fb *rtcpfb = (rtcp_fb *)rtcp;
-   rtcp_nack *nack = (rtcp_nack *)rtcpfb->fci;
-
-   /* FIXME We assume the GSList list is already ordered... */
-   //uint16_t pid = GPOINTER_TO_UINT(nacks->data);
-   uint16_t pid = nacks[0];
-   nack->pid = htons(pid);
-   //nacks = nacks->next;
-   int words = 3;
-
-   for (unsigned int i=1; i<nacks.size(); i++) {
-      uint16_t npid = nacks[i];
-      if(npid-pid < 1) {
-         ICE_DEBUG2("Skipping PID to NACK, npid=%u, pid=%u", npid, pid);
-      } else if(npid-pid > 16) {
-         /* We need a new block: this sequence number will be its root PID */
-         ICE_DEBUG2("Adding another block of NACKs, npid=%u, pid=%u, delta=%u", npid, pid, npid-pid);
-         words++;
-         if(len < (words*4+4)) {
-            ICE_DEBUG2("Buffer too small, len=%d, nack_blocks=%d, words=%d", len, words, words*4+4);
-            return -1;
-         }
-         char *new_block = packet + words*4;
-         nack = (rtcp_nack *)new_block;
-         //pid = GPOINTER_TO_UINT(nacks->data);
-         pid = nacks[i];
-         nack->pid = htons(pid);
-      } else {
-         uint16_t blp = ntohs(nack->blp);
-         blp |= 1 << (npid-pid-1);
-         nack->blp = htons(blp);
-      }
-      //nacks = nacks->next;
-   }
-   rtcp->len = htons(words);
-   return words*4+4;
 }
 
 

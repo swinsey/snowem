@@ -354,8 +354,6 @@ dtls_srtp_create(srtp_t *srtp, unsigned char *key, int key_len, unsigned char *s
 
 int
 dtls_srtp_setup(dtls_ctx_t *dtls, snw_ice_session_t *session, snw_ice_component_t *component) {
-   unsigned char remote_policy_key[SRTP_MASTER_LENGTH];
-   unsigned char local_policy_key[SRTP_MASTER_LENGTH];
    unsigned char *local_key, *local_salt, *remote_key, *remote_salt;
    snw_log_t *log = 0;
    int ret = 0;
