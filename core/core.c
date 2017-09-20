@@ -159,7 +159,7 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
 
    ret = snw_shmmq_init(ctx->snw_net2core_mq,
              "/tmp/snw_net2core_mq.fifo", 0, 0, 
-             NET2CORE_KEY, SHAREDMEM_SIZE, 0);
+             NET2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
       ERROR(ctx->log,"failed to init net2core mq");
       return -2;
@@ -173,7 +173,7 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
 
    ret = snw_shmmq_init(ctx->snw_core2net_mq,
              "/tmp/snw_core2net_mq.fifo", 0, 0, 
-             CORE2NET_KEY, SHAREDMEM_SIZE, 0);
+             CORE2NET_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
       ERROR(ctx->log,"failed to init net2core mq");
       return -2;
