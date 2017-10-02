@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "cicero/agent.h"
+#include "cice/agent.h"
 #include "ice_channel.h"
 #include "ice_stream.h"
 #include "ice_types.h"

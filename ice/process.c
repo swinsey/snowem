@@ -8,6 +8,7 @@
 #include "ice_channel.h"
 #include "ice_session.h"
 #include "json/json.h"
+#include "log.h"
 #include "sdp.h"
 #include "rtcp.h"
 #include "process.h"
