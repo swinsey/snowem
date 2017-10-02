@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <jansson.h>
 
-#include "cicero/agent.h"
+#include "cice/agent.h"
 #include "core.h"
 #include "dtls.h"
 #include "ice_types.h"
