@@ -185,26 +185,16 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
 }
 
 void
-snw_ice_sdp_send_candidates(snw_ice_session_t *session, int video) {
-   snw_ice_stream_t *stream = 0;
+snw_ice_sdp_send_candidates(snw_ice_session_t *session) {
+   struct list_head *n;
+  
+   list_for_each(n,&session->streams.list) {
+      snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
 
-   if (video) {
-      uint32_t id = session->video_stream->id;
-      if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
-          id = session->audio_stream->id > 0 ? 
-                   session->audio_stream->id : 
-                   session->video_stream->id;
-      stream = snw_stream_find(&session->streams, id);
-   } else {
-      stream = snw_stream_find(&session->streams, session->audio_stream->id);
+      snw_ice_send_local_candidate(session, s->is_video, s->id, 1);
+      if (!SET_FLAG(session, WEBRTC_RTCPMUX))
+         snw_ice_send_local_candidate(session, s->is_video, s->id, 2);
    }
-
-   if (stream == 0)
-      return;
-
-   snw_ice_send_local_candidate(session, video, stream->id, 1);
-   if (!SET_FLAG(session, WEBRTC_RTCPMUX))
-      snw_ice_send_local_candidate(session, video, stream->id, 2);
 
    return;
 }
@@ -354,8 +344,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
                  session->flowid, output.size(), output.c_str());
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
 
-      snw_ice_sdp_send_candidates(session,0);//candidate for audio component
-      snw_ice_sdp_send_candidates(session,1);//candidate for video component
+      snw_ice_sdp_send_candidates(session);
    }
 
    return;
@@ -726,11 +715,11 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
 void 
 send_rtp_pkt(snw_ice_session_t *session, 
   int control, int video, char* buf, int len) {
-   snw_log_t *log = 0;
+   //snw_log_t *log = 0;
 
    if (!session || !buf)
       return;
-   log = session->ice_ctx->log;
+   //log = session->ice_ctx->log;
 
    /* check status of receiver */
    ice_verify_stream_status(session);
@@ -746,10 +735,11 @@ send_rtp_pkt(snw_ice_session_t *session,
 
 void 
 ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
-   snw_log_t *log = 0;
+   //snw_log_t *log = 0;
+   
    if (!session || !buf || len < 1)
       return;
-   log = session->ice_ctx->log;
+   //log = session->ice_ctx->log;
 
    //FIXME: check stuff
    send_rtp_pkt(session,1,video,buf,len);
@@ -1143,6 +1133,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    session->streams_gathering_done = 0;
    session->streams_num = 0;
    session->control_mode = ICE_CONTROLLED_MODE;
+   SET_FLAG(session, WEBRTC_BUNDLE);
 
    DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, control_mode=%u, sdp_len=%u",
          session->flowid, ice_ctx->ice_lite_enabled, session->control_mode, strlen(sdp));
