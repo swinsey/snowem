@@ -6,7 +6,8 @@ include(CheckLibraryExists)
 include(CheckSymbolExists)
 include(CheckTypeSize)
 
-add_subdirectory(cicero)
+#add_subdirectory(cicero)
+add_subdirectory(cice)
 add_subdirectory(wslay)
 add_subdirectory(modules/videocall)
 #add_subdirectory(modules/democall)
@@ -118,7 +119,7 @@ endif ()
 
 
 target_link_libraries(snowem PUBLIC
-  cicero
+  cice
   wslay
   ${DL_LIBRARIES}
   ${OPENSSL_LIBRARIES}
