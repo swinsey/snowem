@@ -259,7 +259,7 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
    log = session->ice_ctx->log;
 
    if (video) {
-      uint32_t id = session->video_stream->id;
+      uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
 
       DEBUG(log, "add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
 
@@ -341,7 +341,7 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
       return;
 
    if (video) {
-      uint32_t id = session->video_stream->id;
+      uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
 
       ICE_DEBUG2("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
@@ -487,7 +487,7 @@ snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video
       return;
 
    if (video) {
-      uint32_t id = session->video_stream->id;
+      uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_stream->id > 0 ? 
                     session->audio_stream->id : 
@@ -624,7 +624,7 @@ snw_ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
             }
          } else if (m->m_type == sdp_media_video && m->m_port > 0) {
             video++;
-            uint32_t id = session->video_stream->id;
+            uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
             if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
                 id = session->audio_stream->id > 0 ? 
                           session->audio_stream->id : 
