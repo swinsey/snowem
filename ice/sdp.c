@@ -960,7 +960,7 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
    sdp_parser_t *parser = 0;
    int audio = 0, video = 0; 
 
-   if (!session) return -1;
+   if (!session || !session->ice_ctx) return -1;
    log = session->ice_ctx->log;
 
    parser = snw_ice_sdp_get_parser(session->ice_ctx, sdp);
