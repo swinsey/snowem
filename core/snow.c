@@ -24,6 +24,28 @@ snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char 
 }
 
 int
+snw_sig_auth_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+   std::string auth_data;
+   
+   try {
+      auth_data = root["auth_data"].asString();
+      DEBUG(log,"auth_data, s=%s", auth_data.c_str());
+      //FIXME: send event to redis, and get result back.
+      root["id"] = conn->flowid;
+      root["rc"] = 0;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch (...) {
+      ERROR(log, "json format error");
+      return -1;
+   }
+   return 0;
+}
+
+int
 snw_sig_sdp_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
    Json::FastWriter writer;
@@ -68,6 +90,9 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    try {
       api = root["api"].asUInt();
       switch(api) {
+         case SNW_SIG_AUTH:
+            snw_sig_auth_msg(ctx,conn,root);
+            break;
          case SNW_SIG_SDP:
             snw_sig_sdp_msg(ctx,conn,root);
             break;
@@ -105,26 +130,6 @@ snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, ch
 }
 
 int
-snw_core_handle_auth_req(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
-   snw_log_t *log = ctx->log;
-   Json::FastWriter writer;
-   std::string output;
-
-   DEBUG(log,"handle auth req, flowid=%u",conn->flowid);
-
-   try {
-      //FIXME: send auth req to external service, i.e. redis notification
-      root["id"] = conn->flowid;
-      root["rc"] = 0;
-      output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
-   } catch(...) {
-      return -1;
-   }
-   return 0;
-}
-
-int
 snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    Json::Value root;
@@ -143,11 +148,6 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
    try {
       msgtype = root["msgtype"].asUInt();
       api = root["api"].asUInt();
-
-      if ((msgtype == SNW_ICE) && (api == SNW_ICE_AUTH)) {
-         snw_core_handle_auth_req(ctx,conn,root);
-         return 0;
-      }
 
       switch(msgtype) {
          case SNW_ICE:
