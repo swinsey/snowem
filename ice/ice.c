@@ -248,9 +248,6 @@ ice_rtp_established(snw_ice_session_t *session) {
    snw_context_t *ctx = 0;
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
-   Json::Value root,notify;
-   Json::FastWriter writer;
-   std::string output;
 
    if (!session) return;
    ice_ctx = session->ice_ctx;
@@ -273,13 +270,18 @@ ice_rtp_established(snw_ice_session_t *session) {
    } else if IS_FLAG(session,ICE_REPLAY) {
       // start replaying a stream.
    }
-
-   notify["msgtype"] = SNW_EVENT;
-   notify["api"] = SNW_EVENT_ICE_CONNECTED;
-   notify["flowid"] = session->flowid;
-   notify["channelid"] = session->channelid;
-   output = writer.write(notify);
-   snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
+   
+   /*{//deprecated impl
+      Json::Value root,notify;
+      Json::FastWriter writer;
+      std::string output;
+      notify["msgtype"] = SNW_EVENT;
+      notify["api"] = SNW_EVENT_ICE_CONNECTED;
+      notify["flowid"] = session->flowid;
+      notify["channelid"] = session->channelid;
+      output = writer.write(notify);
+      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
+   }*/
 
    return;
 }
