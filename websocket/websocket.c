@@ -10,16 +10,40 @@
 
 static const char* subprotocols[] = {"default"};
 
-void
-close_handler(struct evwsconn* conn, void* user_data) {
+static void
+notify_event(struct evwsconn* conn, uint32_t type,
+     snw_websocket_context_t *ctx) {
+  snw_context_t *g_ctx = (snw_context_t*)ctx->ctx;
   snw_event_t event;
   time_t cur_time;
+
+  DEBUG(ctx->log, "notify event, flowid=%u, event=%u", conn->flowid, event);
+
+  cur_time = time(NULL);
+  memset(&event,0,sizeof(event));
+  event.magic_num = SNW_EVENT_MAGIC_NUM;
+  event.event_type = type; //i.e. snw_ev_connect;
+  event.ipaddr = conn->ip;
+  event.port = conn->port;
+  event.flow = conn->flowid;
+  event.other = bufferevent_getfd(conn->bev);
+  
+  snw_shmmq_enqueue(g_ctx->snw_net2core_mq,
+      cur_time,&event,sizeof(event),conn->flowid);
+
+  return;
+}
+
+void
+close_handler(struct evwsconn* conn, void* user_data) {
   snw_websocket_context_t *ctx = (snw_websocket_context_t *)user_data;
-  snw_context_t *g_ctx = (snw_context_t*)ctx->ctx;
+  //snw_event_t event;
+  //time_t cur_time;
+  //snw_context_t *g_ctx = (snw_context_t*)ctx->ctx;
 
   DEBUG(ctx->log,"close connection, flowid=%u",conn->flowid);
 
-  cur_time = time(NULL);
+  /*cur_time = time(NULL);
   memset(&event,0,sizeof(event));
   event.magic_num = SNW_EVENT_MAGIC_NUM;
   event.event_type = snw_ev_disconnect;
@@ -29,8 +53,8 @@ close_handler(struct evwsconn* conn, void* user_data) {
   event.other = bufferevent_getfd(conn->bev);
 
   snw_shmmq_enqueue(g_ctx->snw_net2core_mq,
-      cur_time,&event,sizeof(event),conn->flowid);
-  //g_mq_ccd_2_mcd->enqueue(cur_time, &event_header, CCD_EVENT_HEADER_LEN, conn->flowid);
+      cur_time,&event,sizeof(event),conn->flowid);*/
+  notify_event(conn,snw_ev_disconnect,ctx);
 
   snw_flowset_freeid(ctx->flowset,conn->flowid);
   evwsconn_free(conn);
@@ -92,6 +116,7 @@ void message_handler(struct evwsconn* conn, enum evws_data_type data_type,
   return;
 }
 
+
 void 
 new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn, 
                  struct sockaddr *address, int socklen, void* user_data) {
@@ -112,6 +137,7 @@ new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn,
   snw_flowset_setobj(ctx->flowset,flowid,conn);
 
   evwsconn_set_cbs(conn, message_handler, close_handler, error_handler, ctx);
+  notify_event(conn,snw_ev_connect,ctx);
 
   return;
 }

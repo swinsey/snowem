@@ -267,18 +267,11 @@ ice_rtp_established(snw_ice_session_t *session) {
       output = writer.write(root);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);*/
    } else if IS_FLAG(session,ICE_PUBLISHER) {
-      // start recording a stream.
-      /*char filename[256];
-      time_t nowtime = time(NULL);
-      DEBUG(log, "FIXME: start recording a stream");
-      sprintf(filename, "%d_%ld_audio", session->roomid, nowtime);
-      session->a_recorder = recorder_create("/home/tuyettt/record_video", 0, filename);
-      sprintf(filename, "%d_%ld_video", session->roomid, nowtime);
-      session->v_recorder = recorder_create("/home/tuyettt/record_video", 1, filename);*/
+
+      //FIXME: do something
+
    } else if IS_FLAG(session,ICE_REPLAY) {
       // start replaying a stream.
-      /*DEBUG("FIXME: start replaying a stream");
-      record_start(session);*/
    }
 
    notify["msgtype"] = SNW_EVENT;

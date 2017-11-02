@@ -13,11 +13,19 @@ enum {
    ICE_CONTROLLING_MODE = 1,
 };
 
+enum {
+   PEER_TYPE_PUBLISHER = 0,
+   PEER_TYPE_PLAYER = 1,
+   PEER_TYPE_P2P = 2,
+   PEER_TYPE_UNKNOWN = 3,
+};
+
+
 struct snw_ice_session {
    uint32_t flowid;
    uint32_t channelid;
    uint32_t live_channelid;
-   uint32_t forwardid;
+   int      peer_type;
 
    snw_ice_context_t *ice_ctx;
    struct event_base *base;
@@ -43,8 +51,6 @@ struct snw_ice_session {
    char remote_user[32];
    char remote_pass[64];
 
-   //recorder_t* a_recorder;
-   //recorder_t* v_recorder;
    snw_ice_channel_t  *channel;
 };
 
