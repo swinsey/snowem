@@ -14,6 +14,7 @@ enum {
    SNW_ICE = SNW_MSGTYPE_MIN,
    SNW_CORE = 2,
    SNW_EVENT = 3,
+   SNW_SIG = 4,
 
    /* reserve range */
    SNW_MSGTYPE_MAX = 255,
@@ -30,6 +31,7 @@ enum {
    SNW_ICE_STOP = 5,
    SNW_ICE_CONTROL = 6,
    SNW_ICE_AUTH = 7,
+   SNW_ICE_CALL = 8,
 
    // internal api
    SNW_ICE_SDP = 128,
@@ -54,9 +56,25 @@ enum {
 enum {
    SNW_EVENT_MIN = 1,
    SNW_EVENT_ICE_CONNECTED = SNW_EVENT_MIN,
+   SNW_EVENT_PEER_JOINED = 2,
 
    /* reserved range */
    SNW_EVENT_MAX = 255,
+};
+
+/* SIG api code */
+enum {
+   SNW_SIG_MIN = 1,
+   SNW_SIG_AUTH = SNW_SIG_MIN,
+   SNW_SIG_CREATE = 2,
+   SNW_SIG_CONNECT = 3,
+   SNW_SIG_CALL = 4,
+
+   // internal api
+   SNW_SIG_SDP = 128,
+   SNW_SIG_CANDIDATE = 129,
+
+   SNW_SIG_MAX = 255,
 };
 
 typedef struct snw_module_callbacks snw_module_callbacks_t;

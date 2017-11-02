@@ -96,8 +96,8 @@ snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
 
    if (!ctx) return;
 
-   DEBUG(ctx->log, "channel info, id=%u, ownerid=%u, players= %u %u %u %u %u", 
-         c->id, c->ownerid, c->players[0], c->players[1], c->players[2],
+   DEBUG(ctx->log, "channel info, id=%u, peerid=%u, players= %u %u %u %u %u", 
+         c->id, c->peerid, c->players[0], c->players[1], c->players[2],
          c->players[3], c->players[4]);
 
    return;

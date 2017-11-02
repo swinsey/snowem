@@ -24,6 +24,68 @@ snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char 
 }
 
 int
+snw_sig_sdp_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+   uint32_t remoteid = 0;
+   
+   try {
+      remoteid = root["remoteid"].asUInt();
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),remoteid);
+   } catch (...) {
+      ERROR(log, "json format error");
+      return -1;
+   }
+   return 0;
+}
+
+int
+snw_sig_candidate_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+   uint32_t remoteid = 0;
+   
+   try {
+      remoteid = root["remoteid"].asUInt();
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),remoteid);
+   } catch (...) {
+      ERROR(log, "json format error");
+      return -1;
+   }
+   return 0;
+}
+
+int
+snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   uint32_t api = 0;
+
+   DEBUG(log, "sig handler, flowid=%u", conn->flowid);
+   try {
+      api = root["api"].asUInt();
+      switch(api) {
+         case SNW_SIG_SDP:
+            snw_sig_sdp_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_CANDIDATE:
+            snw_sig_candidate_msg(ctx,conn,root);
+            break;
+         default:
+            DEBUG(log, "unknown api, api=%u", api);
+            break;
+      }
+   } catch(...) {
+      return -1;
+   }
+
+   return 0;
+}
+
+int
 snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    struct list_head *p;
@@ -43,11 +105,32 @@ snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, ch
 }
 
 int
+snw_core_handle_auth_req(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+
+   DEBUG(log,"handle auth req, flowid=%u",conn->flowid);
+
+   try {
+      //FIXME: send auth req to external service, i.e. redis notification
+      root["id"] = conn->flowid;
+      root["rc"] = 0;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch(...) {
+      return -1;
+   }
+   return 0;
+}
+
+int
 snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    Json::Value root;
    Json::Reader reader;
    uint32_t msgtype = 0;
+   uint32_t api = 0;
    int ret;
 
    ret = reader.parse(data,data+len,root,0);
@@ -59,9 +142,20 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
    DEBUG(log, "get msg, data=%s", data);
    try {
       msgtype = root["msgtype"].asUInt();
+      api = root["api"].asUInt();
+
+      if ((msgtype == SNW_ICE) && (api == SNW_ICE_AUTH)) {
+         snw_core_handle_auth_req(ctx,conn,root);
+         return 0;
+      }
+
       switch(msgtype) {
          case SNW_ICE:
             snw_ice_handler(ctx,conn,msgtype,data,len);
+            break;
+
+         case SNW_SIG:
+            snw_sig_handler(ctx,conn,root);
             break;
 
          default:
@@ -73,6 +167,14 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
       ERROR(log, "json format error, data=%s", data);
    }
 
+   return 0;
+}
+
+int
+snw_core_connect(snw_context_t *ctx, snw_connection_t *conn) {
+
+   //TODO: handle connect activity etc
+   //      for example, limit connections per ip
    return 0;
 }
 
@@ -123,13 +225,14 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 
    if(header->event_type == snw_ev_connect) {     
       ERROR(log, "event connect error, len=%u,flowid=%u",len,flowid);
-      return -3;
+      snw_core_connect(ctx,&conn);
+      return 0;
    }    
 
    if(header->event_type == snw_ev_disconnect) {     
       ERROR(log, "event disconnect error, len=%u,flowid=%u",len,flowid);
       snw_core_disconnect(ctx,&conn);
-      return -3;
+      return 0;
    }
 
    DEBUG(log, "get msg, srctype: %u, ip: %s, port: %u, flow: %u, data_len: %u, msg_len: %u",
