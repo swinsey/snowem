@@ -83,13 +83,16 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
          return -1;
       }
 
-      //FIXME: create real channel, not use flowid.
-      //Step1: get real channel from free pool.
-      channelid = conn->flowid;
-
-      //Step2: get channel object
-      channel = snw_channel_get(ctx->channel_cache,channelid,&is_new);
+      //Step1: get channel id from a pool.
+      channelid = snw_set_getid(ctx->channel_mgr);
       if (channelid == 0) {
+         ERROR(log, "can not create channel, flowid=%u", conn->flowid);
+         return -1;
+      }
+
+      //Step2: get channel object.
+      channel = snw_channel_get(ctx->channel_cache,channelid,&is_new);
+      if (channel == 0) {
          ERROR(log, "can not create channel, flowid=%u", conn->flowid);
          return -1;
       }
@@ -534,9 +537,16 @@ snw_main_process(snw_context_t *ctx) {
 
    ctx->peer_cache = snw_peer_init();
    if (ctx->peer_cache == 0) {
-      ERROR(ctx->log,"failed to init channel cache");
+      ERROR(ctx->log,"failed to init peer cache");
       return;
    }
+
+   ctx->channel_mgr = snw_set_init(1100000, 10000);
+   if (ctx->channel_mgr == 0) {
+      ERROR(ctx->log,"failed to init channel set");
+      return;
+   }
+
 
    ctx->snw_net2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_net2core_mq));

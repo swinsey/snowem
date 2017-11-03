@@ -12,11 +12,12 @@
 #include <openssl/rand.h>
 
 #include "cache.h"
+#include "channel_mgr.h"
+#include "ice.h"
 #include "mempool.h"
 #include "mq.h"
 #include "module.h"
 #include "types.h"
-#include "ice.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -59,6 +60,9 @@ struct snw_context {
    /* caches */
    snw_hashbase_t *channel_cache;
    snw_hashbase_t *peer_cache;
+
+   /* channel set */
+   snw_set_t      *channel_mgr;
 
    /* mempool for fixed-size objects */
    snw_mempool_t *rcvvars_mp;
