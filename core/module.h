@@ -31,7 +31,6 @@ enum {
    SNW_ICE_STOP = 5,
    SNW_ICE_CONTROL = 6,
    SNW_ICE_AUTH = 7,
-   SNW_ICE_CALL = 8,
 
    // internal api
    SNW_ICE_SDP = 128,

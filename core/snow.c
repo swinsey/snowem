@@ -6,11 +6,13 @@
 
 #include <json/json.h>
 
+#include "channel.h"
 #include "conf.h"
 #include "connection.h"
 #include "core.h"
 #include "log.h"
 #include "module.h"
+#include "peer.h"
 #include "snow.h"
 #include "snw_event.h"
 #include "utils.h"
@@ -26,18 +28,35 @@ snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char 
 int
 snw_sig_auth_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
+   snw_peer_t *peer = 0;
    Json::FastWriter writer;
    std::string output;
    std::string auth_data;
+   uint32_t peerid = 0;
+   int is_new = 0;
    
    try {
       auth_data = root["auth_data"].asString();
       DEBUG(log,"auth_data, s=%s", auth_data.c_str());
-      //FIXME: send event to redis, and get result back.
-      root["id"] = conn->flowid;
+
+      //FIXME: send event to redis, and get id instead of using flowid.
+      peerid = conn->flowid; 
+      peer = snw_peer_get(ctx->peer_cache,peerid,&is_new);
+      if (peer == 0) {
+         ERROR(log, "can not create peer, flowid=%u", conn->flowid);
+         return -1;
+      }
+      if (!is_new) {
+         ERROR(log,"reseting existing peer, flowid=%u", conn->flowid);
+         memset(peer,0,sizeof(snw_peer_t));
+         peer->peerid = peerid;
+      }
+      peer->flowid = conn->flowid;
+
+      root["id"] = peer->peerid;
       root["rc"] = 0;
       output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),peer->flowid);
    } catch (...) {
       ERROR(log, "json format error");
       return -1;
@@ -50,11 +69,41 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
    snw_log_t *log = ctx->log;
    Json::FastWriter writer;
    std::string output;
+   snw_channel_t *channel = 0;
+   snw_peer_t *peer = 0;
+   uint32_t channelid = 0;
+   uint32_t peerid = 0;
+   int is_new = 0;
    
    try {
+      peerid = root["id"].asUInt();
+      peer = snw_peer_search(ctx->peer_cache,peerid);
+      if (!peer) {
+         ERROR(log, "peer not found, flowid=%u, peerid=%u", conn->flowid, peerid);
+         return -1;
+      }
+
       //FIXME: create real channel, not use flowid.
-      DEBUG(log,"create channel, channelid=%u", conn->flowid);
-      root["channelid"] = conn->flowid;
+      //Step1: get real channel from free pool.
+      channelid = conn->flowid;
+
+      //Step2: get channel object
+      channel = snw_channel_get(ctx->channel_cache,channelid,&is_new);
+      if (channelid == 0) {
+         ERROR(log, "can not create channel, flowid=%u", conn->flowid);
+         return -1;
+      }
+      if (!is_new) {
+         ERROR(log,"reseting existing channel, channelid=%u",channelid);
+         memset(channel,0,sizeof(snw_channel_t));
+         channel->id = channelid;
+      }
+      channel->flowid = conn->flowid;
+      channel->peerid = peer->peerid;
+      peer->channelid = channelid;
+       
+      DEBUG(log,"create channel, channelid=%u", channelid);
+      root["channelid"] = channelid;
       root["rc"] = 0;
       output = writer.write(root);
       snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
@@ -68,6 +117,105 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
       ERROR(log, "json format error");
       return -1;
    }
+   return 0;
+}
+
+int
+snw_sig_connect_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   snw_peer_t *peer = 0;
+   snw_channel_t *channel = 0;
+   std::string output;
+   std::string peer_type;
+   uint32_t channelid = 0;
+   uint32_t peerid = 0;
+   int forward_to_ice = 0;
+   
+   //snw_ice_connect_msg
+   try {
+      peerid = root["id"].asUInt();
+      channelid = root["channelid"].asUInt();
+      peer_type = root["peer_type"].asString();
+   } catch (...) {
+      ERROR(log, "json format error");
+      return -1;
+   }
+
+   channel = snw_channel_search(ctx->channel_cache,channelid);
+   if (!channel) {
+      ERROR(log, "peer not found, channelid=%u", channelid);
+      return -1;
+   }
+
+   peer = snw_peer_search(ctx->peer_cache,peerid);
+   if (!peer) {
+      ERROR(log, "peer not found, peerid=%u", peerid);
+      return -1;
+   }
+   peer->channelid = channelid;
+
+   if (!strncmp(peer_type.c_str(),"pub",3)) {
+      peer->peer_type = PEER_TYPE_PUBLISHER;
+      forward_to_ice = 1;
+   } else if (!strncmp(peer_type.c_str(),"pla",3)) {
+      peer->peer_type = PEER_TYPE_PLAYER;
+      forward_to_ice = 1;
+   } else if (!strncmp(peer_type.c_str(),"p2p",3)) {
+      peer->peer_type = PEER_TYPE_P2P;
+   } else {
+      ERROR(log,"unknown peer type, flowid=%u, peer_type=%s",conn->flowid,peer_type.c_str());
+      peer->peer_type = PEER_TYPE_UNKNOWN;
+      return -2;
+   }
+
+   if (forward_to_ice) {
+      //TODO: remove ice_connect from client request
+   }
+
+   if (channel->flowid != conn->flowid) {
+     Json::Value notify;
+     Json::FastWriter writer;
+     std::string output;
+
+     DEBUG(log,"notify peer joined event, flowid=%u",peer->flowid);
+     notify["msgtype"] = SNW_EVENT;
+     notify["api"] = SNW_EVENT_PEER_JOINED;
+     notify["remoteid"] = peer->flowid;
+     notify["peerid"] = channel->peerid;
+     notify["channelid"] = channelid;
+     notify["is_p2p"] = peer->peer_type == PEER_TYPE_P2P ? 1 : 0;
+     output = writer.write(notify);
+     snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),channel->flowid);
+   }
+
+   return 0;
+}
+
+int
+snw_sig_call_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   snw_peer_t *peer = 0;
+   //snw_channel_t *channel = 0;
+   std::string output;
+   std::string peer_type;
+   //uint32_t channelid = 0;
+   uint32_t peerid = 0;
+   
+   try {
+      peerid = root["remoteid"].asUInt();
+
+      //TODO: verify peer in channel
+      //channelid = root["channelid"].asUInt();
+      
+      DEBUG(log,"forward call req to peer, flowid=%u, peerid=%u",conn->flowid, peerid);
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),peerid);
+   } catch (...) {
+      ERROR(log, "json format error");
+   }
+
    return 0;
 }
 
@@ -122,6 +270,12 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
             break;
          case SNW_SIG_CREATE:
             snw_sig_create_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_CONNECT:
+            snw_sig_connect_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_CALL:
+            snw_sig_call_msg(ctx,conn,root);
             break;
          case SNW_SIG_SDP:
             snw_sig_sdp_msg(ctx,conn,root);
@@ -280,7 +434,7 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 int
 snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
 
-   DEBUG(ctx->log, "ice preprocess msg, msg=%s",buffer);
+   DEBUG(ctx->log, "ice preprocess msg, flowid=%u, msg=%s", flowid, buffer);
    snw_shmmq_enqueue(ctx->snw_core2net_mq, 0, buffer, len, flowid);
    return 0;
 }
@@ -372,6 +526,17 @@ snw_main_process(snw_context_t *ctx) {
    }
 
    snw_module_init(ctx);
+   ctx->channel_cache = snw_channel_init();
+   if (ctx->channel_cache == 0) {
+      ERROR(ctx->log,"failed to init channel cache");
+      return;
+   }
+
+   ctx->peer_cache = snw_peer_init();
+   if (ctx->peer_cache == 0) {
+      ERROR(ctx->log,"failed to init channel cache");
+      return;
+   }
 
    ctx->snw_net2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_net2core_mq));
