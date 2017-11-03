@@ -206,13 +206,16 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
    snw_ice_channel_t *channel = 0;
    Json::FastWriter writer;
    std::string output;
+   uint32_t channelid = 0;
    int is_new = 0;
 
 
    //FIXME: mechanism of channel (de)allocation 
-   channel = (snw_ice_channel_t*)snw_ice_channel_get(ice_ctx,flowid,&is_new);
 
    try {
+      channelid = root["channelid"].asUInt();
+      DEBUG(log,"new channel, channelid=%u", channelid);
+      channel = (snw_ice_channel_t*)snw_ice_channel_get(ice_ctx,channelid,&is_new);
       if (!channel || !is_new) {
          root["rc"] = -1;
          output = writer.write(root);
@@ -230,7 +233,7 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
       DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
             ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
 
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
+      //snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    } catch (...) {
       ERROR(log, "json format error, data=%s", output.c_str());
       return;
