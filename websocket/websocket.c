@@ -130,7 +130,8 @@ new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn,
      return;
   }
 
-  DEBUG(ctx->log, "new connection, conn=%p, flowid=%u", conn, flowid);
+  DEBUG(ctx->log, "new connection, conn=%p, flowid=%u, baseidx=%u", 
+           conn, flowid,ctx->flowset->baseidx);
   conn->flowid = flowid;
   conn->ip = ((struct sockaddr_in*) address)->sin_addr.s_addr;
   conn->port = ((struct sockaddr_in*) address)->sin_port;
@@ -206,10 +207,7 @@ snw_websocket_send_msg(snw_websocket_context_t *ws_ctx, char *buf, int len, uint
    snw_context_t *ctx = ws_ctx->ctx;
    struct evwsconn* conn = 0;
 
-   if (flow > ws_ctx->flowset->totalnum) {
-      return -1;
-   }
-
+   DEBUG(ctx->log, "get connection, flowid=%u, baseidx=%u", flow, ws_ctx->flowset->baseidx);
    conn = (struct evwsconn*)snw_flowset_getobj(ws_ctx->flowset,flow);
    if (conn == NULL) {
       ERROR(ctx->log, "connection not found, flowid=%u", flow);
