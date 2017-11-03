@@ -7,37 +7,19 @@
 extern "C" {
 #endif
 
+#define CORE_CHANNEL_SHM_KEY   0x081001
+#define CORE_CHANNEL_HASHTIME  10
+#define CORE_CHANNEL_HASHLEN   100
+
+#define CORE_PEER_SHM_KEY   0x081002
+#define CORE_PEER_HASHTIME  10
+#define CORE_PEER_HASHLEN   100
+
+
+
 typedef struct snw_log snw_log_t;
 typedef struct snw_context snw_context_t;
 typedef struct snw_module snw_module_t;
-
-enum  SGN_CMD{
-   SGN_ROOM = 1,
-   SGN_REPLAY = 7,
-   SGN_VIDEO = 8,
-   SGN_INTERNAL = 9
-};
-
-enum SGN_REPLAY_SUBCMD {
-   SGN_REPLAY_REQ = 1,
-   SGN_REPLAY_SDP = 2,
-   SGN_REPLAY_CANDIDATE = 3,
-   SGN_REPLAY_CLOSE = 4,
-};
-
-enum SGN_VIDEO_SUBCMD {
-   SGN_VIDEO_START = 1,
-   SGN_VIDEO_STOP  = 2,
-   SGN_VIDEO_VIEW  = 3,
-   SGN_VIDEO_SDP   = 4,
-   SGN_VIDEO_CANDIDATE = 5,
-   SGN_VIDEO_FIR = 6,
-};
-
-enum SGN_INTERNAL_SUBCMD {
-   SGN_INTERNAL_PEER_DATA = 2,
-};
-
 
 #define ENABLE_SNW_DEBUG
 #define HEXDUMP(log,p,len,type)\

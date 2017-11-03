@@ -14,11 +14,12 @@ enum {
 };
 
 enum {
-   PEER_TYPE_PUBLISHER = 0,
-   PEER_TYPE_PLAYER = 1,
-   PEER_TYPE_P2P = 2,
-   PEER_TYPE_UNKNOWN = 3,
+   PEER_TYPE_UNKNOWN = 0,
+   PEER_TYPE_PUBLISHER = 1,
+   PEER_TYPE_PLAYER = 2,
+   PEER_TYPE_P2P = 3,
 };
+
 
 
 struct snw_ice_session {

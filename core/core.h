@@ -57,8 +57,8 @@ struct snw_context {
    snw_shmmq_t  *snw_core2net_mq;
 
    /* caches */
-   snw_hashbase_t *session_cache;
    snw_hashbase_t *channel_cache;
+   snw_hashbase_t *peer_cache;
 
    /* mempool for fixed-size objects */
    snw_mempool_t *rcvvars_mp;

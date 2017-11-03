@@ -2026,44 +2026,6 @@ snw_ice_fir_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
 }
 
 void
-snw_ice_call_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
-   snw_context_t *ctx = 0;
-   snw_log_t *log = 0;
-   snw_ice_session_t *session = 0;
-   Json::FastWriter writer;
-   std::string output;
-   //uint32_t channelid = 0;
-   uint32_t peerid = 0;
-
-   if (!ice_ctx) return;
-   ctx = (snw_context_t*)ice_ctx->ctx;
-   log = ice_ctx->log;
-
-   DEBUG(log, "call msg, flowid=%u", flowid);
-   session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
-   if (!session) return;
-   
-   DEBUG(log, "FIXME call msg");
-   try {
-      peerid = root["remoteid"].asUInt();
-
-      //TODO: verify peer in channel
-      //channelid = root["channelid"].asUInt();
-      
-      DEBUG(log,"forward call req to peer, flowid=%u, peerid=%u",session->flowid, peerid);
-      output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),peerid);
-   } catch (...) {
-      ERROR(log, "json format error");
-   }
-
-
-
- 
-   return;
-}
-
-void
 snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
    snw_log_t *log = ice_ctx->log;
    Json::Value root;
@@ -2116,12 +2078,9 @@ snw_ice_process_msg(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       case SNW_ICE_FIR:
          snw_ice_fir_msg(ice_ctx,root,flowid);
          break;
-      case SNW_ICE_CALL:
-         snw_ice_call_msg(ice_ctx,root,flowid);
-         break;
 
       default:
-         ERROR(log, "unknow api, api=%u", api);
+         ERROR(log, "unknown api, api=%u", api);
          break;
    }
 
