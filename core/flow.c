@@ -32,7 +32,6 @@ snw_flowset_init(uint32_t num) {
    flowset->totalnum = num;
    flowset->usednum = 0;
    flowset->baseidx = random()%1000000;
-   printf("base idx, i=%u\n", flowset->baseidx);
    INIT_LIST_HEAD(&flowset->freelist);
    INIT_LIST_HEAD(&flowset->usedlist);
    for (i = 1; i < num; i++) {
@@ -41,7 +40,12 @@ snw_flowset_init(uint32_t num) {
       //flow->flowid = i;
       flow->flowid = i + flowset->baseidx;
       flow->obj = 0;
-      list_add_tail(&flow->list, &flowset->freelist);
+      if (random()%2) {
+         list_add(&flow->list, &flowset->freelist);
+      } else {
+         list_add_tail(&flow->list, &flowset->freelist);
+      }
+      //list_add_tail(&flow->list, &flowset->freelist);
    }
 
    return flowset;
