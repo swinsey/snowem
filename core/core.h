@@ -58,6 +58,7 @@ struct snw_context {
 
    /* caches */
    snw_hashbase_t *session_cache;
+   snw_hashbase_t *channel_cache;
 
    /* mempool for fixed-size objects */
    snw_mempool_t *rcvvars_mp;

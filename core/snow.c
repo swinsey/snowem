@@ -46,6 +46,33 @@ snw_sig_auth_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) 
 }
 
 int
+snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+   
+   try {
+      //FIXME: create real channel, not use flowid.
+      DEBUG(log,"create channel, channelid=%u", conn->flowid);
+      root["channelid"] = conn->flowid;
+      root["rc"] = 0;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
+
+      //inform ice component about new channel
+      root["msgtype"] = SNW_ICE;
+      root["api"] = SNW_ICE_CREATE;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch (...) {
+      ERROR(log, "json format error");
+      return -1;
+   }
+   return 0;
+}
+
+
+int
 snw_sig_sdp_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
    Json::FastWriter writer;
@@ -86,12 +113,15 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
    uint32_t api = 0;
 
-   DEBUG(log, "sig handler, flowid=%u", conn->flowid);
    try {
       api = root["api"].asUInt();
+      DEBUG(log, "sig handler, flowid=%u, api=%u", conn->flowid, api);
       switch(api) {
          case SNW_SIG_AUTH:
             snw_sig_auth_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_CREATE:
+            snw_sig_create_msg(ctx,conn,root);
             break;
          case SNW_SIG_SDP:
             snw_sig_sdp_msg(ctx,conn,root);
