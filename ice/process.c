@@ -22,8 +22,11 @@ snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx,
          "v=0\r\no=- %lu %lu IN IP4 127.0.0.1\r\ns=%s\r\nt=0 0\r\n%s%s";
    static  const char *audio_mline_template = 
          "m=audio 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d opus/48000/2\r\n";
+   //static  const char *video_mline_template = 
+   //      "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
+   //      "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static  const char *video_mline_template = 
-         "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
+         "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d H264/90000\r\n"
          "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static char audio_mline[256], video_mline[512];
    snw_log_t *log = 0;
@@ -1205,8 +1208,11 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
          "v=0\r\no=- %lu %lu IN IP4 127.0.0.1\r\ns=%s\r\nt=0 0\r\n%s%s";
    static  const char *audio_mline_template = 
          "m=audio 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d opus/48000/2\r\n";
+   //static  const char *video_mline_template = 
+   //      "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
+   //      "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static  const char *video_mline_template = 
-         "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
+         "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d H264/90000\r\n"
          "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static char sdp[1024], audio_mline[256], video_mline[512];
    snw_log_t *log = 0;
@@ -1299,25 +1305,8 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    }
    session->channel = channel;
 
-   if (session->peer_type == PEER_TYPE_P2P) { //notify new peer to channel owner
-      if (channel->peerid != session->flowid) {
-        Json::Value notify;
-        Json::FastWriter writer;
-        std::string output;
+   snw_ice_offer_sdp(ice_ctx,session,flowid,0);
 
-        DEBUG(log,"notify peer joined event, flowid=%u",session->flowid);
-        notify["msgtype"] = SNW_EVENT;
-        notify["api"] = SNW_EVENT_PEER_JOINED;
-        notify["remoteid"] = session->flowid;
-        notify["peerid"] = channel->peerid;
-        notify["channelid"] = session->channelid;
-        notify["is_p2p"] = session->peer_type == PEER_TYPE_P2P ? 1 : 0;
-        output = writer.write(notify);
-        snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),channel->peerid);
-      }
-   } else {
-      snw_ice_offer_sdp(ice_ctx,session,flowid,0);
-   }
    return;
 }
 
