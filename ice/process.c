@@ -26,8 +26,10 @@ snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx,
    //static  const char *video_mline_template = 
    //      "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
    //      "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
+         //"a=fmtp:100 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\r\n"
    static  const char *video_mline_template = 
          "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d H264/90000\r\n"
+         "a=fmtp:100 level-asymmetry-allowed=1;profile-level-id=42e01f\r\n"
          "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static char audio_mline[256], video_mline[512];
    snw_log_t *log = 0;
@@ -44,7 +46,7 @@ snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx,
    memset(video_mline,0,512);
    snprintf(video_mline, 512, video_mline_template,
        VP8_PT, sendonly ? "sendonly" : "sendrecv",
-       VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT);
+       VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT);
 
    memset(sdp,0,len);
    snprintf(sdp, len, sdp_template,
@@ -1218,8 +1220,10 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
    //static  const char *video_mline_template = 
    //      "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
    //      "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
+         //"a=fmtp:100 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\r\n"
    static  const char *video_mline_template = 
          "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d H264/90000\r\n"
+         "a=fmtp:100 level-asymmetry-allowed=1;profile-level-id=42e01f\r\n"
          "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
    static char sdp[1024], audio_mline[256], video_mline[512];
    snw_log_t *log = 0;
@@ -1237,7 +1241,7 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
    memset(video_mline,0,512);
    snprintf(video_mline, 512, video_mline_template,
        VP8_PT, sendonly ? "sendonly" : "sendrecv",
-       VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT);
+       VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT, VP8_PT);
 
    memset(sdp,0,1024);
    snprintf(sdp, 1024, sdp_template,

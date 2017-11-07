@@ -61,6 +61,15 @@ struct snw_ice_session {
    int64_t             first_video_ts;
    int64_t             current_ts;
    srs_rtmp_t          rtmp; //pointer to void
+
+   int64_t             pts;
+
+   // rtmp aac
+   char               *audio_pos;
+   char               *audio_raw;
+   off_t               file_size;
+   uint32_t            delta_ts;
+   uint32_t            audio_ts;
 };
 
 
