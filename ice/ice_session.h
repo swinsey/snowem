@@ -7,6 +7,7 @@
 #include "ice_channel.h"
 #include "ice_stream.h"
 #include "ice_types.h"
+#include "srs_librtmp.h"
 
 enum {
    ICE_CONTROLLED_MODE = 0,
@@ -53,6 +54,13 @@ struct snw_ice_session {
    char remote_pass[64];
 
    snw_ice_channel_t  *channel;
+
+   // rtmp settings
+   char               *rtmp_url;
+   int                 rtmp_inited;
+   int64_t             first_video_ts;
+   int64_t             current_ts;
+   srs_rtmp_t          rtmp; //pointer to void
 };
 
 

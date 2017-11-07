@@ -6,6 +6,7 @@
 #include "module.h"
 #include "mq.h"
 #include "ice_channel.h"
+#include "ice_h264.h"
 #include "ice_session.h"
 #include "json/json.h"
 #include "log.h"
@@ -887,11 +888,17 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    }
 
    //ice_rtp_plugin(); //FIXME: impl
+   if (video) {
+      //forward to h264 handler
+      ice_h264_handler(session, buf, buflen);
+   }
+
    if (IS_FLAG(session,ICE_PUBLISHER)) {
       snw_ice_handle_lost_packets(session,stream,
           component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);
    }
+
    return;
 }
 
@@ -1235,8 +1242,9 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
    memset(sdp,0,1024);
    snprintf(sdp, 1024, sdp_template,
        get_real_time(), get_real_time(),
-       "PeerCall Replay", audio_mline, video_mline);
+       "Snowem Replay", audio_mline, video_mline);
 
+   //FIXME: session setup does not require to know sdp in advanced.
    ret = snw_ice_session_setup(ice_ctx, session, 0, (char *)sdp);
    if (ret < 0) {
       ERROR(log, "Error setting ICE locally, ret=%d",ret);
