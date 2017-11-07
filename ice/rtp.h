@@ -12,8 +12,9 @@
 extern "C" {
 #endif
 
-#define RTP_VERSION    2
-#define RTP_HEADER_SIZE	12
+#define RTP_VERSION         2
+#define RTP_HEADER_SIZE     12
+#define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
 
 typedef struct rtp_hdr rtp_hdr_t;
 struct rtp_hdr

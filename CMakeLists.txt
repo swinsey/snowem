@@ -8,6 +8,7 @@ include(CheckTypeSize)
 
 #add_subdirectory(cicero)
 add_subdirectory(cice)
+add_subdirectory(rtmp)
 add_subdirectory(wslay)
 add_subdirectory(modules/videocall)
 #add_subdirectory(modules/democall)
@@ -34,7 +35,7 @@ target_compile_options(snowem PUBLIC -g -Wall)
 #add_definitions(-DBASE_FILE_NAME="$(<F)")
 
 # This allows to include files relative to the root of the src directory with a <> pair
-target_include_directories(snowem PUBLIC . jsoncpp core ice modules)
+target_include_directories(snowem PUBLIC . jsoncpp core ice modules rtmp)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindDL.cmake)
 if (${DL_FOUND})
@@ -121,6 +122,7 @@ endif ()
 target_link_libraries(snowem PUBLIC
   cice
   wslay
+  rtmp
   ${DL_LIBRARIES}
   ${OPENSSL_LIBRARIES}
   ${EVENT_LIBRARIES}
