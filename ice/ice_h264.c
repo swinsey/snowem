@@ -246,15 +246,17 @@ ice_h264_process_nal_unit(snw_ice_session_t *session, int is_end_frame, int dts,
    // 5bits, 7.3.1 NAL unit syntax,
    // H.264-AVC-ISO_IEC_14496-10.pdf, page 44.
    //  7: SPS, 8: PPS, 5: I Frame, 1: P Frame, 9: AUD, 6: SEI
-   DEBUG(log, "nal unit info, nal_unit_type=%u, buflen=%d, dts=%u, pts=%u", 
-         nal_unit_type, buflen, dts, pts);
-   
+   //DEBUG(log, "nal unit info, nal_unit_type=%u, buflen=%d, dts=%u, pts=%u", 
+   //      nal_unit_type, buflen, dts, pts);
+
+   //FIXME: move code from ice_h264_rtmp_handler() here.   
    ice_h264_rtmp_handler(session,is_end_frame,dts,pts,buf,buflen); 
    return 0;
 }
 
 int
-ice_h264_process_stapa_unit(snw_ice_session_t *session, char *buf, int buflen) {
+ice_h264_process_stapa_unit(snw_ice_session_t *session, int is_end_frame, int dts, 
+       int pts, char *buf, int buflen) {
    snw_log_t *log;
    char *p;
    uint8_t nal_unit_type, fbit;
@@ -276,13 +278,61 @@ ice_h264_process_stapa_unit(snw_ice_session_t *session, char *buf, int buflen) {
    while(len > 2) {
       uint16_t nal_size = p[0] << 8 | p[1];
 
+      DEBUG(log, "stapa unit info, nal_size=%u, len=%d", nal_size, len);
+      ice_h264_process_nal_unit(session,is_end_frame,dts,pts,p+2, nal_size);
+
       p += nal_size + 2;
       len -= nal_size + 2;
-      DEBUG(log, "stapa unit info, nal_size=%u, len=%d", nal_size, len);
    }
    
    return 0;
 }
+
+int
+ice_h264_process_fua_unit(snw_ice_session_t *session, int is_end_frame, int dts, 
+       int pts, char *buf, int buflen) {
+   static char data[MAX_BUFFER_SIZE];
+   static int len;
+   snw_log_t *log;
+   fua_indicator_t *indicator;
+   fua_hdr_t *hdr;
+
+   if (!session || !session->ice_ctx || !buf || buflen <= 0) {
+      return -1;
+   }
+   log = session->ice_ctx->log;
+
+
+   HEXDUMP(log,buf,2,"fua");
+   indicator = (fua_indicator_t*)buf;
+   hdr = (fua_hdr_t*)(buf+1);
+  
+   DEBUG(log, "fua indicator info, buflen=%u, f=%u, nir=%u, type=%u, size=%u", 
+         buflen, indicator->f, indicator->nir, indicator->type, sizeof(fua_indicator_t));
+   DEBUG(log, "fua hdr info, buflen=%u, s=%u, e=%u, r=%u, type=%u, size=%u", 
+         buflen, hdr->s, hdr->e, hdr->r, hdr->type, sizeof(fua_hdr_t));
+   
+   if (hdr->s) {
+      fua_indicator_t ind;
+      ind.f = indicator->f;
+      ind.nir = indicator->nir;
+      ind.type = hdr->type;
+      memcpy(data,&ind,sizeof(ind));
+      len = sizeof(ind);
+      HEXDUMP(log,(char*)&ind,sizeof(ind),"fua");
+   }
+
+   memcpy(data+len, buf+2, buflen-2);
+   len += buflen-2;
+  
+   if (hdr->e) {
+      DEBUG(log, "complete fua unit, len=%u",len);
+      ice_h264_process_nal_unit(session,is_end_frame,dts,pts,data,len);
+   }
+
+   return 0;
+}
+
 
 int
 ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
@@ -314,7 +364,7 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
 
    if (!session->rtmp_inited) {
       ret = ice_h264_rtmp_init(session,"rtmp://49.213.76.92:1935/live/livestream");
-      //ret = ice_h264_rtmp_init(session,"rtmp://live-api.facebook.com:80/rtmp/2046979208865329?ds=1&a=ATiX-nwt4dhs30Ue");
+      //ret = ice_h264_rtmp_init(session,"rtmp://live-api.facebook.com:80/rtmp/2047183778844872?ds=1&a=AThzc932cOy1c91Q");
       if (ret < 0) {
          ERROR(log, "failed to init rtmp, ret=%d", ret);
          return -1;
@@ -339,8 +389,11 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
    p = buf + hdrlen;
    {
       uint8_t nal_unit_type = *p & 0x1f;
-
+      // 5bits, 7.3.1 NAL unit syntax,
+      // H.264-AVC-ISO_IEC_14496-10.pdf, page 44.
+      //  7: SPS, 8: PPS, 5: I Frame, 1: P Frame, 9: AUD, 6: SEI
       //DEBUG(log,"h264 header info, nal_unit_type=%u", nal_unit_type);
+
       switch(nal_unit_type) {
          case H264_PT_RSV0:
          case H264_PT_RSV1:
@@ -349,7 +402,7 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
             break;
          case H264_PT_STAPA:
             DEBUG(log,"stapa nal unit type, nal_unit_type=%u", nal_unit_type);
-            ice_h264_process_stapa_unit(session,p,buflen - hdrlen);
+            ice_h264_process_stapa_unit(session,hdr->m,dts,pts,p,buflen - hdrlen);
             break;
          case H264_PT_STAPB:
             DEBUG(log,"stapb nal unit type, nal_unit_type=%u", nal_unit_type);
@@ -362,6 +415,7 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
             break;
          case H264_PT_FUA:
             DEBUG(log,"fua nal unit type, nal_unit_type=%u", nal_unit_type);
+            ice_h264_process_fua_unit(session,hdr->m,dts,pts,p,buflen - hdrlen);
             break;
          case H264_PT_FUB:
             DEBUG(log,"fub nal unit type, nal_unit_type=%u", nal_unit_type);
