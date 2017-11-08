@@ -38,6 +38,37 @@
 #define H264_PT_RSV1        30
 #define H264_PT_RSV2        31
 
+#pragma pack(push, 1)
+typedef struct fua_indicator fua_indicator_t;
+struct fua_indicator {
+#if __BYTE_ORDER == __BIG_ENDIAN
+   uint8_t f:1;
+   uint8_t nir:2;
+   uint8_t type:5;
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+   uint8_t type:5;
+   uint8_t nir:2;
+   uint8_t f:1;
+#endif
+};
+
+typedef struct fua_hdr fua_hdr_t;
+struct fua_hdr {
+#if __BYTE_ORDER == __BIG_ENDIAN
+   uint8_t s:1;
+   uint8_t e:1;
+   uint8_t r:1;
+   uint8_t type:5;
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+   uint8_t type:5;
+   uint8_t r:1;
+   uint8_t e:1;
+   uint8_t s:1;
+#endif
+};
+#pragma pack(pop)
+
+
 int
 ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen);
 
