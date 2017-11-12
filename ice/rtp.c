@@ -8,7 +8,7 @@
 #include "rtp.h"
 
 void
-snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, char *buf, int len) {
+snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int video, char *buf, int len) {
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
    snw_ice_session_t *s = 0;
@@ -37,9 +37,9 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int control, int video, ch
             session->flowid, video, header->pt, VP8_PT, seq,len);
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
-            DEBUG(log, "forward, is_rtcp=%u, flowid=%u -> forwardid=%u", 
-                  control, session->flowid, flowid);
-            send_rtp_pkt(s, control, video, buf, len);
+            DEBUG(log, "forward, flowid=%u -> forwardid=%u", 
+                  session->flowid, flowid);
+            send_rtp_pkt(s, 0, video, buf, len);
          } else {
             // failed
             ERROR(log, "session not found, flowid=%u",flowid);
