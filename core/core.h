@@ -13,7 +13,7 @@
 
 #include "cache.h"
 #include "channel_mgr.h"
-#include "ice.h"
+#include "ice/ice.h"
 #include "mempool.h"
 #include "mq.h"
 #include "module.h"

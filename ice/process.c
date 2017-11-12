@@ -3,17 +3,17 @@
 #include <ifaddrs.h>
 #include <sys/types.h>
 
-#include "module.h"
-#include "mq.h"
+#include "core/module.h"
+#include "core/mq.h"
+#include "core/log.h"
+#include "core/utils.h"
 #include "ice_channel.h"
 #include "ice_h264.h"
 #include "ice_session.h"
 #include "json/json.h"
-#include "log.h"
 #include "sdp.h"
 #include "rtcp.h"
 #include "process.h"
-#include "utils.h"
 
 /* FIXME: standardize sdp */
 static int

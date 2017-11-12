@@ -1,14 +1,15 @@
 #include <stdio.h>
 
-#include "core.h"
+#include "core/core.h"
+#include "core/log.h"
 #include "ice.h"
 #include "ice_channel.h"
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "json/json.h"
-#include "log.h"
 #include "sdp.h"
 #include "process.h"
+#include "rtp/rtp.h"
 
 void
 snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
@@ -238,6 +239,8 @@ snw_ice_init(snw_context_t *ctx) {
             list_add_tail(&handlers[j].list, &h->handlers.list);
       }
    }
+
+   snw_rtp_init(ice_ctx);
 
    event_base_dispatch(ctx->ev_base);
    return;

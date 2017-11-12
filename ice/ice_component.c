@@ -1,7 +1,7 @@
 #include <assert.h>
 
+#include "core/mempool.h"
 #include "ice_component.h"
-#include "mempool.h"
 
 void
 snw_component_mempool_init(snw_ice_context_t *ctx) {

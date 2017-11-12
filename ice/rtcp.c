@@ -1,6 +1,6 @@
-#include "log.h"
+#include "core/log.h"
+#include "core/types.h"
 #include "rtcp.h"
-#include "types.h"
 
 int 
 snw_rtcp_has_payload_type(char *buf, int len, int8_t type) {

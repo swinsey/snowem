@@ -10,7 +10,7 @@
 #include "mq.h"
 #include "module.h"
 #include "log.h"
-#include "ice.h"
+#include "ice/ice.h"
 #include "websocket/websocket.h"
 
 snw_context_t*

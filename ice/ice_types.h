@@ -2,7 +2,7 @@
 #define _SNOW_ICE_ICETYPES_H_
 
 #include <stdint.h>
-#include "linux_list.h"
+#include "core/linux_list.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -36,8 +36,8 @@
 #include "evws-internal.h"
 #include "evws_util.h"
 
-#include "log.h"
-#include "utils.h"
+#include "core/log.h"
+#include "core/utils.h"
 
 #define MAX_HTTP_HEADER_SIZE 8192
 

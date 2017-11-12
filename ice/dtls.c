@@ -1,13 +1,13 @@
 #include "dtls.h"
 
-#include "log.h"
+#include "core/log.h"
+#include "core/types.h"
+#include "core/session.h"
+#include "core/utils.h"
 #include "ice.h"
 #include "ice_types.h"
 #include "ice_session.h"
 #include "rtcp.h"
-#include "session.h"
-#include "types.h"
-#include "utils.h"
 
 void
 dtls_callback(const SSL *ssl, int where, int ret) {
