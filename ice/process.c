@@ -883,15 +883,13 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    } 
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_broadcast_rtp_pkg(session,0,video,buf,buflen);
+      snw_ice_broadcast_rtp_pkg(session,video,buf,buflen);
    } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
       //do nothing
    }
 
-   //ice_rtp_plugin(); //FIXME: impl
    if (video) {
-      //forward to h264 handler
-      //ice_h264_handler(session, buf, buflen);
+      //forward to rtp handler, i.e h264
       snw_rtp_handle_pkg(&session->rtp_ctx,buf,buflen);
    }
 

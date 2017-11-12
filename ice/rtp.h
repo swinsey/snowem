@@ -13,43 +13,6 @@
 extern "C" {
 #endif
 
-/*
-#define RTP_VERSION         2
-#define RTP_HEADER_SIZE     12
-#define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
-
-typedef struct rtp_hdr rtp_hdr_t;
-struct rtp_hdr
-{
-#if __BYTE_ORDER == __BIG_ENDIAN
-	uint16_t v:2;
-	uint16_t p:1;
-	uint16_t x:1;
-	uint16_t cc:4;
-	uint16_t m:1;
-	uint16_t pt:7;
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
-	uint16_t cc:4;
-	uint16_t x:1;
-	uint16_t p:1;
-	uint16_t v:2;
-	uint16_t pt:7;
-	uint16_t m:1;
-#endif
-	uint16_t seq;
-	uint32_t ts;
-	uint32_t ssrc;
-	uint32_t csrc[1];
-};
-
-// RTP extension 
-typedef struct rtp_hdr_ext rtp_hdr_ext_t;
-struct rtp_hdr_ext {
-	uint16_t type;
-	uint16_t len;
-};
-*/
-
 
 #define RTP_SEQ_NUM_MAX   (1<<16)
 #define RTP_SLIDEWIN_SIZE 16
@@ -89,11 +52,12 @@ struct rtp_slidewin {
 };
 
 uint32_t
-snw_rtp_slidewin_put(snw_ice_session_t *session, rtp_slidewin_t *win, uint16_t seq);
+snw_rtp_slidewin_put(snw_ice_session_t *session, 
+     rtp_slidewin_t *win, uint16_t seq);
 
 void
 snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, 
-      int control, int video, char *buf, int len);
+     int video, char *buf, int len);
 
 #ifdef __cplusplus
 }
