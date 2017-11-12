@@ -7,7 +7,8 @@
 #include "ice_channel.h"
 #include "ice_stream.h"
 #include "ice_types.h"
-#include "srs_librtmp.h"
+#include "rtmp/srs_librtmp.h"
+#include "rtp/rtp.h"
 
 enum {
    ICE_CONTROLLED_MODE = 0,
@@ -55,21 +56,9 @@ struct snw_ice_session {
 
    snw_ice_channel_t  *channel;
 
-   // rtmp settings
-   char               *rtmp_url;
-   int                 rtmp_inited;
-   int64_t             first_video_ts;
-   int64_t             current_ts;
-   srs_rtmp_t          rtmp; //pointer to void
+   //rtp context
+   snw_rtp_ctx_t       rtp_ctx;
 
-   int64_t             pts;
-
-   // rtmp aac
-   char               *audio_pos;
-   char               *audio_raw;
-   off_t               file_size;
-   uint32_t            delta_ts;
-   uint32_t            audio_ts;
 };
 
 

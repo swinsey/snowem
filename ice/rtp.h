@@ -7,11 +7,13 @@
 #include <string.h>
 
 #include "ice_types.h"
+#include "rtp/rtp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/*
 #define RTP_VERSION         2
 #define RTP_HEADER_SIZE     12
 #define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
@@ -40,12 +42,14 @@ struct rtp_hdr
 	uint32_t csrc[1];
 };
 
-/* RTP extension */
+// RTP extension 
 typedef struct rtp_hdr_ext rtp_hdr_ext_t;
 struct rtp_hdr_ext {
 	uint16_t type;
 	uint16_t len;
 };
+*/
+
 
 #define RTP_SEQ_NUM_MAX   (1<<16)
 #define RTP_SLIDEWIN_SIZE 16
