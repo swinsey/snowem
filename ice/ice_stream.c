@@ -1,9 +1,9 @@
 #include <assert.h>
 
+#include "core/mempool.h"
+#include "core/log.h"
 #include "ice.h"
 #include "ice_stream.h"
-#include "mempool.h"
-#include "log.h"
 
 void 
 snw_stream_mempool_init(snw_ice_context_t *ctx) {

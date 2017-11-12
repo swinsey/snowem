@@ -22,7 +22,9 @@ file(GLOB sources
        ice/*.c ice/*.h 
        #modules/*.c modules/*.h 
        jsoncpp/*.cpp jsoncpp/json/*.h
-       websocket/*.c websocket/*.h)
+       websocket/*.c websocket/*.h
+       rtp/*.c rtp/*.h
+       )
 file(GLOB c_sources core/*.c ice/*.c websocket/*.c)
 SET_SOURCE_FILES_PROPERTIES(${c_source} PROPERTIES LANGUAGE CXX)
 
@@ -35,7 +37,7 @@ target_compile_options(snowem PUBLIC -g -Wall)
 #add_definitions(-DBASE_FILE_NAME="$(<F)")
 
 # This allows to include files relative to the root of the src directory with a <> pair
-target_include_directories(snowem PUBLIC . jsoncpp core ice modules rtmp)
+target_include_directories(snowem PUBLIC . jsoncpp)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindDL.cmake)
 if (${DL_FOUND})

@@ -30,9 +30,9 @@
 #include <nettle/base64.h>
 #include <nettle/sha.h>
 
+#include "core/log.h"
+#include "core/utils.h"
 #include "http_parser.h"
-#include "log.h"
-#include "utils.h"
 
 enum ws_header {
   NOT_RELEVANT = 0,

@@ -2,7 +2,7 @@
 #define _ICE_PACKET_H_
 
 #include <stdint.h>
-#include "linux_list.h"
+#include "core/linux_list.h"
 
 #define RTP_PACKET_AUDIO   0
 #define RTP_PACKET_VIDEO   1

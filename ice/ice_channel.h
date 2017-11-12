@@ -1,8 +1,8 @@
 #ifndef _SNOW_ICE_CHANNEL_H_
 #define _SNOW_ICE_CHANNEL_H_
 
+#include "core/types.h"
 #include "ice_types.h"
-#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {

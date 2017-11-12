@@ -2,12 +2,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "core/log.h"
+#include "core/types.h"
 #include "ice_h264.h"
 #include "ice_session.h"
-#include "log.h"
+#include "rtmp/srs_librtmp.h"
 #include "rtp.h"
-#include "srs_librtmp.h"
-#include "types.h"
 
 //test_aac
 int
@@ -147,7 +147,7 @@ ice_aac_rtmp_init(snw_ice_session *session, const char* raw_file) {
 }
 
 int
-ice_h264_rtmp_init(snw_ice_session *session, const char* rtmp_url) {
+ice_h264_rtmp_init(snw_ice_session_t *session, const char* rtmp_url) {
    snw_log_t *log;
    int ret;
 
@@ -260,6 +260,7 @@ ice_h264_process_stapa_unit(snw_ice_session_t *session, int is_end_frame, int dt
    snw_log_t *log;
    char *p;
    uint8_t nal_unit_type, fbit;
+   int nal_size;
    int len;
 
    if (!session || !session->ice_ctx || !buf || buflen <= 0) {
@@ -275,12 +276,22 @@ ice_h264_process_stapa_unit(snw_ice_session_t *session, int is_end_frame, int dt
    len--;
    
    DEBUG(log, "stapa unit info, buflen=%d, len=%d", buflen, len);
+
    while(len > 2) {
-      uint16_t nal_size = p[0] << 8 | p[1];
-
-      DEBUG(log, "stapa unit info, nal_size=%u, len=%d", nal_size, len);
+      //FIXME: p[1] not working
+      //nal_size = p[0] << 8 | p[1];
+      
+      //HEXDUMP(log,(char*)p,2,"stata");
+      nal_size = ntohs(*((short*)p));
+      DEBUG(log, "stapa unit info, nal_size=%u, len=%d, p0=%u, p1=%u", 
+                 nal_size, len, *p, *(((char*)p)+1)); 
+      //TODO: set stricter condition on nal_size
+      if (nal_size == 0) {
+         ERROR(log,"wrong nal_size, nal_size=%u", nal_size);
+         return -1;
+      }
       ice_h264_process_nal_unit(session,is_end_frame,dts,pts,p+2, nal_size);
-
+      
       p += nal_size + 2;
       len -= nal_size + 2;
    }
@@ -303,7 +314,7 @@ ice_h264_process_fua_unit(snw_ice_session_t *session, int is_end_frame, int dts,
    log = session->ice_ctx->log;
 
 
-   HEXDUMP(log,buf,2,"fua");
+   //HEXDUMP(log,buf,2,"fua");
    indicator = (fua_indicator_t*)buf;
    hdr = (fua_hdr_t*)(buf+1);
   
@@ -319,7 +330,7 @@ ice_h264_process_fua_unit(snw_ice_session_t *session, int is_end_frame, int dts,
       ind.type = hdr->type;
       memcpy(data,&ind,sizeof(ind));
       len = sizeof(ind);
-      HEXDUMP(log,(char*)&ind,sizeof(ind),"fua");
+      //HEXDUMP(log,(char*)&ind,sizeof(ind),"fua");
    }
 
    memcpy(data+len, buf+2, buflen-2);
@@ -363,8 +374,9 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
    }
 
    if (!session->rtmp_inited) {
-      ret = ice_h264_rtmp_init(session,"rtmp://49.213.76.92:1935/live/livestream");
-      //ret = ice_h264_rtmp_init(session,"rtmp://live-api.facebook.com:80/rtmp/2047183778844872?ds=1&a=AThzc932cOy1c91Q");
+      //ret = ice_h264_rtmp_init(session,"rtmp://49.213.76.92:1935/live/livestream");
+      ret = ice_h264_rtmp_init(session,"rtmp://live-api.facebook.com:80/rtmp/2048813932015190?ds=1&a=ATiH7SKrqDT6Z8eE");
+
       if (ret < 0) {
          ERROR(log, "failed to init rtmp, ret=%d", ret);
          return -1;
@@ -382,9 +394,11 @@ ice_h264_handler(snw_ice_session_t *session, char *buf, int buflen) {
    dts = pts;
    session->pts = pts;
 
+
    DEBUG(log, "rtp info, seq=%u, start_ts=%llu, cur_ts=%llu, hdrlen=%u, extlen=%u, v=%u, x=%u, cc=%u, pt=%u, m=%u", 
          htons(hdr->seq), session->first_video_ts, session->current_ts, hdrlen, extlen, hdr->v, hdr->x, hdr->cc, hdr->pt, hdr->m);
-
+   
+   //HEXDUMP(log,(char*)buf,buflen,"rtp");
    //parsing h264 header
    p = buf + hdrlen;
    {

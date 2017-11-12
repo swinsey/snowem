@@ -1,7 +1,7 @@
 #include <stdio.h>
 
-#include "cache.h"
-#include "log.h"
+#include "core/cache.h"
+#include "core/log.h"
 #include "ice.h"
 #include "ice_session.h"
 #include "ice_types.h"

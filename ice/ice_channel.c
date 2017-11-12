@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "cache.h"
-#include "log.h"
+#include "core/cache.h"
+#include "core/log.h"
 #include "ice.h"
 #include "ice_channel.h"
 #include "ice_types.h"

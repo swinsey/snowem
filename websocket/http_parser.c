@@ -21,7 +21,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-#include "http_parser.h"
 #include <assert.h>
 #include <stddef.h>
 #include <ctype.h>
@@ -29,7 +28,8 @@
 #include <string.h>
 #include <limits.h>
 
-#include "log.h"
+#include "core/log.h"
+#include "http_parser.h"
 
 #ifndef ULLONG_MAX
 # define ULLONG_MAX ((uint64_t) -1) /* 2^64-1 */

@@ -5,7 +5,7 @@
 #include <jansson.h>
 
 #include "cice/agent.h"
-#include "core.h"
+#include "core/core.h"
 #include "dtls.h"
 #include "ice_types.h"
 #include "packet.h"

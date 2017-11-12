@@ -1,14 +1,14 @@
 
 #include <sofia-sip/sdp.h>
 
-#include "log.h"
+#include "core/log.h"
+#include "core/utils.h"
 #include "ice.h"
 #include "ice_types.h"
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "sdp.h"
 #include "process.h"
-#include "utils.h"
 
 static su_home_t *g_home = NULL;
 

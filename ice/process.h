@@ -1,7 +1,7 @@
 #ifndef _SNOW_ICE_PROCESS_H_
 #define _SNOW_ICE_PROCESS_H_
 
-#include "core.h"
+#include "core/core.h"
 #include "ice_types.h"
 
 #ifdef __cplusplus
