@@ -8,7 +8,6 @@
 #include "core/log.h"
 #include "core/utils.h"
 #include "ice_channel.h"
-#include "ice_h264.h"
 #include "ice_session.h"
 #include "json/json.h"
 #include "sdp.h"
@@ -892,7 +891,8 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    //ice_rtp_plugin(); //FIXME: impl
    if (video) {
       //forward to h264 handler
-      ice_h264_handler(session, buf, buflen);
+      //ice_h264_handler(session, buf, buflen);
+      snw_rtp_handle_pkg(&session->rtp_ctx,buf,buflen);
    }
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
@@ -1295,6 +1295,8 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    session->control_mode = ICE_CONTROLLED_MODE;
    session->base = ctx->ev_base;
    session->flags = 0;
+   session->rtp_ctx.session = session;
+   session->rtp_ctx.log = log;
    INIT_LIST_HEAD(&session->streams.list);
 
    if (!strncmp(peer_type.c_str(),"pub",3)) {

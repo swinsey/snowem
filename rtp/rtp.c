@@ -31,4 +31,22 @@ snw_rtp_init(snw_ice_context_t *ctx) {
 }
 
 
+int
+snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len) {
+   snw_log_t *log;
+   int i = 0;
+
+   if (!ctx) return -1;
+   log = ctx->log;
+
+   for (i=0; ; i++) {
+      snw_rtp_module_t *m = g_rtp_modules[i];
+      if (!m) break;
+
+      DEBUG(log,"rtp handling, name=%s",m->name);
+      m->handle_pkg(ctx,buffer,len);
+   }
+
+   return 0;
+}
 
