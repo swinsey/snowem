@@ -397,7 +397,10 @@ snw_rtp_h264_handle_pkg(void *data, char *buf, int buflen) {
       return -1;
    }
    log = ctx->log;
-   
+
+   if (ctx->pkt_type != RTP_VIDEO)
+      return 0;   
+
    //parsing rtp header
    hdr = (rtp_hdr_t*)buf;
    hdrlen = MIN_RTP_HEADER_SIZE + 4*hdr->cc;
@@ -489,6 +492,7 @@ snw_rtp_h264_fini() {
 snw_rtp_module_t g_rtp_h264_module = { 
    "h264",
    0,/*ctx*/
+   RTP_VIDEO,
    snw_rtp_h264_init, 
    snw_rtp_h264_handle_pkg, 
    snw_rtp_h264_fini,
