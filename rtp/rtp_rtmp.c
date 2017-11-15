@@ -29,6 +29,7 @@ snw_rtp_rtmp_fini() {
 snw_rtp_module_t g_rtp_rtmp_module = { 
    "rtmp",
    0,/*ctx*/
+   RTP_VIDEO,
    snw_rtp_rtmp_init, 
    snw_rtp_rtmp_handle_pkg, 
    snw_rtp_rtmp_fini,

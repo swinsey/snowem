@@ -849,6 +849,7 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
 void
 ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       snw_ice_component_t *component, char* buf, int len) {
+   snw_rtp_ctx_t *rtp_ctx = 0;
    snw_log_t *log = 0;
    rtp_hdr_t *header = (rtp_hdr_t *)buf;
    err_status_t ret;
@@ -860,6 +861,7 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
    if (!session || !stream || !component) return;
    log = session->ice_ctx->log;
+   rtp_ctx = &session->rtp_ctx;
 
    ssrc = ntohl(header->ssrc);
    timestamp = ntohl(header->ts);
@@ -888,10 +890,23 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       //do nothing
    }
 
-   if (video) {
+   /*if (video) {
       //forward to rtp handler, i.e h264
-      snw_rtp_handle_pkg(&session->rtp_ctx,buf,buflen);
-   }
+      rtp_ctx->stream = stream;
+      rtp_ctx->component = component; 
+      rtp_ctx->is_video = video;
+      snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
+   }*/
+
+   //forward to rtp handler, i.e h264
+   rtp_ctx->stream = stream;
+   rtp_ctx->component = component; 
+   if (video)
+      rtp_ctx->pkt_type = RTP_VIDEO;
+   else 
+      rtp_ctx->pkt_type = RTP_AUDIO;
+   snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
+
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
       snw_ice_handle_lost_packets(session,stream,

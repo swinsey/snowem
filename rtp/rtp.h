@@ -51,6 +51,7 @@ typedef struct snw_rtp_module snw_rtp_module_t;
 struct snw_rtp_module {
    char  *name;
    void  *ctx;
+   int    pkt_type;
    int  (*init)(void *ctx);
    int  (*handle_pkg)(void *ctx, char *buffer, int len);
    int  (*fini)();
@@ -58,10 +59,21 @@ struct snw_rtp_module {
    snw_rtp_module_t *next;
 };
 
+/* packet type */
+enum {
+   RTP_AUDIO = 1,
+   RTP_VIDEO = 2,
+   RTP_RTCP  = 3,
+};
+
 typedef struct snw_rtp_ctx snw_rtp_ctx_t;
 struct snw_rtp_ctx {
    void      *session;
+   void      *stream;
+   void      *component;
    snw_log_t *log;
+
+   int        pkt_type;
 
    // rtmp settings
    char               *rtmp_url;

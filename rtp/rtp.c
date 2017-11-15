@@ -2,6 +2,7 @@
 #include "core/log.h"
 #include "rtp/rtp.h"
 #include "rtp/rtp_h264.h"
+#include "rtp/rtp_rtcp.h"
 
 #define USE_MODULE_COMMON
 #define DECLARE_MODULE(name) &(g_rtp_##name##_module),
@@ -43,8 +44,10 @@ snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len) {
       snw_rtp_module_t *m = g_rtp_modules[i];
       if (!m) break;
 
-      DEBUG(log,"rtp handling, name=%s",m->name);
-      m->handle_pkg(ctx,buffer,len);
+      DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
+               m->name, m->pkt_type, ctx->pkt_type);
+      if (ctx->pkt_type == m->pkt_type)
+         m->handle_pkg(ctx,buffer,len);
    }
 
    return 0;
