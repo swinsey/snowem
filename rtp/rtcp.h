@@ -1,5 +1,5 @@
-#ifndef _SNOW_ICE_RTCP_H
-#define _SNOW_ICE_RTCP_H
+#ifndef _SNOW_RTP_RTCP_H_
+#define _SNOW_RTP_RTCP_H_
 
 #include <arpa/inet.h>
 #ifdef __MACH__
@@ -11,9 +11,7 @@
 #include <string.h>
 #include <vector>
 
-#include "ice.h"
-#include "ice_types.h"
-#include "ice_session.h"
+#include "rtp/rtp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -33,7 +31,9 @@ extern "C" {
 #define RTCP_APP   204
  
 #define RTCP_RTPFB 205
-#define RTCP_RTPFB_GENERIC_FMT 1
+#define RTCP_RTPFB_GENERIC_FMT      1
+#define RTCP_RTPFB_TPLR_FMT         7 //rfc 6642
+#define RTCP_RTPFB_PAUSE_RESUME_FMT 9 //rfc 7728
 
 #define RTCP_RTPFB_MSG_LEN     16
 
@@ -46,11 +46,24 @@ extern "C" {
 #define RTCP_PSFB_TSTR_FMT      5
 #define RTCP_PSFB_TSTN_FMT      6
 #define RTCP_PSFB_VBCM_FMT      7
-#define RTCP_PSFB_APP_FMT       15
+#define RTCP_PSFB_TPLR_FMT      8 // rfc 6642
+// https://tools.ietf.org/html/draft-alvestrand-rmcat-remb-03
+#define RTCP_PSFB_REMB_FMT      15 
 
 #define RTCP_PSFB_PLI_MSG_LEN   12
 #define RTCP_PSFB_FIR_MSG_LEN   20
-  
+
+/* sdes names */
+#define RTCP_SDES_END   0
+#define RTCP_SDES_CNAME 1
+#define RTCP_SDES_NAME  2
+#define RTCP_SDES_EMAIL 3
+#define RTCP_SDES_PHONE 4
+#define RTCP_SDES_LOC   5
+#define RTCP_SDES_TOOL  6
+#define RTCP_SDES_NOTE  7
+#define RTCP_SDES_PRIV  8  
+
 typedef struct rtcp_hdr rtcp_hdr_t;
 struct rtcp_hdr 
 {
@@ -141,25 +154,23 @@ struct rtcp_pkt {
    } pkt;
 }__attribute__((packed));
 
-typedef int (*resend_callback_fn)(snw_ice_session_t *session, 
-                 snw_ice_component_t *component,
-                 int video, int seqnr, int64_t now);
+
+void
+print_rtcp_header(snw_log_t *log, char *buf, int buflen, const char *msg);
 
 int
 snw_rtcp_has_payload_type(char *buf, int len, int type);
 
+//TODO: move to rtp_utils.c/h?
 uint32_t
-snw_rtcp_get_ssrc(snw_ice_session_t *s, char *buf, int len);
-
-void 
-snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c, 
-       int video, char *buf, int len, resend_callback_fn);
+snw_rtcp_get_ssrc(snw_rtp_ctx_t *ctx, char *buf, int len);
 
 int
 snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc, 
        uint32_t remote_ssrc, int seqnr);
 
-int snw_rtcp_gen_pli(char *buf, int len,
+int
+snw_rtcp_gen_pli(char *buf, int len,
       uint32_t local_ssrc, uint32_t remote_ssrc);
 
 uint32_t

@@ -2,7 +2,7 @@
 #define _ICE_VP8_H
 
 #include "core/types.h"
-#include "packet.h"
+#include "rtp/packet.h"
 
 typedef struct vp8_desc vp8_desc_t;
 struct vp8_desc {

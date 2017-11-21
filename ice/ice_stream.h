@@ -5,9 +5,9 @@
 
 #include "core/core.h"
 #include "core/linux_list.h"
-#include "dtls.h"
-#include "ice_component.h"
-#include "ice_types.h"
+#include "ice/dtls.h"
+#include "ice/ice_component.h"
+#include "ice/ice_types.h"
 
 #ifdef __cplusplus
 extern "C" {

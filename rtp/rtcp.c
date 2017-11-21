@@ -1,6 +1,25 @@
 #include "core/log.h"
 #include "core/types.h"
-#include "rtcp.h"
+#include "rtp/rtcp.h"
+#include "rtp/rtp.h"
+
+void
+print_rtcp_header(snw_log_t *log, char *buf, int buflen, const char *msg) {
+   rtcp_hdr_t *hdr;
+   char *p;
+   uint16_t id = 0;
+   int hdrlen = 0;
+   int extlen = 0;
+
+   //parsing rtcp header
+   hdr = (rtcp_hdr_t*)buf;
+   DEBUG(log, "rctp %s info, v=%u, p=%u, rc=%u, pt=%u, len=%u", 
+         msg, hdr->v, hdr->p, hdr->rc, hdr->pt, ntohs(hdr->len));
+
+   return;
+ 
+}
+
 
 int 
 snw_rtcp_has_payload_type(char *buf, int len, int8_t type) {
@@ -26,14 +45,14 @@ snw_rtcp_has_payload_type(char *buf, int len, int8_t type) {
 }
 
 uint32_t
-snw_rtcp_get_ssrc(snw_ice_session_t *s, char *buf, int len) {
+snw_rtcp_get_ssrc(snw_rtp_ctx_t *ctx, char *buf, int len) {
    snw_log_t *log = 0;
    rtcp_pkt_t *rtcp = 0;
    char *end = buf + len;
    int rtcp_len;
 
-   if (!s || !buf || len == 0) return 0;
-   log = s->ice_ctx->log;
+   if (!ctx || !buf || len == 0) return 0;
+   log = ctx->log;
 
    rtcp = (rtcp_pkt_t *)buf;
    if (rtcp->hdr.v != RTCP_VERSION) return 0;
@@ -61,7 +80,7 @@ snw_rtcp_get_ssrc(snw_ice_session_t *s, char *buf, int len) {
    return 0;
 }
 
-
+/*
 void 
 snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c, 
        int video, char *buf, int len, resend_callback_fn cb) {
@@ -118,6 +137,7 @@ snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c,
 	return;
 
 }
+*/
 
 int
 snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc, 
@@ -184,7 +204,7 @@ snw_rtcp_gen_nack(char *buf, int len,
       // FIXME: has padding
       return -1;
    }
-	rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
+   rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
 
    rtcp->pkt.fb.ssrc = htonl(local_ssrc);
    rtcp->pkt.fb.media = htonl(remote_ssrc);

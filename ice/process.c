@@ -7,12 +7,12 @@
 #include "core/mq.h"
 #include "core/log.h"
 #include "core/utils.h"
-#include "ice_channel.h"
-#include "ice_session.h"
+#include "ice/ice_channel.h"
+#include "ice/ice_session.h"
+#include "ice/process.h"
 #include "json/json.h"
 #include "sdp.h"
-#include "rtcp.h"
-#include "process.h"
+#include "rtp/rtcp.h"
 
 /* FIXME: standardize sdp */
 static int
@@ -716,9 +716,9 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
    }
 
    //TODO: impl circular buffer to keep sent packets for restransmission.
+
    return;
 }
-
 
 void 
 send_rtp_pkt(snw_ice_session_t *session, 
@@ -845,6 +845,49 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
    return;
 }
 
+void
+snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int video, char *buf, int len) {
+   snw_ice_context_t *ice_ctx = 0;
+   snw_log_t *log = 0;
+   snw_ice_session_t *s = 0;
+   uint32_t flowid = 0;
+
+   if (!session) return;
+   ice_ctx = session->ice_ctx;
+   log = ice_ctx->log;
+
+   DEBUG(log, "broadcast session, flowid=%u, players=%u %u %u %u %u", 
+         session->flowid,
+         session->channel->players[0],
+         session->channel->players[1],
+         session->channel->players[2],
+         session->channel->players[3],
+         session->channel->players[4]);
+
+   for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
+     
+      if (session->channel->players[i] != 0) {
+         rtp_hdr_t *header = (rtp_hdr_t *)buf;
+         uint16_t seq = ntohs(header->seq);
+
+         flowid = session->channel->players[i];
+         DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
+            session->flowid, video, header->pt, VP8_PT, seq,len);
+         s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
+         if (s) {
+            DEBUG(log, "forward, flowid=%u -> forwardid=%u", 
+                  session->flowid, flowid);
+            send_rtp_pkt(s, 0, video, buf, len);
+         } else {
+            // failed
+            ERROR(log, "session not found, flowid=%u",flowid);
+         }
+      }
+   }
+
+   return;
+}
+
 
 void
 ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
@@ -874,7 +917,7 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    }
    video = ((stream->remote_video_ssrc == ssrc) ? 1 : 0);
 
-   DEBUG(log, "rtp incoming message, flowid=%u, len=%u, video=%u, ssrc=%u, a_ssrc=%u, v_ssrc=%u",
+   DEBUG(log, "rtp message, flowid=%u, len=%u, video=%u, ssrc=%u, a_ssrc=%u, v_ssrc=%u",
               session->flowid, len, video, ssrc, stream->remote_audio_ssrc, stream->remote_video_ssrc);
 
    ret = srtp_unprotect(component->dtls->srtp_in, buf, &buflen);
@@ -889,14 +932,6 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
       //do nothing
    }
-
-   /*if (video) {
-      //forward to rtp handler, i.e h264
-      rtp_ctx->stream = stream;
-      rtp_ctx->component = component; 
-      rtp_ctx->is_video = video;
-      snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
-   }*/
 
    //forward to rtp handler, i.e h264
    rtp_ctx->stream = stream;
@@ -932,6 +967,7 @@ void
 ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
                           snw_ice_component_t *component, char* buf, int len) {
    snw_log_t *log = 0;
+   snw_rtp_ctx_t *rtp_ctx = 0;
    err_status_t ret;
    uint32_t ssrc = 0;
    int buflen = len;
@@ -939,53 +975,37 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
    if (!session) return;
    log = session->ice_ctx->log;
+   rtp_ctx = &session->rtp_ctx;
 
    ret = srtp_unprotect_rtcp(component->dtls->srtp_in, buf, &buflen);
    if (ret != err_status_ok) {
       DEBUG(log, "SRTCP unprotect error, ret=%u, len=%d, buflen=%d", ret, len, buflen);
       return;
-   } 
+   }
 
+   //FIXME: remove this part
    /* Determine which stream: audio or video? */
-   ssrc = snw_rtcp_get_ssrc(session,buf,len);
+
+   /*ssrc = snw_rtcp_get_ssrc(session,buf,len);
    video = stream->remote_video_ssrc == ssrc ? 1 : 0;
    DEBUG(log, "ssrc info, flowid=%u, flags=%u, video=%u, ssrc=%u, buflen=%u",
            session->flowid, session->flags, video, ssrc, buflen);
-   snw_stream_print_ssrc(session->ice_ctx, stream, "stream");
+   snw_stream_print_ssrc(session->ice_ctx, stream, "stream");*/
     
    /* Resend lost packets if having any */
-   if (IS_FLAG(session,ICE_SUBSCRIBER))
-      snw_rtcp_handle_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
-   
+   //if (IS_FLAG(session,ICE_SUBSCRIBER)) {
+      //FIXME: hanndle at rtcp module
+      //snw_rtcp_handle_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
+   //}
+
+   //forward to rtp handler, i.e h264
+   rtp_ctx->stream = stream;
+   rtp_ctx->component = component; 
+   rtp_ctx->pkt_type = RTP_RTCP;
+   snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
+  
    return;
 }
-
-int ice_get_packet_type(snw_ice_session_t *session, char* buf, int len) {
-   rtp_hdr_t *header = 0;
-   
-   if (!session || !buf || len <= 0) {
-      return UNKNOWN_PT;
-   }
-
-   //FIXME: change number to CONSTANTS
-   if ((*buf >= 20) && (*buf < 64)) {
-      return DTLS_PT;
-   }
-
-   if (len < RTP_HEADER_SIZE) {
-      return UNKNOWN_PT;
-   }
-
-   header = (rtp_hdr_t *)buf;
-   if ((header->pt < 64) || (header->pt >= 96)) {
-      return RTP_PT;
-   } else if ((header->pt >= 64) && (header->pt < 96)) {
-      return RTCP_PT;
-   }
-
-   return UNKNOWN_PT;
-}
-
 
 void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
           uint32_t component_id, char *buf, uint32_t len, void *data) {
@@ -1005,7 +1025,7 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    log = session->ice_ctx->log;
    session->curtime = get_monotonic_time();
 
-   pt = ice_get_packet_type(session, buf,len);
+   pt = snw_rtp_get_pkt_type(buf,len);
    DEBUG(log, "get packet type, flowid=%u, pt=%u", 
               session->flowid, pt);
    if (pt == UNKNOWN_PT) {

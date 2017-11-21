@@ -4,11 +4,15 @@
 #include <stdint.h>
 
 #include "cice/agent.h"
-#include "ice_channel.h"
-#include "ice_stream.h"
-#include "ice_types.h"
-#include "rtmp/srs_librtmp.h"
+#include "ice/ice_channel.h"
+#include "ice/ice_stream.h"
+#include "ice/ice_types.h"
 #include "rtp/rtp.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 enum {
    ICE_CONTROLLED_MODE = 0,
@@ -21,8 +25,6 @@ enum {
    PEER_TYPE_PLAYER = 2,
    PEER_TYPE_P2P = 3,
 };
-
-
 
 struct snw_ice_session {
    uint32_t flowid;
@@ -76,6 +78,11 @@ snw_ice_session_insert(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
 
 int 
 snw_ice_session_remove(snw_ice_context_t *ctx, snw_ice_session_t *sitem);
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif //_SNOW_ICE_SESSION_H_
 

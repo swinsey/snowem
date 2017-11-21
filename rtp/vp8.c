@@ -1,9 +1,8 @@
 
 #include "core/log.h"
 #include "core/types.h"
-#include "vp8.h"
-#include "rtp.h"
-#include "packet.h"
+#include "rtp/vp8.h"
+#include "rtp/rtp.h"
 
 
 int g_max_rtp_queue = 3001;
