@@ -7,7 +7,6 @@
 #include "ice.h"
 #include "ice_types.h"
 #include "ice_session.h"
-#include "rtcp.h"
 
 void
 dtls_callback(const SSL *ssl, int where, int ret) {

@@ -7,12 +7,10 @@
 #include "rtp/rtp_rtmp.h"
 
 #define USE_MODULE_H264
-#define DECLARE_MODULE(name) &(g_rtp_##name##_module),
 snw_rtp_module_t *g_rtp_h264_modules[] = {
    #include "rtp_module_dec.h"
    0
 };
-#undef DECLARE_MODULE
 #undef USE_MODULE_H264
 
 int
@@ -25,8 +23,12 @@ snw_rtp_h264_init(void *c) {
    if (!ctx) return -1;
    log = ctx->log;
    
+   if (MODULE_IS_FLAG(g_rtp_h264_module,M_FLAGS_INIT)) {
+      WARN(log,"rtp h264 aready init");
+      return -1;
+   }
+
    DEBUG(log,"init rtp h264");
-   //FIXME init rtmp module
     
    for (i=0; ; i++) {
       snw_rtp_module_t *m = g_rtp_h264_modules[i];
@@ -34,9 +36,9 @@ snw_rtp_h264_init(void *c) {
 
       DEBUG(log,"init module, name=%s",m->name);
       m->init(ctx);
-      prev->next = m;
-      prev = m;
    }
+
+   MODULE_SET_FLAG(g_rtp_h264_module,M_FLAGS_INIT);
 
    return 0;
 }
@@ -493,6 +495,7 @@ snw_rtp_module_t g_rtp_h264_module = {
    "h264",
    0,/*ctx*/
    RTP_VIDEO,
+   0,
    snw_rtp_h264_init, 
    snw_rtp_h264_handle_pkg, 
    snw_rtp_h264_fini,

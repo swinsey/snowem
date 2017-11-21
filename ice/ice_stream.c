@@ -2,8 +2,8 @@
 
 #include "core/mempool.h"
 #include "core/log.h"
-#include "ice.h"
-#include "ice_stream.h"
+#include "ice/ice.h"
+#include "ice/ice_stream.h"
 
 void 
 snw_stream_mempool_init(snw_ice_context_t *ctx) {
