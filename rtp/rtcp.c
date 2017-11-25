@@ -36,7 +36,7 @@ snw_rtcp_has_payload_type(char *buf, int len, int8_t type) {
 		length = ntohs(rtcp->len);
 		if (length == 0)
 			break;
-		total -= (length+1)*RTCP_LENGTH_IN_WORDS;
+		total -= (length+1)*RTCP_LEN_IN_WORDS;
 		if (total <= 0)
 			break;
 		rtcp = (rtcp_hdr_t *)((uint32_t*)rtcp + length + 1);
@@ -151,11 +151,11 @@ snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc,
 	rtcp->hdr.v = RTCP_VERSION;
 	rtcp->hdr.pt = RTCP_PSFB;
 	rtcp->hdr.rc = RTCP_PSFB_FIR_FMT;
-   if (len % RTCP_LENGTH_IN_WORDS != 0) {
+   if (len % RTCP_LEN_IN_WORDS != 0) {
       // FIXME: has padding
       return -1;
    }
-	rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
+	rtcp->hdr.len = htons((len/RTCP_LEN_IN_WORDS)-1);
 
    rtcp->pkt.fb.ssrc = htonl(local_ssrc);
    rtcp->pkt.fb.media = htonl(remote_ssrc);
@@ -176,11 +176,11 @@ int snw_rtcp_gen_pli(char *buf, int len,
 	rtcp->hdr.v = RTCP_VERSION;
 	rtcp->hdr.pt = RTCP_PSFB;
 	rtcp->hdr.rc = RTCP_PSFB_PLI_FMT;
-   if (len % RTCP_LENGTH_IN_WORDS != 0) {
+   if (len % RTCP_LEN_IN_WORDS != 0) {
       // FIXME: has padding
       return -1;
    }
-	rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
+	rtcp->hdr.len = htons((len/RTCP_LEN_IN_WORDS)-1);
 
    rtcp->pkt.fb.ssrc = htonl(local_ssrc);
    rtcp->pkt.fb.media = htonl(remote_ssrc);
@@ -200,15 +200,39 @@ snw_rtcp_gen_nack(char *buf, int len,
 	rtcp->hdr.v = RTCP_VERSION;
 	rtcp->hdr.pt = RTCP_RTPFB;
 	rtcp->hdr.rc = RTCP_RTPFB_GENERIC_FMT;
-   if (len % RTCP_LENGTH_IN_WORDS != 0) {
+   if (len % RTCP_LEN_IN_WORDS != 0) {
       // FIXME: has padding
       return -1;
    }
-   rtcp->hdr.len = htons((len/RTCP_LENGTH_IN_WORDS)-1);
+   rtcp->hdr.len = htons((len/RTCP_LEN_IN_WORDS)-1);
 
    rtcp->pkt.fb.ssrc = htonl(local_ssrc);
    rtcp->pkt.fb.media = htonl(remote_ssrc);
    memcpy(rtcp->pkt.fb.fci.nack, &payload, 4);
+
+	return RTCP_PSFB_PLI_MSG_LEN;
+}
+
+uint32_t
+snw_rtcp_gen_rr(char *buf, int len,
+      uint32_t local_ssrc, uint32_t remote_ssrc, snw_report_block_t *rb) {
+
+	if (buf == NULL || len < RTCP_RR_MSG_LEN)
+		return -1;
+
+	memset(buf, 0, RTCP_RR_MSG_LEN);
+	rtcp_pkt_t *rtcp = (rtcp_pkt_t *)buf;
+	rtcp->hdr.v = RTCP_VERSION;
+	rtcp->hdr.pt = RTCP_RR;
+	rtcp->hdr.rc = 1;
+   if (len % RTCP_LEN_IN_WORDS != 0) {
+      // FIXME: has padding
+      return -1;
+   }
+   rtcp->hdr.len = htons((len/RTCP_LEN_IN_WORDS)-1);
+
+   rtcp->pkt.rr.ssrc = htonl(local_ssrc);
+   memcpy(rtcp->pkt.rr.rb, rb, sizeof(*rb));
 
 	return RTCP_PSFB_PLI_MSG_LEN;
 }

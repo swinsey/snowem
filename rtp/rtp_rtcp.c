@@ -114,15 +114,28 @@ int
 snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    snw_log_t *log = 0;
    snw_rtcp_sr_t *sr = 0;
+   snw_rtcp_stats_t *stats = 0;
 
    if (!ctx || !rtcp) return -1;
    log = ctx->log;
 
    sr = &rtcp->pkt.sr;
-   DEBUG(log,"rtcp sr, ssrc=%u , ntp_secs=%u, ntp_frac=%u, rtp_ts=%u, packet_cnt=%u, octet_cnt=%u", 
-         sr->ssrc, sr->ntp_secs, sr->ntp_frac, sr->rtp_ts, ntohl(sr->packet_cnt), ntohl(sr->octet_cnt));
+   DEBUG(log,"rtcp sr, ssrc=%u , ntp_ts=%llu, rtp_ts=%u, "
+         "packet_cnt=%u, octet_cnt=%u", ntohl(sr->ssrc), ntohl(sr->ntp_ts), 
+         ntohl(sr->rtp_ts), ntohl(sr->pkt_cnt), ntohl(sr->byte_cnt));
 
-   //.1 collect ntp and rtp, RtcpAggregator
+   stats = snw_rtcp_stats_find(ctx, ntohl(sr->ssrc));
+   if (!stats) {
+      ERROR(log, "no rtcp stats found, ssrc=%u", ntohl(sr->ssrc));
+      return -1;
+   }
+
+   //.1 collect ntp and rtp
+   stats->last_sr_ntp = ntohl((rtcp->pkt.sr.ntp_ts << 16) >> 32);
+   stats->last_sr_rtp_ts = ntohl(rtcp->pkt.sr.rtp_ts);
+
+   DEBUG(log,"rtcp sr stats lsr, ssrc=%u, pkt_cnt=%u, byte_cnt=%u, last_sr_ntp=%u(%llu)", 
+          stats->ssrc, stats->pkt_cnt, stats->byte_cnt, stats->last_sr_ntp,be64toh(rtcp->pkt.sr.ntp_ts));
    
    //.2 sender bandwidth estimation, SenderBandwidthEstimationHandler
    

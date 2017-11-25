@@ -50,6 +50,7 @@ struct snw_context {
    uint32_t            log_file_maxsize;
    uint32_t            log_rotate_num;
    uint32_t            log_level;
+   int                 ice_log_enabled;
 
    /* message queues */
    snw_shmmq_t  *snw_ice2core_mq;

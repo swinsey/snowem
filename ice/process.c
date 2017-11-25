@@ -49,7 +49,7 @@ snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx,
 
    memset(sdp,0,len);
    snprintf(sdp, len, sdp_template,
-       get_real_time(), get_real_time(),
+       get_epoch_time(), get_epoch_time(),
        "PeerCall Replay", audio_mline, video_mline);
 
    return 0;
@@ -754,6 +754,7 @@ ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
    return;
 }
 
+/*
 void 
 snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream,
       snw_ice_component_t *component, uint16_t seqno, int video) {
@@ -763,13 +764,10 @@ snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream
    if (!session) return;
    log = session->ice_ctx->log;
 
-   /* Save current seq number and 
-      generate list of lost seqs */
    if (!video) {
       nack = snw_rtp_slidewin_put(session, &component->v_slidewin, seqno);
    }
     
-   /* Generate NACK rtpfb message */
    if (nack != 0) {
       char rtcpbuf[RTCP_RTPFB_MSG_LEN];
       DEBUG(log,"sending rtpfb nack, flowid=%u, local_ssrc=%x, remote_ssrc=%x, payload=%x",
@@ -787,6 +785,7 @@ snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream
 
    return;
 }
+*/
 
 void
 snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int force) {
@@ -936,6 +935,8 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    //forward to rtp handler, i.e h264
    rtp_ctx->stream = stream;
    rtp_ctx->component = component; 
+   rtp_ctx->epoch_curtime = session->curtime;
+   rtp_ctx->ntp_curtime = rtp_ctx->epoch_curtime + NTP_EPOCH_DIFF;
    if (video)
       rtp_ctx->pkt_type = RTP_VIDEO;
    else 
@@ -944,8 +945,8 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_handle_lost_packets(session,stream,
-          component,ntohs(header->seq),video);
+      //snw_ice_handle_lost_packets(session,stream,
+      //    component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);
    }
 
@@ -1001,6 +1002,8 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    //forward to rtp handler, i.e h264
    rtp_ctx->stream = stream;
    rtp_ctx->component = component; 
+   rtp_ctx->epoch_curtime = session->curtime;
+   rtp_ctx->ntp_curtime = rtp_ctx->epoch_curtime + NTP_EPOCH_DIFF;
    rtp_ctx->pkt_type = RTP_RTCP;
    snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
   
@@ -1023,7 +1026,7 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
    stream = component->stream;
    session = stream->session;
    log = session->ice_ctx->log;
-   session->curtime = get_monotonic_time();
+   session->curtime = get_epoch_time();
 
    pt = snw_rtp_get_pkt_type(buf,len);
    DEBUG(log, "get packet type, flowid=%u, pt=%u", 
@@ -1278,7 +1281,7 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
 
    memset(sdp,0,1024);
    snprintf(sdp, 1024, sdp_template,
-       get_real_time(), get_real_time(),
+       get_epoch_time(), get_epoch_time(),
        "Snowem Replay", audio_mline, video_mline);
 
    //FIXME: session setup does not require to know sdp in advanced.
@@ -1328,6 +1331,7 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    session->control_mode = ICE_CONTROLLED_MODE;
    session->base = ctx->ev_base;
    session->flags = 0;
+   snw_rtp_ctx_init(&session->rtp_ctx);
    session->rtp_ctx.session = session;
    session->rtp_ctx.log = log;
    INIT_LIST_HEAD(&session->streams.list);

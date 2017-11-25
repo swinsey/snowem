@@ -5,6 +5,7 @@
 #include "rtp/rtp_audio.h"
 #include "rtp/rtp_rtcp.h"
 #include "rtp/rtp_video.h"
+#include "rtp/rtp_utils.h"
 
 #define USE_MODULE_COMMON
 #define DECLARE_MODULE(name) &(g_rtp_##name##_module),
@@ -43,16 +44,7 @@ print_rtp_header(snw_log_t *log, char *buf, int buflen, const char *msg) {
 
    //parsing rtp header
    hdr = (rtp_hdr_t*)buf;
-   hdrlen = MIN_RTP_HEADER_SIZE + 4*hdr->cc;
-   if (hdr->x) {
-      uint16_t len;
-      p = buf + hdrlen; 
-      id = ntohs(*((uint16_t*)p));
-      len = ntohs(*((uint16_t*)(p+2)));
-      extlen = 4 + 4*len;
-      hdrlen += extlen;
-   }
-
+   hdrlen = snw_rtp_get_hdrlen(hdr);
    DEBUG(log, "rtp %s info, seq=%u, id=%u, hdrlen=%u, "
               "extlen=%u, v=%u, x=%u, cc=%u, pt=%u, m=%u", 
          msg, htons(hdr->seq), id, hdrlen, extlen, hdr->v, 
@@ -67,12 +59,14 @@ print_rtp_header(snw_log_t *log, char *buf, int buflen, const char *msg) {
 int
 snw_rtp_get_pkt_type(char* buf, int len) {
    rtp_hdr_t *header = 0;
+   uint8_t c;
    
    if (!buf || len <= 0) {
       return UNKNOWN_PT;
    }
 
-   if ((*buf >= 20) && (*buf < 64)) {
+   c = (uint8_t)*buf;
+   if ((c >= 20) && (c < 64)) {
       return DTLS_PT;
    }
 
@@ -111,6 +105,19 @@ snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len) {
 
    return 0;
 }
+
+
+int
+snw_rtp_ctx_init(snw_rtp_ctx_t *ctx) {
+   if (!ctx) return 0;
+   
+   memset(ctx,0,sizeof(*ctx));
+   INIT_LIST_HEAD(&ctx->sender_stats.list);
+   INIT_LIST_HEAD(&ctx->receiver_stats.list);
+
+   return 0;
+}
+
 
 
 

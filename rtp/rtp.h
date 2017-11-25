@@ -16,6 +16,8 @@ extern "C" {
 #define RTP_HEADER_SIZE     12
 #define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
 
+#define RTCP_MIN_INTERVAL 2000000 // microseconds
+
 typedef struct rtp_hdr rtp_hdr_t;
 struct rtp_hdr
 {
@@ -62,6 +64,7 @@ struct snw_rtp_module {
    int    flags;
    int  (*init)(void *ctx);
    int  (*handle_pkg)(void *ctx, char *buffer, int len);
+   //int  (*handle_pkg_out)(void *ctx, char *buffer, int len);
    int  (*fini)();
 
    snw_rtp_module_t *next;
@@ -80,6 +83,8 @@ struct snw_rtp_ctx {
    snw_log_t *log;
 
    int        pkt_type;
+   int64_t    epoch_curtime;
+   int64_t    ntp_curtime;
 
    // rtmp settings
    char               *rtmp_url;
@@ -97,9 +102,8 @@ struct snw_rtp_ctx {
    uint32_t            delta_ts;
    uint32_t            audio_ts;
 
-#define MAX_RECEIVER_NUM 2
-   snw_rtcp_stats_t    sender_stats[MAX_RECEIVER_NUM];
-   //snw_rtcp_stats_t    receiver_stats[MAX_RECEIVER_NUM];
+   snw_rtcp_stats_t    sender_stats;
+   snw_rtcp_stats_t    receiver_stats;
 };
 
 int
@@ -113,6 +117,9 @@ snw_rtp_get_pkt_type(char* buf, int len);
 
 int
 snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len);
+
+int
+snw_rtp_ctx_init(snw_rtp_ctx_t *ctx);
 
 #ifdef __cplusplus
 }

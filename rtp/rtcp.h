@@ -17,10 +17,10 @@
 extern "C" {
 #endif
 
-#define RTCP_VERSION    2
-#define RTCP_LENGTH_IN_WORDS 4
-#define RTCP_HDR_LENGTH 4
-#define RTCP_PKT_NUM_MAX 31
+#define RTCP_VERSION      2
+#define RTCP_LEN_IN_WORDS 4
+#define RTCP_HDR_LEN      4
+#define RTCP_PKT_NUM_MAX  31
 
 /* rtcp payload type */
 #define RTCP_FIR   192
@@ -36,6 +36,9 @@ extern "C" {
 #define RTCP_RTPFB_PAUSE_RESUME_FMT 9 //rfc 7728
 
 #define RTCP_RTPFB_MSG_LEN     16
+
+#define REPORT_BLOCK_LEN       24
+#define RTCP_RR_MSG_LEN        RTCP_HDR_LEN + 4 + REPORT_BLOCK_LEN
 
 /* see rfc4858, rfc5104 */
 #define RTCP_PSFB  206
@@ -101,11 +104,10 @@ typedef struct snw_rtcp_sr snw_rtcp_sr_t;
 struct snw_rtcp_sr
 {
 	uint32_t ssrc;
-	uint32_t ntp_secs;
-	uint32_t ntp_frac;
+	uint64_t ntp_ts;
 	uint32_t rtp_ts;
-	uint32_t packet_cnt;
-	uint32_t octet_cnt;
+	uint32_t pkt_cnt;
+	uint32_t byte_cnt;
 	snw_report_block_t rb[1];
 };
 
