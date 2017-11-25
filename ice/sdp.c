@@ -145,7 +145,7 @@ snw_ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp
             orig_sdp->sdp_origin->o_id, orig_sdp->sdp_origin->o_version);
       strncat(sdp, buffer, ICE_BUFSIZE);
    } else {
-      int64_t sessid = get_real_time();
+      int64_t sessid = get_epoch_time();
       snprintf(buffer, 512, "o=%s %lu  %lu IN IP4 0.0.0.0\r\n", "-", sessid, sessid/*version*/);
       strncat(sdp, buffer, ICE_BUFSIZE);
    }

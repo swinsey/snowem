@@ -77,6 +77,13 @@ snw_config_init(snw_context_t *ctx, const char *file) {
       exit(0);
    }
 
+   if (config_lookup_int(&cfg, "ice_log_enabled", &number)) {
+      printf("log_level: %u\n", number);
+      ctx->ice_log_enabled = number;
+   } else {
+      ctx->ice_log_enabled = 0;
+   }
+
 
    setting = config_lookup(&cfg, "modules");
    if (setting != NULL) {

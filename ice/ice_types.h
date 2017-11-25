@@ -39,7 +39,7 @@ typedef struct dtls_ctx dtls_ctx_t;
 #define ICE_ERROR2(...) do {} while(0)
 
 #define ICE_BUFSIZE   8192
-#define ICE_USEC_PER_SEC 1000000
+#define ICE_USEC_PER_SEC 10000
 
 //status
 #define WEBRTC_START           0x0001
