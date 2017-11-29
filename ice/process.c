@@ -845,7 +845,9 @@ snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int
 }
 
 void
-snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int video, char *buf, int len) {
+snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, 
+      snw_ice_stream_t *stream, snw_ice_component_t *component,
+      int video, char *buf, int len) {
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
    snw_ice_session_t *s = 0;
@@ -870,16 +872,40 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session, int video, char *buf, int 
          uint16_t seq = ntohs(header->seq);
 
          flowid = session->channel->players[i];
-         DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, pkg_type: %u(%u), seq: %u, length=%u", 
-            session->flowid, video, header->pt, VP8_PT, seq,len);
+         DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, "
+                    "pkg_type: %u(%u), seq: %u, length=%u", 
+              session->flowid, video, header->pt, VP8_PT, seq,len);
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
             DEBUG(log, "forward, flowid=%u -> forwardid=%u", 
                   session->flowid, flowid);
+
             send_rtp_pkt(s, 0, video, buf, len);
+
+            { // handle pkg out
+               snw_rtp_ctx_t *rtp_ctx = 0;
+               uint32_t remote_ssrc = 0;
+               rtp_ctx = &s->rtp_ctx;
+               //FIXME: more checks here
+               rtp_ctx->stream = s->audio_stream;
+               rtp_ctx->component = s->audio_stream->rtp_component; 
+               rtp_ctx->epoch_curtime = session->curtime;
+               rtp_ctx->ntp_curtime = session->curtime + NTP_EPOCH_DIFF;
+               rtp_ctx->pkt_type = video ? RTP_VIDEO : RTP_AUDIO;
+               remote_ssrc = /*htonl*/(video ? s->audio_stream->local_video_ssrc : 
+                                               s->audio_stream->local_audio_ssrc);
+
+               DEBUG(log, "handle package out, flowid=%u, seq=%u, ssrc=%u, remote_ssrc=%u", 
+                     s->flowid, ntohs(header->seq), ntohl(header->ssrc), remote_ssrc);
+               header->ssrc = htonl(remote_ssrc);
+               snw_rtp_handle_pkg_out(rtp_ctx,buf,len);
+            }
+ 
+
          } else {
             // failed
             ERROR(log, "session not found, flowid=%u",flowid);
+            continue;
          }
       }
    }
@@ -911,26 +937,25 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    /* XXX: stream ssrc should be set by sdp offer/answer? */
    if (ssrc != stream->remote_audio_ssrc
        && ssrc != stream->remote_video_ssrc) {
-      ERROR(log, "wrong ssrc, ssrc=%u, ts=%u, seq=%u", ssrc, timestamp, seq);
+      ERROR(log, "wrong ssrc, ssrc=%u, ts=%u, seq=%u", 
+           ssrc, timestamp, seq);
       return;
    }
    video = ((stream->remote_video_ssrc == ssrc) ? 1 : 0);
 
-   DEBUG(log, "rtp message, flowid=%u, len=%u, video=%u, ssrc=%u, a_ssrc=%u, v_ssrc=%u",
-              session->flowid, len, video, ssrc, stream->remote_audio_ssrc, stream->remote_video_ssrc);
+   DEBUG(log, "rtp message, flowid=%u, len=%u, video=%u, "
+              "ssrc=%u, a_ssrc=%u, v_ssrc=%u",
+              session->flowid, len, video, ssrc, 
+              stream->remote_audio_ssrc, 
+              stream->remote_video_ssrc);
 
    ret = srtp_unprotect(component->dtls->srtp_in, buf, &buflen);
    if (ret != err_status_ok) {
-      ERROR(log, "unprotect error, len=%d, buflen=%d, ts=%u, seq=%u, res=%u",
+      ERROR(log, "unprotect error, len=%d, buflen=%d, "
+                 "ts=%u, seq=%u, res=%u",
             len, buflen, timestamp, seq, ret);
       return;
    } 
-
-   if (IS_FLAG(session,ICE_PUBLISHER)) {
-      snw_ice_broadcast_rtp_pkg(session,video,buf,buflen);
-   } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
-      //do nothing
-   }
 
    //forward to rtp handler, i.e h264
    rtp_ctx->stream = stream;
@@ -941,7 +966,13 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       rtp_ctx->pkt_type = RTP_VIDEO;
    else 
       rtp_ctx->pkt_type = RTP_AUDIO;
-   snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
+   snw_rtp_handle_pkg_in(rtp_ctx,buf,buflen);
+
+   if (IS_FLAG(session,ICE_PUBLISHER)) {
+      snw_ice_broadcast_rtp_pkg(session,stream,component,video,buf,buflen);
+   } else if (IS_FLAG(session,ICE_SUBSCRIBER)) {
+      //do nothing
+   }
 
 
    if (IS_FLAG(session,ICE_PUBLISHER)) {
@@ -1005,7 +1036,7 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    rtp_ctx->epoch_curtime = session->curtime;
    rtp_ctx->ntp_curtime = rtp_ctx->epoch_curtime + NTP_EPOCH_DIFF;
    rtp_ctx->pkt_type = RTP_RTCP;
-   snw_rtp_handle_pkg(rtp_ctx,buf,buflen);
+   snw_rtp_handle_pkg_in(rtp_ctx,buf,buflen);
   
    return;
 }
@@ -1121,7 +1152,8 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
       stream->remote_audio_ssrc = 0;
       if (IS_FLAG(session, WEBRTC_BUNDLE)) {
          stream->local_video_ssrc = random();
-         DEBUG(log, "generate video ssrc, ssrc=%u",stream->local_video_ssrc);
+         DEBUG(log, "generate ssrc, a_ssrc=%u, v_ssrc=%u",
+               stream->local_audio_ssrc, stream->local_video_ssrc);
       } else {
          stream->local_video_ssrc = 0;
       }

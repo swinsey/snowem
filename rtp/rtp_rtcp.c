@@ -120,11 +120,13 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    log = ctx->log;
 
    sr = &rtcp->pkt.sr;
+   //HEXDUMP(log,(char*)sr,sizeof(*sr),"sr");
+   //HEXDUMP(log,(char*)&sr->ntp_ts,sizeof(sr->ntp_ts),"ntp");
    DEBUG(log,"rtcp sr, ssrc=%u , ntp_ts=%llu, rtp_ts=%u, "
-         "packet_cnt=%u, octet_cnt=%u", ntohl(sr->ssrc), ntohl(sr->ntp_ts), 
+         "packet_cnt=%u, octet_cnt=%u", ntohl(sr->ssrc), be64toh(sr->ntp_ts), 
          ntohl(sr->rtp_ts), ntohl(sr->pkt_cnt), ntohl(sr->byte_cnt));
 
-   stats = snw_rtcp_stats_find(ctx, ntohl(sr->ssrc));
+   stats = snw_rtcp_stats_find(ctx,&ctx->receiver_stats, ntohl(sr->ssrc));
    if (!stats) {
       ERROR(log, "no rtcp stats found, ssrc=%u", ntohl(sr->ssrc));
       return -1;
@@ -133,6 +135,7 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    //.1 collect ntp and rtp
    stats->last_sr_ntp = ntohl((rtcp->pkt.sr.ntp_ts << 16) >> 32);
    stats->last_sr_rtp_ts = ntohl(rtcp->pkt.sr.rtp_ts);
+   stats->last_sr_recv_ts = ctx->epoch_curtime;
 
    DEBUG(log,"rtcp sr stats lsr, ssrc=%u, pkt_cnt=%u, byte_cnt=%u, last_sr_ntp=%u(%llu)", 
           stats->ssrc, stats->pkt_cnt, stats->byte_cnt, stats->last_sr_ntp,be64toh(rtcp->pkt.sr.ntp_ts));
@@ -142,16 +145,53 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    return 0;
 }
 
+void
+snw_rtp_rtcp_print_rb(snw_log_t *log, snw_report_block_t *rb) {
+
+   if (!log || !rb) return;
+
+   DEBUG(log,"rtcp rr rb, cum_lost=%u, frac_lost=%u, hi_seqno=%u, jitter=%u, lsr=%u, dlsr=%u", 
+         rb->cum_lost,
+         rb->frac_lost,
+         ntohl(rb->hi_seqno),
+         ntohl(rb->lsr),
+         ntohl(rb->dlsr));
+   return;
+}
+
 int
 snw_rtp_rtcp_rr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    snw_log_t *log = 0;
    snw_rtcp_rr_t *rr = 0;
+   snw_rtcp_stats_t *stats = 0;
+   int i = 0;
 
    if (!ctx || !rtcp) return -1;
    log = ctx->log;
 
    rr = &rtcp->pkt.rr;
-   DEBUG(log,"rtcp rr, ssrc=%u", rr->ssrc);
+   DEBUG(log,"rtcp rr, rc=%u, ssrc=%u", rtcp->hdr.rc, ntohl(rr->ssrc));
+   
+   for (i=0; i<rtcp->hdr.rc; i++) {
+      snw_report_block_t *rb = &rr->rb[i];
+      DEBUG(log, "rtcp rr rb, ssrc=%u", ntohl(rb->ssrc));
+      snw_rtp_rtcp_print_rb(log,rb);
+      stats = snw_rtcp_stats_find(ctx,&ctx->sender_stats,ntohl(rb->ssrc));
+      if (!stats) {
+         stats = snw_rtcp_stats_new(ctx,&ctx->sender_stats,ntohl(rb->ssrc));
+         if (!stats) continue;
+      }
+      DEBUG(log, "rtcp rr update stats, ssrc=%u", ntohl(rb->ssrc));
+      stats->last_rr_recv_ts = ctx->epoch_curtime;
+
+      stats->last_rr_cum_lost = rb->cum_lost;
+	   stats->last_rr_frac_lost = ntohl(rb->frac_lost);
+   	stats->last_rr_hi_seqno = ntohl(rb->hi_seqno);
+   	stats->last_rr_jitter = ntohl(rb->jitter);
+   	stats->last_rr_lsr = ntohl(rb->lsr);
+   	stats->last_rr_dlsr = ntohl(rb->dlsr);
+
+   }
 
    return 0;
 }
@@ -193,7 +233,7 @@ snw_rtp_rtcp_app_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
 }
 
 int
-snw_rtp_rtcp_handle_pkg(void *data, char *buf, int buflen) {
+snw_rtp_rtcp_handle_pkg_in(void *data, char *buf, int buflen) {
    snw_rtp_ctx_t *ctx = (snw_rtp_ctx_t*)data;
    snw_log_t *log;
    rtcp_pkt_t *rtcp = 0;
@@ -256,6 +296,12 @@ snw_rtp_rtcp_handle_pkg(void *data, char *buf, int buflen) {
 }
 
 int
+snw_rtp_rtcp_handle_pkg_out(void *data, char *buf, int buflen) {
+
+   return 0;
+}
+
+int
 snw_rtp_rtcp_fini() {
    return 0;
 }
@@ -266,7 +312,8 @@ snw_rtp_module_t g_rtp_rtcp_module = {
    RTP_RTCP,
    0,
    snw_rtp_rtcp_init, 
-   snw_rtp_rtcp_handle_pkg, 
+   snw_rtp_rtcp_handle_pkg_in, 
+   snw_rtp_rtcp_handle_pkg_out, 
    snw_rtp_rtcp_fini,
    0 /*next*/
 };
