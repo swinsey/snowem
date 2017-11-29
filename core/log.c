@@ -162,7 +162,7 @@ snw_log_init(const char* filename, uint32_t level, uint32_t rotate_num, long siz
 
 void snw_log_write(snw_log_t *log, uint32_t level, const char* sourcefilename, int line, const char* msg, ...) {
     static const char* level_str[] = 
-        {"TRACE", "INFO", "DEBUG", "WARN", "ERROR", "FATAL"};
+        {"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"};
 
     if (log == NULL)
        return;

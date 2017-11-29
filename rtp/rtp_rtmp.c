@@ -24,9 +24,15 @@ snw_rtp_rtmp_init(void *c) {
 }
 
 int
-snw_rtp_rtmp_handle_pkg(void *ctx, char *buffer, int len) {
+snw_rtp_rtmp_handle_pkg_in(void *ctx, char *buffer, int len) {
    return 0;
 }
+
+int
+snw_rtp_rtmp_handle_pkg_out(void *ctx, char *buffer, int len) {
+   return 0;
+}
+
 
 int
 snw_rtp_rtmp_fini() {
@@ -39,7 +45,8 @@ snw_rtp_module_t g_rtp_rtmp_module = {
    RTP_VIDEO,
    0,
    snw_rtp_rtmp_init, 
-   snw_rtp_rtmp_handle_pkg, 
+   snw_rtp_rtmp_handle_pkg_in, 
+   snw_rtp_rtmp_handle_pkg_out, 
    snw_rtp_rtmp_fini,
    0 /*next*/
 };

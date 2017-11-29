@@ -4,7 +4,7 @@
 #include "rtp/rtp.h"
 
 snw_rtcp_stats_t*
-snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, uint32_t ssrc) {
+snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc) {
    snw_log_t *log = 0;
    snw_rtcp_stats_t* stats = 0;
    struct list_head *n;
@@ -12,10 +12,10 @@ snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, uint32_t ssrc) {
    if (!ctx) return 0;
    log = ctx->log;
 
-   list_for_each(n,&ctx->receiver_stats.list) {
+   list_for_each(n,&s->list) {
       snw_rtcp_stats_t* s = list_entry(n,snw_rtcp_stats_t,list);
       if (s->ssrc == ssrc) {
-         DEBUG(log,"found receiver stats, ssrc=%u", s->ssrc);
+         DEBUG(log,"found rtcp stats, ssrc=%u", s->ssrc);
          stats = s;
          break;
       }
@@ -25,7 +25,7 @@ snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, uint32_t ssrc) {
 }
 
 snw_rtcp_stats_t*
-snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, uint32_t ssrc) {
+snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc) {
    snw_log_t *log = 0;
    snw_rtcp_stats_t* stats = 0;
    struct list_head *n;
@@ -41,9 +41,13 @@ snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, uint32_t ssrc) {
    DEBUG(log,"new source stats, ssrc=%u", ssrc);
    SNW_MEMZERO(stats,snw_rtcp_stats_t);
    stats->ssrc = ssrc;
-   stats->lastsr_time = ctx->epoch_curtime;
-   stats->rtcp_interval = RTCP_MIN_INTERVAL;
-   list_add(&stats->list,&ctx->receiver_stats.list);
+   stats->last_send_sr_ts = ctx->epoch_curtime;
+   stats->last_send_rr_ts = ctx->epoch_curtime;
+   stats->last_sr_recv_ts = ctx->epoch_curtime;
+   stats->last_rr_recv_ts = ctx->epoch_curtime;
+   stats->rtcp_rr_interval = RTCP_MIN_RR_INTERVAL;
+   stats->rtcp_sr_interval = RTCP_MIN_SR_INTERVAL;
+   list_add(&stats->list,&s->list);
 
    return stats;
 }

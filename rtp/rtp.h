@@ -16,7 +16,8 @@ extern "C" {
 #define RTP_HEADER_SIZE     12
 #define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
 
-#define RTCP_MIN_INTERVAL 2000000 // microseconds
+#define RTCP_MIN_RR_INTERVAL 2000 // miliseconds
+#define RTCP_MIN_SR_INTERVAL 5000 // miliseconds
 
 typedef struct rtp_hdr rtp_hdr_t;
 struct rtp_hdr
@@ -63,8 +64,8 @@ struct snw_rtp_module {
    int    pkt_type;
    int    flags;
    int  (*init)(void *ctx);
-   int  (*handle_pkg)(void *ctx, char *buffer, int len);
-   //int  (*handle_pkg_out)(void *ctx, char *buffer, int len);
+   int  (*handle_pkg_in)(void *ctx, char *buffer, int len);
+   int  (*handle_pkg_out)(void *ctx, char *buffer, int len);
    int  (*fini)();
 
    snw_rtp_module_t *next;
@@ -82,6 +83,7 @@ struct snw_rtp_ctx {
    void      *component;
    snw_log_t *log;
 
+   //uint32_t   ssrc;
    int        pkt_type;
    int64_t    epoch_curtime;
    int64_t    ntp_curtime;
@@ -116,7 +118,10 @@ int
 snw_rtp_get_pkt_type(char* buf, int len);
 
 int
-snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len);
+snw_rtp_handle_pkg_in(snw_rtp_ctx_t *ctx, char *buffer, int len);
+
+int
+snw_rtp_handle_pkg_out(snw_rtp_ctx_t *ctx, char *buffer, int len);
 
 int
 snw_rtp_ctx_init(snw_rtp_ctx_t *ctx);

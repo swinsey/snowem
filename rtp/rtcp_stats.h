@@ -58,16 +58,33 @@ struct snw_rtcp_stats {
    int      type;
    
    //stats
-   uint32_t   pkt_cnt;        //accummulcated packet count
-   uint32_t   byte_cnt;       //accummulcated byte count
-   uint32_t   last_sr_ntp;    // mid ntp of the last sr
-   uint32_t   last_sr_rtp_ts; // rtp ts of the last sr
-   int64_t    lastsr_time;    //local time of the last sr
-   int64_t    rtcp_interval;
+   uint32_t   pkt_cnt;            // accummulcated packet count
+   uint32_t   byte_cnt;           // accummulcated byte count
+
+   // info of the last send report
+   int64_t    last_sr_recv_ts;    // local time of the last sr
+   uint32_t   last_sr_ntp;        // mid ntp of the last sr
+   uint32_t   last_sr_rtp_ts;     // rtp ts of the last sr
+
+   // info of the last receiver report
+   int64_t    last_rr_recv_ts;    // local time of the last sr
+	uint32_t   last_rr_cum_lost;
+	uint32_t   last_rr_frac_lost;
+	uint32_t   last_rr_hi_seqno;
+	uint32_t   last_rr_jitter;
+	uint32_t   last_rr_lsr;
+	uint32_t   last_rr_dlsr;
+
+
+   int64_t    last_send_sr_ts;    // local time of the last sr
+   int64_t    rtcp_sr_interval;
+   int64_t    last_send_rr_ts;    // local time of the last sr
+   int64_t    rtcp_rr_interval;
 
    //uint32_t bad_seq;
    //uint32_t probation;
 
+   uint32_t   sended;         // total num of sended pkts
    uint32_t   received;       // total num of received pkts
    uint32_t   expected_prior; // last expected num of received pkts
    uint32_t   received_prior; // last num of received pkts
@@ -76,15 +93,20 @@ struct snw_rtcp_stats {
    double     jitter;
 
    rtp_slidewin_t    seq_win;
+
+   //additional stats
+   uint32_t   nack_cnt;
+   uint32_t   fir_cnt;
+   uint32_t   pli_cnt;
 };
 
 typedef struct snw_rtp_ctx snw_rtp_ctx_t;
 
 snw_rtcp_stats_t*
-snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, uint32_t ssrc);
+snw_rtcp_stats_find(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc);
 
 snw_rtcp_stats_t*
-snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, uint32_t ssrc);
+snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc);
 
 void
 snw_rtp_slidewin_reset(snw_rtp_ctx_t *ctx, rtp_slidewin_t *win, uint16_t seq);

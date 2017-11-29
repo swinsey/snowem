@@ -47,7 +47,7 @@ snw_rtp_video_init(void *c) {
 
 
 int
-snw_rtp_video_handle_pkg(void *data, char *buf, int buflen) {
+snw_rtp_video_handle_pkg_in(void *data, char *buf, int buflen) {
    snw_rtp_ctx_t *ctx = (snw_rtp_ctx_t*)data;
    snw_log_t *log;
    int i = 0;
@@ -64,13 +64,40 @@ snw_rtp_video_handle_pkg(void *data, char *buf, int buflen) {
       if (!m) break;
 
       DEBUG(log,"handle pkg, module=%s",m->name);
-      m->handle_pkg(ctx,buf,buflen);
+      m->handle_pkg_in(ctx,buf,buflen);
    }
 
     
    //HEXDUMP(log,(char*)buf,buflen,"rtp");
    return 0;
 }
+
+int
+snw_rtp_video_handle_pkg_out(void *data, char *buf, int buflen) {
+   snw_rtp_ctx_t *ctx = (snw_rtp_ctx_t*)data;
+   snw_log_t *log;
+   int i = 0;
+
+   if (!ctx || !buf || buflen <= 0) {
+      return -1;
+   }
+   log = ctx->log;
+   
+   print_rtp_header(log,buf,buflen,"video");
+
+   for (i=0; ; i++) {
+      snw_rtp_module_t *m = g_rtp_video_modules[i];
+      if (!m) break;
+
+      DEBUG(log,"handle pkg, module=%s",m->name);
+      m->handle_pkg_in(ctx,buf,buflen);
+   }
+
+    
+   //HEXDUMP(log,(char*)buf,buflen,"rtp");
+   return 0;
+}
+
 
 int
 snw_rtp_video_fini() {
@@ -83,7 +110,8 @@ snw_rtp_module_t g_rtp_video_module = {
    RTP_VIDEO,
    0,
    snw_rtp_video_init, 
-   snw_rtp_video_handle_pkg, 
+   snw_rtp_video_handle_pkg_in, 
+   snw_rtp_video_handle_pkg_out, 
    snw_rtp_video_fini,
    0 /*next*/
 };

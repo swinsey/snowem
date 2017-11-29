@@ -8,12 +8,10 @@
 #include "rtp/rtp_utils.h"
 
 #define USE_MODULE_COMMON
-#define DECLARE_MODULE(name) &(g_rtp_##name##_module),
 snw_rtp_module_t *g_rtp_modules[] = {
    #include "rtp_module_dec.h"
    0
 };
-#undef DECLARE_MODULE
 #undef USE_MODULE_COMMON
 
 int
@@ -86,7 +84,7 @@ snw_rtp_get_pkt_type(char* buf, int len) {
 
 
 int
-snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len) {
+snw_rtp_handle_pkg_in(snw_rtp_ctx_t *ctx, char *buffer, int len) {
    snw_log_t *log;
    int i = 0;
 
@@ -100,7 +98,28 @@ snw_rtp_handle_pkg(snw_rtp_ctx_t *ctx, char *buffer, int len) {
       //DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
       //         m->name, m->pkt_type, ctx->pkt_type);
       if (ctx->pkt_type & m->pkt_type)
-         m->handle_pkg(ctx,buffer,len);
+         m->handle_pkg_in(ctx,buffer,len);
+   }
+
+   return 0;
+}
+
+int
+snw_rtp_handle_pkg_out(snw_rtp_ctx_t *ctx, char *buffer, int len) {
+   snw_log_t *log;
+   int i = 0;
+
+   if (!ctx) return -1;
+   log = ctx->log;
+
+   for (i=0; ; i++) {
+      snw_rtp_module_t *m = g_rtp_modules[i];
+      if (!m) break;
+
+      //DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
+      //         m->name, m->pkt_type, ctx->pkt_type);
+      if (ctx->pkt_type & m->pkt_type)
+         m->handle_pkg_out(ctx,buffer,len);
    }
 
    return 0;

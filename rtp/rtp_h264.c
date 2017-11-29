@@ -384,7 +384,7 @@ ice_aac_rtmp_init(snw_rtp_ctx_t *ctx, const char* raw_file) {
 
 
 int
-snw_rtp_h264_handle_pkg(void *data, char *buf, int buflen) {
+snw_rtp_h264_handle_pkg_in(void *data, char *buf, int buflen) {
    snw_rtp_ctx_t *ctx = (snw_rtp_ctx_t*)data;
    snw_log_t *log;
    rtp_hdr_t *hdr;
@@ -487,6 +487,12 @@ snw_rtp_h264_handle_pkg(void *data, char *buf, int buflen) {
 }
 
 int
+snw_rtp_h264_handle_pkg_out(void *data, char *buf, int buflen) {
+
+   return 0;
+}
+
+int
 snw_rtp_h264_fini() {
    return 0;
 }
@@ -497,7 +503,8 @@ snw_rtp_module_t g_rtp_h264_module = {
    RTP_VIDEO,
    0,
    snw_rtp_h264_init, 
-   snw_rtp_h264_handle_pkg, 
+   snw_rtp_h264_handle_pkg_in, 
+   snw_rtp_h264_handle_pkg_out, 
    snw_rtp_h264_fini,
    0 /*next*/
 };

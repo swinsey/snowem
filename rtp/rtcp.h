@@ -39,6 +39,7 @@ extern "C" {
 
 #define REPORT_BLOCK_LEN       24
 #define RTCP_RR_MSG_LEN        RTCP_HDR_LEN + 4 + REPORT_BLOCK_LEN
+#define RTCP_SR_MSG_LEN        RTCP_HDR_LEN + 24 + REPORT_BLOCK_LEN
 
 /* see rfc4858, rfc5104 */
 #define RTCP_PSFB  206
@@ -109,14 +110,14 @@ struct snw_rtcp_sr
 	uint32_t pkt_cnt;
 	uint32_t byte_cnt;
 	snw_report_block_t rb[1];
-};
+}__attribute__((packed));
 
 typedef struct snw_rtcp_rr snw_rtcp_rr_t;
 struct snw_rtcp_rr
 {
 	uint32_t       ssrc;
 	snw_report_block_t rb[1];
-};
+}__attribute__((packed));
 
 typedef struct snw_rtcp_nack snw_rtcp_nack_t;
 struct snw_rtcp_nack
@@ -178,6 +179,13 @@ snw_rtcp_gen_pli(char *buf, int len,
 uint32_t
 snw_rtcp_gen_nack(char *buf, int len,
       uint32_t local_ssrc, uint32_t remote_ssrc, uint32_t payload);
+
+uint32_t
+snw_rtcp_gen_rr(char *buf, int len,
+      uint32_t ssrc, snw_report_block_t *rb);
+
+uint32_t
+snw_rtcp_gen_sr(char *buf, int len, snw_rtcp_sr_t *sr);
 
 #ifdef __cplusplus
 }
