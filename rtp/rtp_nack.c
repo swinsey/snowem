@@ -137,8 +137,8 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
       snw_rtp_slidewin_reset(ctx,&stats->seq_win,seqno-1);
    }
 
-   stats->pkt_cnt++; 
-   stats->byte_cnt += buflen - snw_rtp_get_hdrlen(hdr);
+   stats->recv_pkt_cnt++; 
+   stats->recv_byte_cnt += buflen - snw_rtp_get_hdrlen(hdr);
    stats->received++;
 
    //FIXME: handle retransmitted packet
@@ -248,10 +248,10 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
 
          ret = snw_rtcp_gen_rr(data, RTCP_RR_MSG_LEN, local_ssrc, &rb);
          if (ret == RTCP_RR_MSG_LEN) {
-            HEXDUMP(log,data,ret,"rr");
-            DEBUG(log,"send rr msg, ret=%u(%u), ssrc=%u, len=%u",
-                  ret, sizeof(snw_report_block_t), ntohl(local_ssrc), 
-                  RTCP_RR_MSG_LEN);
+            //HEXDUMP(log,data,ret,"rr");
+            //DEBUG(log,"send rr msg, ret=%u(%u), ssrc=%u, len=%u",
+            //      ret, sizeof(snw_report_block_t), ntohl(local_ssrc), 
+            //      RTCP_RR_MSG_LEN);
             send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
                  RTCP_RR_MSG_LEN);
          }
@@ -295,17 +295,33 @@ snw_rtp_nack_handle_pkg_out(void *data, char *buf, int buflen) {
    }
 
    //update stats
-   stats->pkt_cnt++;
-   stats->byte_cnt += buflen - snw_rtp_get_hdrlen(hdr);
+   stats->sent_pkt_cnt++;
+   stats->sent_byte_cnt += buflen - snw_rtp_get_hdrlen(hdr);
 
    if (ctx->epoch_curtime - stats->last_send_sr_ts <= stats->rtcp_sr_interval) {
       //nothing to do
       return 0;
    }
+   stats->last_send_sr_ts = ctx->epoch_curtime;
+
+   { //send empty rr report
+      char data[RTCP_EMPTY_RR_MSG_LEN] = {0};
+      snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
+      snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
+      int ret = 0;
+
+      ret = snw_rtcp_gen_rr(data, RTCP_EMPTY_RR_MSG_LEN, 0, NULL);
+      if (ret == RTCP_EMPTY_RR_MSG_LEN) {
+         HEXDUMP(log,data,ret,"rr");
+         DEBUG(log,"send rr empty rb, ret=%u, ssrc=%u, len=%u",
+               ret, ssrc, RTCP_EMPTY_RR_MSG_LEN);
+         send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
+              RTCP_RR_MSG_LEN);
+      }
+   }
 
    DEBUG(log,"send sr, ssrc=%u, ts=%llu, last=%llu", 
          ssrc, ctx->epoch_curtime, stats->last_send_sr_ts);
-   stats->last_send_sr_ts = ctx->epoch_curtime;
 
    { //send sr rtcp
       char data[RTCP_SR_MSG_LEN] = {0};
@@ -313,23 +329,23 @@ snw_rtp_nack_handle_pkg_out(void *data, char *buf, int buflen) {
       rtcp_hdr_t *rtcp = 0;
       snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
       snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
-      uint32_t local_ssrc =  0;
       int ret = 0;
 
+      memset(&sr,0,sizeof(sr));
       sr.ssrc = htonl(ssrc);
-	   sr.ntp_ts = ctx->epoch_curtime;
+	   sr.ntp_ts = htobe64(ctx->epoch_curtime);
 	   sr.rtp_ts = hdr->ts;
-	   sr.pkt_cnt = htonl(stats->pkt_cnt);
-	   sr.byte_cnt = htonl(stats->byte_cnt);
+	   sr.pkt_cnt = htonl(stats->sent_pkt_cnt);
+	   sr.byte_cnt = htonl(stats->sent_byte_cnt);
 
-      ret = snw_rtcp_gen_sr(data, RTCP_SR_MSG_LEN, &sr);
-      if (ret == RTCP_SR_MSG_LEN) {
+      ret = snw_rtcp_gen_sr(data, RTCP_EMPTY_SR_MSG_LEN, &sr);
+
+      if (ret == RTCP_EMPTY_SR_MSG_LEN) {
          HEXDUMP(log,data,ret,"sr");
-         DEBUG(log,"send sr msg, ret=%u(%u), ssrc=%u, len=%u",
-               ret, sizeof(snw_report_block_t), ntohl(local_ssrc), 
-               RTCP_RR_MSG_LEN);
-         //send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-         //     RTCP_SR_MSG_LEN);
+         DEBUG(log,"send sr empty rb, ret=%u, ssrc=%u, len=%u",
+               ret, ntohl(sr.ssrc), RTCP_EMPTY_SR_MSG_LEN);
+         send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
+              RTCP_EMPTY_SR_MSG_LEN);
       }
    }
 

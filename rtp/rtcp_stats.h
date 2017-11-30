@@ -16,6 +16,9 @@ extern "C" {
 #define RTP_LOST 0
 #define RTP_RECV 1
 
+#define RTCP_MIN_RR_INTERVAL 500 // miliseconds
+#define RTCP_MIN_SR_INTERVAL 1000 // miliseconds
+
 typedef struct nack_data nack_data_t;
 struct nack_data {
    uint16_t seq;
@@ -58,8 +61,10 @@ struct snw_rtcp_stats {
    int      type;
    
    //stats
-   uint32_t   pkt_cnt;            // accummulcated packet count
-   uint32_t   byte_cnt;           // accummulcated byte count
+   uint32_t   recv_pkt_cnt;            // accummulcated packet count
+   uint32_t   recv_byte_cnt;           // accummulcated byte count
+   uint32_t   sent_pkt_cnt;            // accummulcated packet count
+   uint32_t   sent_byte_cnt;           // accummulcated byte count
 
    // info of the last send report
    int64_t    last_sr_recv_ts;    // local time of the last sr

@@ -137,8 +137,8 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    stats->last_sr_rtp_ts = ntohl(rtcp->pkt.sr.rtp_ts);
    stats->last_sr_recv_ts = ctx->epoch_curtime;
 
-   DEBUG(log,"rtcp sr stats lsr, ssrc=%u, pkt_cnt=%u, byte_cnt=%u, last_sr_ntp=%u(%llu)", 
-          stats->ssrc, stats->pkt_cnt, stats->byte_cnt, stats->last_sr_ntp,be64toh(rtcp->pkt.sr.ntp_ts));
+   DEBUG(log,"rtcp sr stats lsr, ssrc=%u, pkt_cnt=%u, byte_cnt=%u, last_sr_ntp=%u", 
+          stats->ssrc, stats->recv_pkt_cnt, stats->recv_byte_cnt, stats->last_sr_ntp);
    
    //.2 sender bandwidth estimation, SenderBandwidthEstimationHandler
    
@@ -154,6 +154,7 @@ snw_rtp_rtcp_print_rb(snw_log_t *log, snw_report_block_t *rb) {
          rb->cum_lost,
          rb->frac_lost,
          ntohl(rb->hi_seqno),
+         ntohl(rb->jitter),
          ntohl(rb->lsr),
          ntohl(rb->dlsr));
    return;

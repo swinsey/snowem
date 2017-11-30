@@ -16,9 +16,7 @@ extern "C" {
 #define RTP_HEADER_SIZE     12
 #define MIN_RTP_HEADER_SIZE RTP_HEADER_SIZE
 
-#define RTCP_MIN_RR_INTERVAL 2000 // miliseconds
-#define RTCP_MIN_SR_INTERVAL 5000 // miliseconds
-
+#pragma pack(push, 1)
 typedef struct rtp_hdr rtp_hdr_t;
 struct rtp_hdr
 {
@@ -49,6 +47,7 @@ struct rtp_hdr_ext {
 	uint16_t type;
 	uint16_t len;
 };
+#pragma pack(pop)
 
 
 #define M_FLAGS_INIT (1<<0)
