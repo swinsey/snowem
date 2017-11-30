@@ -38,8 +38,10 @@ extern "C" {
 #define RTCP_RTPFB_MSG_LEN     16
 
 #define REPORT_BLOCK_LEN       24
-#define RTCP_RR_MSG_LEN        RTCP_HDR_LEN + 4 + REPORT_BLOCK_LEN
-#define RTCP_SR_MSG_LEN        RTCP_HDR_LEN + 24 + REPORT_BLOCK_LEN
+#define RTCP_EMPTY_RR_MSG_LEN  (RTCP_HDR_LEN + 4)
+#define RTCP_RR_MSG_LEN        (RTCP_HDR_LEN + 4 + REPORT_BLOCK_LEN)
+#define RTCP_EMPTY_SR_MSG_LEN  (RTCP_HDR_LEN + 24)
+#define RTCP_SR_MSG_LEN        (RTCP_HDR_LEN + 24 + REPORT_BLOCK_LEN)
 
 /* see rfc4858, rfc5104 */
 #define RTCP_PSFB  206
@@ -68,6 +70,7 @@ extern "C" {
 #define RTCP_SDES_NOTE  7
 #define RTCP_SDES_PRIV  8  
 
+#pragma pack(push, 1)
 typedef struct rtcp_hdr rtcp_hdr_t;
 struct rtcp_hdr 
 {
@@ -110,14 +113,14 @@ struct snw_rtcp_sr
 	uint32_t pkt_cnt;
 	uint32_t byte_cnt;
 	snw_report_block_t rb[1];
-}__attribute__((packed));
+};
 
 typedef struct snw_rtcp_rr snw_rtcp_rr_t;
 struct snw_rtcp_rr
 {
 	uint32_t       ssrc;
 	snw_report_block_t rb[1];
-}__attribute__((packed));
+};
 
 typedef struct snw_rtcp_nack snw_rtcp_nack_t;
 struct snw_rtcp_nack
@@ -155,8 +158,8 @@ struct rtcp_pkt {
       /* feedback msg */
       snw_rtcp_fb_t   fb;
    } pkt;
-}__attribute__((packed));
-
+};
+#pragma pack(pop)
 
 void
 print_rtcp_header(snw_log_t *log, char *buf, int buflen, const char *msg);

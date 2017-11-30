@@ -877,8 +877,8 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
               session->flowid, video, header->pt, VP8_PT, seq,len);
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
-            DEBUG(log, "forward, flowid=%u -> forwardid=%u", 
-                  session->flowid, flowid);
+            DEBUG(log, "forward, flowid=%u -> forwardid=%u s=%p",
+                  session->flowid, flowid, s);
 
             send_rtp_pkt(s, 0, video, buf, len);
 
@@ -887,6 +887,7 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
                uint32_t remote_ssrc = 0;
                rtp_ctx = &s->rtp_ctx;
                //FIXME: more checks here
+               rtp_ctx->session = s;
                rtp_ctx->stream = s->audio_stream;
                rtp_ctx->component = s->audio_stream->rtp_component; 
                rtp_ctx->epoch_curtime = session->curtime;
@@ -895,8 +896,8 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
                remote_ssrc = /*htonl*/(video ? s->audio_stream->local_video_ssrc : 
                                                s->audio_stream->local_audio_ssrc);
 
-               DEBUG(log, "handle package out, flowid=%u, seq=%u, ssrc=%u, remote_ssrc=%u", 
-                     s->flowid, ntohs(header->seq), ntohl(header->ssrc), remote_ssrc);
+               DEBUG(log, "handle package out, flowid=%u, seq=%u, ssrc=%u, remote_ssrc=%u, s=%p", 
+                     s->flowid, ntohs(header->seq), ntohl(header->ssrc), remote_ssrc, rtp_ctx->session);
                header->ssrc = htonl(remote_ssrc);
                snw_rtp_handle_pkg_out(rtp_ctx,buf,len);
             }
