@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-/* SDP offer/answer templates */
 #define OPUS_PT   111
 #define VP8_PT    100
 

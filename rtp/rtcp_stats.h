@@ -100,6 +100,7 @@ struct snw_rtcp_stats {
    rtp_slidewin_t    seq_win;
 
    //additional stats
+   int64_t    last_sent_fir_ts;    // local time of the last fir/pli
    uint32_t   nack_cnt;
    uint32_t   fir_cnt;
    uint32_t   pli_cnt;

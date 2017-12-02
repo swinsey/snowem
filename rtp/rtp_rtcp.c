@@ -44,11 +44,11 @@ snw_rtp_rtcp_fb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    if (!ctx || !rtcp) return -1;
    log = ctx->log;
 
-   DEBUG(log,"rtcp transport layer feedback msg");
    if (rtcp->hdr.rc == RTCP_RTPFB_GENERIC_FMT) {
       snw_rtcp_nack_handle_pkg(ctx,rtcp);
    } else {
-      WARN(log, "unknown rtcp-fb format, fmt=%u", rtcp->hdr.rc);
+      WARN(log, "unknown transport layer rtcp-fb format, fmt=%u", 
+           rtcp->hdr.rc);
    }
 
    return 0;
@@ -57,16 +57,20 @@ snw_rtp_rtcp_fb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
 int
 snw_rtp_rtcp_psfb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    snw_log_t *log = 0;
+   snw_rtcp_fb_t *fb = 0;
 
    if (!ctx || !rtcp) return -1;
    log = ctx->log;
 
-   DEBUG(log,"rtcp payload-specific layer feedback msg");
+   fb = &rtcp->pkt.fb;
+   DEBUG(log,"rtcp pt psfb, ssrc=%u, media=%u", 
+         ntohl(fb->ssrc), ntohl(fb->media));
 
    switch (rtcp->hdr.rc) {
       case RTCP_PSFB_PLI_FMT:
          // rfc 4585 6.3.1
          //store the last key frame, and send it
+         DEBUG(log,"rtcp pli");
          break;
       case RTCP_PSFB_SLI_FMT:
          // rfc 4585 6.3.2
@@ -89,6 +93,7 @@ snw_rtp_rtcp_psfb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
          break;
 
       case RTCP_PSFB_REMB_FMT:
+         DEBUG(log,"rtcp remb");
          break;
 
       default:
@@ -254,6 +259,7 @@ snw_rtp_rtcp_handle_pkg_in(void *data, char *buf, int buflen) {
 
 	if (rtcp->hdr.v != RTCP_VERSION) return -2;
 
+   DEBUG(log,"rtcp pt, pt=%u", rtcp->hdr.pt);
 	while (rtcp) {
       switch (rtcp->hdr.pt) {
          case RTCP_RTPFB:

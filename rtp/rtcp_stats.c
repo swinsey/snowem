@@ -45,6 +45,7 @@ snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc) {
    stats->last_send_rr_ts = ctx->epoch_curtime;
    stats->last_sr_recv_ts = ctx->epoch_curtime;
    stats->last_rr_recv_ts = ctx->epoch_curtime;
+   stats->last_sent_fir_ts = ctx->epoch_curtime;
    stats->rtcp_rr_interval = RTCP_MIN_RR_INTERVAL;
    stats->rtcp_sr_interval = RTCP_MIN_SR_INTERVAL;
    list_add(&stats->list,&s->list);
