@@ -720,6 +720,13 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
    return;
 }
 
+void
+send_pkt_callback(void *session, int control, 
+      int video, char* buf, int len) {
+  return send_rtp_pkt((snw_ice_session_t*)session,
+               control, video, buf, len);
+}
+
 void 
 send_rtp_pkt(snw_ice_session_t *session, 
   int control, int video, char* buf, int len) {
@@ -976,11 +983,11 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
    }
 
 
-   if (IS_FLAG(session,ICE_PUBLISHER)) {
+   /*if (IS_FLAG(session,ICE_PUBLISHER)) {
       //snw_ice_handle_lost_packets(session,stream,
       //    component,ntohs(header->seq),video);
       snw_ice_send_fir(session,component,0);
-   }
+   }*/
 
    return;
 }
@@ -1367,6 +1374,7 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    snw_rtp_ctx_init(&session->rtp_ctx);
    session->rtp_ctx.session = session;
    session->rtp_ctx.log = log;
+   session->rtp_ctx.send_pkt = send_pkt_callback;
    INIT_LIST_HEAD(&session->streams.list);
 
    if (!strncmp(peer_type.c_str(),"pub",3)) {
