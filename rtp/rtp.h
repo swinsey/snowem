@@ -107,8 +107,6 @@ struct snw_rtp_ctx {
    snw_rtcp_stats_t    receiver_stats;
 
    //callbacks
-   //send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-   //     RTCP_RR_MSG_LEN);
    void (*send_pkt)(void *ctx, int control, int video, char *buffer, int len);
 };
 
