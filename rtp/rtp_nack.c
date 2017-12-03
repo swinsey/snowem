@@ -100,6 +100,40 @@ snw_rtp_nack_init(void *c) {
 }
 
 int
+snw_rtp_send_pli_req(snw_rtp_ctx_t *ctx, uint32_t local_ssrc, uint32_t remote_ssrc) {
+   char rtcpbuf[RTCP_PSFB_PLI_MSG_LEN];
+   snw_log_t *log = 0;
+   snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
+
+   if (!ctx) return -1;
+   log = ctx->log;
+
+   DEBUG(log,"sending pli request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, video=%u",
+                           session->flowid, local_ssrc, remote_ssrc, ctx->pkt_type & RTP_VIDEO);
+   snw_rtcp_gen_pli(rtcpbuf, RTCP_PSFB_PLI_MSG_LEN, local_ssrc, remote_ssrc);
+   ctx->send_pkt(session,1,1,rtcpbuf,RTCP_PSFB_PLI_MSG_LEN);
+   return 0;
+}
+
+int
+snw_rtp_send_fir_req(snw_rtp_ctx_t *ctx, uint32_t local_ssrc, uint32_t remote_ssrc) {
+   char rtcpbuf[RTCP_PSFB_FIR_MSG_LEN];
+   snw_log_t *log = ctx->log;
+   snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
+   snw_ice_component_t *component = (snw_ice_component_t*)ctx->component;
+
+   component->fir_seq++;
+   DEBUG(log,"sending fir request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
+                        session->flowid, local_ssrc, remote_ssrc, component->fir_seq);
+                            
+   snw_rtcp_gen_fir(rtcpbuf, RTCP_PSFB_FIR_MSG_LEN, 
+                     local_ssrc, remote_ssrc, component->fir_seq);
+   ctx->send_pkt(session,1,1,rtcpbuf,RTCP_PSFB_FIR_MSG_LEN);
+ 
+   return 0;
+}
+
+int
 snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
    snw_rtp_ctx_t *ctx = (snw_rtp_ctx_t*)data;
    rtp_hdr_t *hdr = 0;
@@ -141,7 +175,6 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
    stats->recv_byte_cnt += buflen - snw_rtp_get_hdrlen(hdr);
    stats->received++;
 
-   //FIXME: handle retransmitted packet
    if (!snw_rtp_slidewin_is_retransmit(ctx, &stats->seq_win, seqno)) {
       clockrate = video ? 90 : 48;
       transit = ctx->epoch_curtime * clockrate - ntohl(hdr->ts);
@@ -155,7 +188,7 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
    }
 
    //HEXDUMP(log,(char*)buf,buflen,"rtp");
-   //FIXME: save rtp packet in component, not here
+   //FIXME: save rtp packets to resend them later
    
    //handle lost packets and generate NACK rtpfb message.
    nack = snw_rtp_slidewin_put(ctx, &stats->seq_win, seqno);
@@ -172,13 +205,12 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
                 " remote_ssrc=%x, payload=%x", session->flowid,
                 stream->local_video_ssrc, stream->remote_video_ssrc, 
                 nack);
-                            
+      //FIXME: take audio stream into account?
       ret = snw_rtcp_gen_nack(rtcpbuf, RTCP_RTPFB_MSG_LEN, 
                         stream->local_video_ssrc, 
                         stream->remote_video_ssrc, 
                         nack);
       if (ret < 0) return -1;
-      //send_rtp_pkt(session,1,video,rtcpbuf,RTCP_RTPFB_MSG_LEN);
       ctx->send_pkt(session,1,video,rtcpbuf,RTCP_RTPFB_MSG_LEN);
       stats->nack_cnt++;
    }
@@ -235,6 +267,7 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
             ntohl(rb.hi_seqno), ntohl(rb.jitter), ntohl(rb.lsr), ntohl(rb.dlsr));
       //HEXDUMP(log,(char*)&rb,sizeof(rb),"rb");
 
+      //FIXME: move this code to a function.
       // generate rtcp pkt
       {
          char data[RTCP_RR_MSG_LEN] = {0};
@@ -250,12 +283,8 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
 
          ret = snw_rtcp_gen_rr(data, RTCP_RR_MSG_LEN, local_ssrc, &rb);
          if (ret == RTCP_RR_MSG_LEN) {
-            //HEXDUMP(log,data,ret,"rr");
-            //DEBUG(log,"send rr msg, ret=%u(%u), ssrc=%u, len=%u",
-            //      ret, sizeof(snw_report_block_t), ntohl(local_ssrc), 
-            //      RTCP_RR_MSG_LEN);
-            //send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-            //     RTCP_RR_MSG_LEN);
+            //DEBUG(log,"send rr msg, ret=%u, ssrc=%u",
+            //      ret, ntohl(local_ssrc));
             ctx->send_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
                  RTCP_RR_MSG_LEN);
          }
@@ -265,43 +294,12 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
 
    if (ctx->epoch_curtime - stats->last_sent_fir_ts > 10000) {
       snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
-      snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
-      snw_ice_component_t *component = (snw_ice_component_t*)ctx->component;
 
-      //snw_ice_send_fir(session,component,1);
-      /*{// send fir command
-         char rtcpbuf[RTCP_PSFB_FIR_MSG_LEN];
-         component->fir_seq++;
-         DEBUG(log,"sending fir request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
-                              session->flowid,
-                              stream->local_video_ssrc, 
-                              stream->remote_video_ssrc, 
-                              component->fir_seq);
-                            
-         snw_rtcp_gen_fir(rtcpbuf, RTCP_PSFB_FIR_MSG_LEN, 
-                           stream->local_video_ssrc, 
-                           stream->remote_video_ssrc, 
-                           component->fir_seq);
-         ctx->send_pkt(session,1,1,rtcpbuf,RTCP_PSFB_FIR_MSG_LEN);
-         //send_rtp_pkt(session,1,1,rtcpbuf,RTCP_PSFB_FIR_MSG_LEN);
-      }*/
-
-      {// send pli report
-         char rtcpbuf[RTCP_PSFB_PLI_MSG_LEN];
-         DEBUG(log,"sending pli request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
-                              session->flowid,
-                              stream->local_video_ssrc, 
-                              stream->remote_video_ssrc, 
-                              component->fir_seq);
-         snw_rtcp_gen_pli(rtcpbuf, RTCP_PSFB_PLI_MSG_LEN,
-                          stream->local_video_ssrc, 
-                          stream->remote_video_ssrc);
-         ctx->send_pkt(session,1,1,rtcpbuf,RTCP_PSFB_PLI_MSG_LEN);
-      }
-
-
+      //snw_rtp_send_fir_req(ctx, stream->local_video_ssrc, stream->remote_video_ssrc);
+      snw_rtp_send_pli_req(ctx, stream->local_video_ssrc, stream->remote_video_ssrc);
       stats->last_sent_fir_ts = ctx->epoch_curtime;
    }
+
    return 0;
 }
 
