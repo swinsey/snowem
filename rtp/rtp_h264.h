@@ -71,11 +71,9 @@ struct fua_hdr {
 };
 #pragma pack(pop)
 
-
-
 int snw_rtp_h264_init(void *ctx);
-int snw_rtp_h264_handle_pkg(void *ctx, char *buffer, int len);
-int snw_rtp_h264_hanle_pkg_next(void *ctx, char *buffer, int len);
+int snw_rtp_h264_handle_pkg_in(void *ctx, char *buffer, int len);
+int snw_rtp_h264_handle_pkg_out(void *ctx, char *buffer, int len);
 int snw_rtp_h264_fini();
 
 extern snw_rtp_module_t g_rtp_h264_module;
