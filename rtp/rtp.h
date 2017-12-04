@@ -5,8 +5,8 @@
 #include "core/linux_list.h"
 #include "core/log.h"
 #include "ice/ice.h"
-#include "rtmp/srs_librtmp.h"
 #include "rtp/rtcp_stats.h"
+#include "rtp/rtmp.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,7 +88,7 @@ struct snw_rtp_ctx {
    int64_t    ntp_curtime;
 
    // rtmp settings
-   char               *rtmp_url;
+   /*char               *rtmp_url;
    int                 rtmp_inited;
    int64_t             first_video_ts;
    int64_t             current_ts;
@@ -101,13 +101,16 @@ struct snw_rtp_ctx {
    char               *audio_raw;
    off_t               file_size;
    uint32_t            delta_ts;
-   uint32_t            audio_ts;
+   uint32_t            audio_ts;*/
 
    snw_rtcp_stats_t    sender_stats;
    snw_rtcp_stats_t    receiver_stats;
 
    //callbacks
    void (*send_pkt)(void *ctx, int control, int video, char *buffer, int len);
+
+
+   snw_rtmp_ctx_t     *rtmp_ctx;
 };
 
 int
