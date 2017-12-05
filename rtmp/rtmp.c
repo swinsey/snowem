@@ -22,7 +22,6 @@ snw_rtmp_ctx_new(const char* url) {
 
 int
 ice_aac_rtmp_init(snw_rtmp_ctx_t *ctx, const char* raw_file) {
-   snw_log_t *log;
    int raw_fd = -1;
    off_t file_size = 0;
    int ret;
@@ -30,25 +29,24 @@ ice_aac_rtmp_init(snw_rtmp_ctx_t *ctx, const char* raw_file) {
    if (!ctx || !raw_file) {
       return -1;
    }
-   log = ctx->log;
  
    raw_fd = open(raw_file, O_RDONLY);
    if (raw_fd < 0) {
-      ERROR(log, "open audio raw file %s failed.", raw_file);
+      RTMP_ERROR("open audio raw file %s failed.", raw_file);
       return -2;
    }
     
    file_size = lseek(raw_fd, 0, SEEK_END);
    if (file_size <= 0) {
-      ERROR(log, "audio raw file %s empty.", raw_file);
+      RTMP_ERROR("audio raw file %s empty.", raw_file);
       close(raw_fd);
       return -3;
    }
-   DEBUG(log,"read entirely audio raw file, size=%dKB", (int)(file_size / 1024));
+   RTMP_DEBUG("read entirely audio raw file, size=%dKB", (int)(file_size / 1024));
     
    ctx->audio_raw = (char*)malloc(file_size);
    if (!ctx->audio_raw) {
-      ERROR(log, "alloc raw buffer failed for file %s.", raw_file);
+      RTMP_ERROR("alloc raw buffer failed for file %s.", raw_file);
       close(raw_fd);
       return -4;
    }
@@ -60,7 +58,7 @@ ice_aac_rtmp_init(snw_rtmp_ctx_t *ctx, const char* raw_file) {
    lseek(raw_fd, 0, SEEK_SET);
    ssize_t nb_read = 0;
    if ((nb_read = read(raw_fd, ctx->audio_raw, ctx->file_size)) != ctx->file_size) {
-      ERROR(log, "buffer %s failed, expect=%dKB, actual=%dKB.", 
+      RTMP_ERROR("buffer %s failed, expect=%dKB, actual=%dKB.", 
             raw_file, (int)(file_size / 1024), (int)(nb_read / 1024));
       close(raw_fd);
       return -5;
@@ -75,34 +73,31 @@ ice_aac_rtmp_init(snw_rtmp_ctx_t *ctx, const char* raw_file) {
 //"rtmp://live-api.facebook.com:80/rtmp/2048813932015190?ds=1&a=ATiH7SKrqDT6Z8eE"
 int
 snw_rtmp_init(snw_rtmp_ctx_t *ctx, const char* rtmp_url) {
-   snw_log_t *log;
    int ret;
 
    if (!ctx  || !rtmp_url) {
       return -1;
    }
-   log = ctx->log;
  
     // connect rtmp context
    srs_rtmp_t rtmp = srs_rtmp_create(rtmp_url);
     
    if (srs_rtmp_handshake(rtmp) != 0) {
-      DEBUG(log,"simple handshake failed.");
+      RTMP_ERROR("simple handshake failed.");
       goto rtmp_destroy;
    }
-   DEBUG(log,"simple handshake success");
     
    if (srs_rtmp_connect_app(rtmp) != 0) {
-      DEBUG(log,"connect vhost/app failed.");
+      RTMP_ERROR("connect vhost/app failed.");
       goto rtmp_destroy;
    }
-   DEBUG(log,"connect vhost/app success");
     
    if (srs_rtmp_publish_stream(rtmp) != 0) {
-      DEBUG(log,"publish stream failed.");
+      RTMP_ERROR("publish stream failed.");
       goto rtmp_destroy;
    }
-   DEBUG(log,"publish stream success");
+
+   RTMP_DEBUG("publish stream success");
 
    ctx->rtmp = rtmp;
 
@@ -163,7 +158,6 @@ read_audio_frame(char* data, int size, char** pp, char** frame, int* frame_size)
 
 int
 snw_rtmp_send_audio_frame(snw_rtmp_ctx_t *ctx) {
-   snw_log_t *log;
    char sound_format = 10;
    // 0 = Linear PCM, platform endian
    // 1 = ADPCM
@@ -180,7 +174,6 @@ snw_rtmp_send_audio_frame(snw_rtmp_ctx_t *ctx) {
    if (!ctx) {
       return -1;
    }
-   log = ctx->log;
   
    while (ctx->audio_ts < ctx->pts) { 
       if (ctx->audio_pos < ctx->audio_raw + ctx->file_size) {
@@ -188,7 +181,7 @@ snw_rtmp_send_audio_frame(snw_rtmp_ctx_t *ctx) {
         int size = 0;
         if (read_audio_frame(ctx->audio_raw, ctx->file_size, 
                &ctx->audio_pos, &data, &size) < 0) {
-            ERROR(log, "read a frame from file buffer failed.");
+            RTMP_ERROR("read a frame from file buffer failed.");
             return -2;
         }
         
@@ -198,11 +191,11 @@ snw_rtmp_send_audio_frame(snw_rtmp_ctx_t *ctx) {
             sound_format, sound_rate, sound_size, sound_type,
             data, size, ctx->audio_ts)) != 0
         ) {
-            ERROR(log, "send audio raw data failed. ret=%d", ret);
+            RTMP_ERROR("send audio raw data failed. ret=%d", ret);
             return -3;
         }
         
-        DEBUG(log, "sent packet: type=%s, time=%d, size=%d, codec=%d, rate=%d, sample=%d, channel=%d", 
+        RTMP_DEBUG("sent packet: type=%s, time=%d, size=%d, codec=%d, rate=%d, sample=%d, channel=%d", 
             srs_human_flv_tag_type2string(SRS_RTMP_TYPE_AUDIO), ctx->audio_ts, size, 
             sound_format, sound_rate, sound_size, sound_type);
         
@@ -221,29 +214,27 @@ int
 snw_rtmp_handle_pkg(snw_rtmp_ctx_t *ctx, char *buf, int buflen) {
    static char data[MAX_BUFFER_SIZE];
    static char sync_bytes[4] = { 0x00, 0x00, 0x00, 0x01};
-   snw_log_t *log;
    int ret;
 
    if (!ctx || !buf || buflen <= 0) {
       return -1;
    }
-   log = ctx->log;
 
    memcpy(data,sync_bytes,4); 
    memcpy(data+4,buf,buflen);
 
    // send out the h264 packet over RTMP
-   DEBUG(log, "send h264 frame, len=%u, dts=%u", buflen+4, ctx->dts);
+   RTMP_DEBUG("send h264 frame, len=%u, dts=%u", buflen+4, ctx->dts);
    ret = srs_h264_write_raw_frames(ctx->rtmp, data, buflen+4, ctx->dts, ctx->pts);
    if (ret != 0) {
       if (srs_h264_is_dvbsp_error(ret)) {
-         DEBUG(log, "rtmp: ignore drop video error, code=%d", ret);
+         RTMP_DEBUG("rtmp: ignore drop video error, code=%d", ret);
       } else if (srs_h264_is_duplicated_sps_error(ret)) {
-         DEBUG(log,"rtmp: ignore duplicated sps, code=%d", ret);
+         RTMP_DEBUG("rtmp: ignore duplicated sps, code=%d", ret);
       } else if (srs_h264_is_duplicated_pps_error(ret)) {
-         DEBUG(log,"rtmp: ignore duplicated pps, code=%d", ret);
+         RTMP_DEBUG("rtmp: ignore duplicated pps, code=%d", ret);
       } else {
-         ERROR(log,"rtmp: send h264 raw data failed. ret=%d", ret);
+         RTMP_ERROR("rtmp: send h264 raw data failed. ret=%d", ret);
          return -2;
       }
    }
