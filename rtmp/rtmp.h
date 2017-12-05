@@ -3,16 +3,17 @@
 
 #include <stdint.h>
 
-#include "core/log.h"
-#include "rtmp/srs_librtmp.h"
+#include "log.h"
+#include "srs_librtmp.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define MAX_BUFFER_SIZE 16*1024*1024
+
 typedef struct snw_rtmp_ctx snw_rtmp_ctx_t;
 struct snw_rtmp_ctx {
-   snw_log_t          *log;
    srs_rtmp_t          rtmp; //pointer to void
 
    // rtmp settings
