@@ -7,7 +7,7 @@ include(CheckSymbolExists)
 include(CheckTypeSize)
 
 ## file globbing ##############################################################
-file(GLOB sources srs_librtmp.cpp)
+file(GLOB sources srs_librtmp.cpp rtmp.c log.c)
 
 ## target definitions #########################################################
 add_library(rtmp ${sources})
