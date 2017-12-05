@@ -5,7 +5,6 @@
 #include "core/linux_list.h"
 #include "core/log.h"
 #include "ice/ice.h"
-#include "rtmp/rtmp.h"
 #include "rtp/rtcp_stats.h"
 
 #ifdef __cplusplus
@@ -91,9 +90,6 @@ struct snw_rtp_ctx {
 
    //callbacks
    void (*send_pkt)(void *ctx, int control, int video, char *buffer, int len);
-
-   //rtmp setting
-   snw_rtmp_ctx_t     *rtmp_ctx;
 };
 
 int

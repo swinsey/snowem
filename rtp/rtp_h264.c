@@ -4,7 +4,6 @@
 
 #include "core/log.h"
 #include "rtp/rtp_h264.h"
-#include "rtp/rtp_rtmp.h"
 
 #define USE_MODULE_H264
 snw_rtp_module_t *g_rtp_h264_modules[] = {
@@ -63,7 +62,7 @@ ice_h264_process_nal_unit(snw_rtp_ctx_t *ctx, int is_end_frame,
    //DEBUG(log, "nal unit info, nal_unit_type=%u, buflen=%d", 
    //      nal_unit_type, buflen);
 
-   snw_rtmp_handle_pkg(ctx->rtmp_ctx,buf,buflen); 
+   //FIXME: do stuff
 
    return 0;
 }
@@ -188,21 +187,9 @@ snw_rtp_h264_handle_pkg_in(void *data, char *buf, int buflen) {
       hdrlen += extlen;
    }
 
-   if (!ctx->rtmp_ctx) {
-      ctx->rtmp_ctx = snw_rtmp_ctx_new("rtmp://49.213.76.92:1935/live/livestream");
-      if (!ctx->rtmp_ctx) {
-         ERROR(log, "failed to allocate rtmp ctx");
-         return -1;
-      }
-   }
-   snw_rtmp_update_ts(ctx->rtmp_ctx, ntohl(hdr->ts));
-
-   DEBUG(log, "rtp info, seq=%u, start_ts=%llu, cur_ts=%llu, hdrlen=%u,"
-              " extlen=%u, v=%u, x=%u, cc=%u, pt=%u, m=%u", 
-         htons(hdr->seq), ctx->rtmp_ctx->first_video_ts, 
-         ctx->rtmp_ctx->current_ts, hdrlen, extlen, hdr->v, hdr->x, hdr->cc, hdr->pt, hdr->m);
+   DEBUG(log, "rtp info, seq=%u, extlen=%u, v=%u, x=%u, cc=%u, pt=%u, m=%u", 
+         htons(hdr->seq), hdrlen, extlen, hdr->v, hdr->x, hdr->cc, hdr->pt, hdr->m);
    
-   //HEXDUMP(log,(char*)buf,buflen,"rtp");
    //parsing h264 header
    p = buf + hdrlen;
    {
