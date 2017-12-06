@@ -20,7 +20,6 @@
 int
 snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
 
-   DEBUG(ctx->log, "ice handler, flowid=%u, len=%u", conn->flowid, len);
    snw_shmmq_enqueue(ctx->snw_core2ice_mq, 0, data, len, conn->flowid);
    return 0;
 }
@@ -109,13 +108,15 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
       root["channelid"] = channelid;
       root["rc"] = 0;
       output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),output.size(),conn->flowid);
+      snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),
+           output.size(),conn->flowid);
 
       //inform ice component about new channel
       root["msgtype"] = SNW_ICE;
       root["api"] = SNW_ICE_CREATE;
       output = writer.write(root);
-      snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),output.size(),conn->flowid);
+      snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),
+            output.size(),conn->flowid);
    } catch (...) {
       ERROR(log, "json format error");
       return -1;
@@ -302,14 +303,12 @@ snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, ch
    snw_log_t *log = ctx->log;
    struct list_head *p;
    
-   DEBUG(log, "module handling, type=%x", type);   
    list_for_each(p,&ctx->modules.list) {
       snw_module_t *m = list_entry(p,snw_module_t,list);
-      DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
-             m->name, m->type, m->sofile);
+      //DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
+      //       m->name, m->type, m->sofile);
       if (m->type == type) {
          m->methods->handle_msg(m,conn,data,len);
-         //call snw_videocall_handle_msg
       }
    }
 
@@ -327,11 +326,10 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
 
    ret = reader.parse(data,data+len,root,0);
    if (!ret) {
-      ERROR(log,"error json format, s=%s",data);
+      ERROR(log,"error json format, data=%s",data);
       return -1;
    }
 
-   DEBUG(log, "get msg, data=%s", data);
    try {
       msgtype = root["msgtype"].asUInt();
       api = root["api"].asUInt();
@@ -437,7 +435,6 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 int
 snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
 
-   DEBUG(ctx->log, "ice preprocess msg, flowid=%u, msg=%s", flowid, buffer);
    snw_shmmq_enqueue(ctx->snw_core2net_mq, 0, buffer, len, flowid);
    return 0;
 }
@@ -458,7 +455,6 @@ snw_ice_msg(int fd, short int event,void* data) {
          break;
       }
 #endif
-      // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
       snw_shmmq_dequeue(ctx->snw_ice2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
 
       if (len == 0) return;
@@ -492,7 +488,6 @@ snw_net_msg(int fd, short int event,void* data) {
          break;
       }
 #endif
-      // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
       snw_shmmq_dequeue(ctx->snw_net2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
 
       if (len == 0 || len >= MAX_BUFFER_SIZE) return;
@@ -590,7 +585,7 @@ snw_main_process(snw_context_t *ctx) {
              "/tmp/snw_ice2core_mq.fifo", 0, 0, 
              ICE2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-      ERROR(ctx->log,"failed to init core2net mq");
+      ERROR(ctx->log,"failed to message queue");
       return;
    }
 
@@ -604,7 +599,7 @@ snw_main_process(snw_context_t *ctx) {
              "/tmp/snw_core2ice_mq.fifo", 0, 0, 
              CORE2ICE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-      ERROR(ctx->log,"failed to init core2net mq");
+      ERROR(ctx->log,"failed to message queue");
       return;
    }
 

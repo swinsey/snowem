@@ -29,7 +29,6 @@ snw_set_init(uint32_t base, uint32_t num) {
 
    res = posix_memalign((void **)&flowset->data, getpagesize(), total_size);
    if (res != 0) {
-      //printf("posix_memalign failed, size=%ld\n", total_size);
       assert(0);
       if (flowset) free(flowset);
       return 0;
