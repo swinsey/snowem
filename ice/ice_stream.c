@@ -87,7 +87,7 @@ snw_stream_print_ssrc(snw_ice_context *ctx, snw_ice_stream_t *s, const char *inf
    if (!ctx || !s) return;
    log = ctx->log;
 
-   DEBUG(log,"stream ssrcr, info=%s, local_audio_ssrc=%u, remote_audio_ssrc=%u, "
+   DEBUG(log,"stream ssrc, info=%s, local_audio_ssrc=%u, remote_audio_ssrc=%u, "
              "local_video_ssrc=%u, remote_video_ssrc=%u", info,
          s->local_audio_ssrc,
          s->remote_audio_ssrc,

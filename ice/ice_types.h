@@ -73,7 +73,7 @@ typedef struct dtls_ctx dtls_ctx_t;
 }
 #endif
 
-#endif //_SNOW_CORE_TYPES_H_
+#endif //_SNOW_ICE_ICETYPES_H_
 
 
 

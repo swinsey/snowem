@@ -36,7 +36,7 @@ snw_ice_generate_base_sdp(snw_ice_context_t *ice_ctx,
    if (!ice_ctx) return -1;
    log = ice_ctx->log;
 
-   DEBUG(log,"sendonly=%u",sendonly);
+   DEBUG(log,"generate sdp, sendonly=%u",sendonly);
 
    memset(audio_mline,0,512);
    snprintf(audio_mline, 256, audio_mline_template,
@@ -84,7 +84,7 @@ void ice_send_candidate(snw_ice_session_t *session, int video, char *buffer, int
    root["candidate"] = candidate;
 
    output = writer.write(root);
-   DEBUG(log, "Sending sdp, sdp=%s",output.c_str());
+   DEBUG(log, "sending sdp, sdp=%s",output.c_str());
    snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
 
    return;
@@ -107,13 +107,14 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
    agent = session->agent;
    stream = snw_stream_find(&session->streams, stream_id);
    if(!stream) {
-      ERROR(log, "No stream %d", stream_id);
+      ERROR(log, "stream not found, sid=%d", stream_id);
       return;
    }
 
    component = snw_component_find(&stream->components, component_id);
    if (!component) {
-      ERROR(log, "No component %d in stream %d", component_id, stream_id);
+      ERROR(log, "component not found in a stream, cid=%u, sid=%u", 
+            component_id, stream_id);
       return;
    }
 
@@ -121,7 +122,7 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
    if (candidates == 0 )
       return;
 
-   DEBUG(log, "got candidates, size=%u, sid=%u, cid=%u",
+   DEBUG(log, "got list of candidates, size=%u, sid=%u, cid=%u",
          list_size(&candidates->list), stream_id, component_id);
 
    list_for_each_safe(i,n,&candidates->list) {
@@ -142,7 +143,7 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
             len = snprintf(buffer, 100, "candidate:%s %d %s %d %s %d typ host generation 0",
                   c->foundation, c->component_id, "udp", c->priority, address, port);
          } else {
-            DEBUG(log, "only ice-udp supported");
+            WARN(log, "only ice-udp supported");
             candidate_free(c);
             continue;
          }
@@ -158,7 +159,7 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
             continue;
          }
       } else if(c->type == ICE_CANDIDATE_TYPE_PEER_REFLEXIVE) {
-         DEBUG(log, "skipping prflx candidate");
+         WARN(log, "skipping prflx candidate");
          candidate_free(c);
          continue;
       } else if(c->type == ICE_CANDIDATE_TYPE_RELAYED) {
@@ -166,12 +167,12 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
             len = snprintf(buffer, 100, "candidate:%s %d %s %d %s %d typ relay raddr %s rport %d",
                   c->foundation, c->component_id, "udp", c->priority, address, port, base_address, base_port);
          } else {
-            DEBUG(log, "only ice-udp supported");
+            WARN(log, "only ice-udp supported");
             candidate_free(c);
             continue;
          }
       }
-      DEBUG(log, "output, len=%d, sdp=%s", len, buffer);
+
       if ( len > 0 ) {
          ice_send_candidate(session,video,buffer,len);
       }
@@ -179,7 +180,7 @@ snw_ice_send_local_candidate(snw_ice_session_t *session, int video, uint32_t str
       candidate_free(c);
    }
 
-   //FXIME: free list of candidates
+   //FIXME: free list of candidates
    /*list_for_each_safe(i,n,&candidates->list) {
       candidate_t *c = list_entry(i,candidate_t,list);
       candidate_free(c);
@@ -214,21 +215,18 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
    uint32_t channelid = 0;
    int is_new = 0;
 
-
-   //FIXME: mechanism of channel (de)allocation 
-
    try {
       channelid = root["channelid"].asUInt();
-      DEBUG(log,"new channel, channelid=%u", channelid);
       channel = (snw_ice_channel_t*)snw_ice_channel_get(ice_ctx,channelid,&is_new);
       if (!channel || !is_new) {
          root["rc"] = -1;
          output = writer.write(root);
-         DEBUG(log,"failed to create ice channel, flowid=%u, is_new=%u, len=%u, res=%s", 
+         ERROR(log,"failed to create ice channel, flowid=%u, is_new=%u, len=%u, res=%s", 
                flowid, is_new, output.size(), output.c_str());
          snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
          return;
       }
+      DEBUG(log,"new channel created, channelid=%u", channelid);
       channel->peerid = flowid;
       root["id"] = flowid;
       root["channelid"] = flowid; //FIXME: create 'real' sessionid
@@ -238,6 +236,7 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
       DEBUG(log,"ice create, mq=%p, flowid=%u, len=%u, res=%s", 
             ctx->snw_ice2core_mq, flowid, output.size(), output.c_str());
 
+      //FIXME: we dont send info to main?
       //snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    } catch (...) {
       ERROR(log, "json format error, data=%s", output.c_str());
@@ -285,7 +284,6 @@ verify_disabled_streams(snw_ice_session_t *session, int audio, int video, const 
    return 0;
 }
 
-
 int
 snw_ice_generate_sdp(snw_ice_session_t *session) {
    static char base_sdp[1024];
@@ -293,8 +291,7 @@ snw_ice_generate_sdp(snw_ice_session_t *session) {
    ice_sdp_attr_t sdp_attr;
    char *sdp_merged;
 
-   if (!session)
-      return -1;
+   if (!session) return -1;
 
    snw_ice_generate_base_sdp(session->ice_ctx,base_sdp,1024,0);
    DEBUG(log, "sdp info, base_sdp=%s",base_sdp);
@@ -306,8 +303,10 @@ snw_ice_generate_sdp(snw_ice_session_t *session) {
    }
 
    verify_disabled_streams(session,sdp_attr.audio, sdp_attr.video, sdp_merged);
+
+   //FIXME: need to save sdp_merged?
+   DEBUG(log,"generated sdp, local_sdp=%s",sdp_merged);
    session->local_sdp = sdp_merged;
-   //DEBUG("generated sdp, local_sdp=%s",sdp_merged);
 
    return 0;
 }
@@ -325,12 +324,12 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    if (!session) return;
 
    session->streams_gathering_done++;
-   DEBUG(log, "gathering done, user_data=%p, stream=%d, cdone=%u, streams_num=%u",
-          user_data, stream_id, session->streams_gathering_done, session->streams_num);
+   DEBUG(log, "gathering done, stream=%d, cdone=%u, streams_num=%u",
+         stream_id, session->streams_gathering_done, session->streams_num);
 
    snw_ice_stream_t *stream = snw_stream_find(&session->streams, stream_id);
    if (!stream) {
-      DEBUG(log, "no stream, stream_id=%d", stream_id);
+      ERROR(log, "stream not found, sid=%d", stream_id);
       return;
    }
    stream->gathering_done = 1;
@@ -338,7 +337,9 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
    if (session->streams_gathering_done == session->streams_num) {
       ret = snw_ice_generate_sdp(session);
       if (ret < 0 || !session->local_sdp) {
-         ERROR(log, "failed to generate sdp, ret=%d, local_sdp=%s",ret,session->local_sdp);
+         ERROR(log, "failed to generate sdp, ret=%d, local_sdp=%s",
+              ret,session->local_sdp);
+         return;
       }
 
       //send sdp into to client.
@@ -348,7 +349,7 @@ snw_ice_cb_candidate_gathering_done(agent_t *agent, uint32_t stream_id, void *us
       root["sdp"]["type"] = "offer";
       root["sdp"]["sdp"] = session->local_sdp;
       output = writer.write(root);
-      DEBUG(log, "Sending ice sdp, flowid=%u, len=%u, sdp=%s", 
+      DEBUG(log, "sending sdp offer to peer, flowid=%u, len=%u, sdp=%s", 
                  session->flowid, output.size(), output.c_str());
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
 
@@ -371,7 +372,7 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
    log = session->ice_ctx->log;
 
    if (component_id > 1 && IS_FLAG(session, WEBRTC_RTCPMUX)) {
-      ERROR(log, "wait for webrtc rtcpmux, component_id=%u",component_id);
+      ERROR(log, "wait for webrtc rtcpmux, cid=%u",component_id);
       return;
    }
 
@@ -379,13 +380,13 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
                 component_id, stream_id, local, remote);
    stream = snw_stream_find(&session->streams, stream_id);
    if (!stream) {
-      ERROR(log, "stream not found, sid=%d", stream_id);
+      ERROR(log, "stream not found, sid=%u", stream_id);
       return;
    }
 
    component = snw_component_find(&stream->components, component_id);
    if (!component) {
-      ERROR(log, "component not found, cid=%d, sid=%d", component_id, stream_id);
+      ERROR(log, "component not found, cid=%u, sid=%u", component_id, stream_id);
       return;
    }
 
@@ -396,7 +397,7 @@ snw_ice_cb_new_selected_pair(agent_t *agent, uint32_t stream_id,
    component->fir_latest = get_monotonic_time();
    component->dtls = dtls_create(session->ice_ctx, component, stream->dtls_type);
    if (!component->dtls) {
-      ERROR(log, "no dtls context");
+      ERROR(log, "dtls context is null");
       return;
    }
 
@@ -422,18 +423,18 @@ snw_ice_cb_component_state_changed(agent_t *agent,
 
    stream = snw_stream_find(&session->streams, stream_id);
    if (!stream) {
-      ERROR(log, "No stream %d", stream_id);
+      ERROR(log, "stream not found, sid=%u", stream_id);
       return;
    }
 
    component = snw_component_find(&stream->components, component_id);
    if (!component) {
-      ERROR(log, "No component %d in stream %d", component_id, stream_id);
+      ERROR(log, "component not found, cid=%u, sid=%u", 
+            component_id, stream_id);
       return;
    }
    component->state = state;
    if ((state == ICE_COMPONENT_STATE_CONNECTED || state == ICE_COMPONENT_STATE_READY)) {
-      //session->ready = 1;
       SET_FLAG(session,WEBRTC_READY);
    }
 
@@ -461,7 +462,7 @@ snw_ice_cb_new_remote_candidate(agent_t *agent, uint32_t stream_id,
    if (!session) return;
    log = session->ice_ctx->log;
 
-   DEBUG(log, "discovered new remote candidate, cid=%d, sid=%d, foundation=%s",
+   DEBUG(log, "discovered new remote candidate, cid=%u, sid=%u, foundation=%s",
           component_id, stream_id, foundation);
 
    if (component_id > 1 && IS_FLAG(session, WEBRTC_RTCPMUX)) {
@@ -493,12 +494,11 @@ snw_ice_cb_new_remote_candidate(agent_t *agent, uint32_t stream_id,
    }
 
    if(candidate == 0) {
-      DEBUG(log, "candidate not found, foundation %s", foundation);
+      ERROR(log, "candidate not found, foundation %s", foundation);
       return;
    }
 
    if(candidate->type != ICE_CANDIDATE_TYPE_PEER_REFLEXIVE) {
-      DEBUG(log, "candidatedone");
       goto candidatedone;
    }
 
@@ -526,7 +526,8 @@ snw_ice_cb_new_remote_candidate(agent_t *agent, uint32_t stream_id,
             base_address,
             base_port);
    } else {
-      ERROR(log, "transport not supported");
+      ERROR(log, "transport not supported, transport=%u", 
+            candidate->transport);
    }
 
 candidatedone:
@@ -541,7 +542,6 @@ snw_ice_add_local_addresses(snw_ice_session_t *session) {
    char host[NI_MAXHOST];
 
    if (getifaddrs(&ifaddr) == -1) {
-      //ERROR("Error getting list of interfaces");
       return -1;
    } else {
       for(ifa = ifaddr; ifa != 0; ifa = ifa->ifa_next) {
@@ -567,17 +567,14 @@ snw_ice_add_local_addresses(snw_ice_session_t *session) {
                (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6),
                host, NI_MAXHOST, 0, 0, NI_NUMERICHOST);
          if(s != 0) {
-            //DEBUG(log,"failed to getnameinfo, error=%s", gai_strerror(s));
             continue;
          }
          if (!strcmp(host, "0.0.0.0") || !strcmp(host, "::") || !strncmp(host, "fe80:", 5))
             continue;
 
          // add interface to the ICE agent
-         //DEBUG(log, "gather candidates, host=%s", host);
          address_init(&addr_local);
          if(address_set_from_string(&addr_local, host) != ICE_OK) {
-            //ERROR(log,"Skipping invalid address, host=%s", host);
             continue;
          }
          ice_agent_add_local_address(session->agent, &addr_local);
@@ -585,33 +582,6 @@ snw_ice_add_local_addresses(snw_ice_session_t *session) {
       }
       freeifaddrs(ifaddr);
    }
-
-   return 0;
-}
-
-int
-ice_verify_stream_status(snw_ice_session_t *session) {
-   snw_log_t *log = 0;
-   int64_t before,now;
-
-   if (!session) return -1;
-   log = session->ice_ctx->log;
-
-   before = session->lasttime;
-   now = get_monotonic_time();
-
-   //DEBUG(log, "time interval, delta=%lu, before=%lu, now=%lu",now-before,before,now);
-   if (now-before >= ICE_USEC_PER_SEC) {
-      if (session->audio_stream && session->audio_stream->rtp_component) {
-         ERROR(log, "missing stream data, flowid=%u", session->flowid);
-      }
-
-      if(session->video_stream && session->video_stream->rtp_component) {
-         ERROR(log, "missing stream data, flowid=%u", session->flowid);
-      }
-      before = now;
-   }
-   session->lasttime = now;
 
    return 0;
 }
@@ -632,7 +602,8 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
 
    if (!stream) return;
 
-   component = IS_FLAG(session, WEBRTC_RTCPMUX) ? stream->rtp_component : stream->rtcp_component;
+   component = IS_FLAG(session, WEBRTC_RTCPMUX) ? 
+         stream->rtp_component : stream->rtcp_component;
    if (!component) return;
 
    //FIXME: check cdone equal to num of stream
@@ -657,7 +628,8 @@ send_rtcp_pkt_internal(snw_ice_session_t *session, int video, int encrypted, cha
       enc_len = len;
       ret = srtp_protect_rtcp(component->dtls->srtp_out, &sbuf, &enc_len);
       if (ret != err_status_ok) {
-         ERROR(log, "protect error, len=%d-->%d, s=%u", len, enc_len, ret);
+         ERROR(log, "encrypting srtp pkt failed, len=%d, enc_len=%d, ret=%d", 
+               len, enc_len, ret);
       } else {
          ice_agent_send(session->agent, stream->id, component->id,
                                     (const char *)&sbuf, enc_len);
@@ -699,12 +671,11 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
    memcpy(&sbuf, buf, len);
    header->ssrc = htonl(video ? stream->local_video_ssrc : stream->local_audio_ssrc);
    ret = srtp_protect(component->dtls->srtp_out, &sbuf, &enc_len);
-   DEBUG(log, "SRTP protect, ret=%d , flowid=%u, len=%d-->%d",
-         ret, session->flowid, len, enc_len);
    if (ret != err_status_ok) {
       uint32_t timestamp = ntohl(header->ts);
       uint16_t seq = ntohs(header->seq);
-      ERROR(log, "srtp protect error, ret=%d , flowid=%u, len=%d-->%d, ts=%u, seq=%u",
+      ERROR(log, "encrypting srtp pkt failed, ret=%d, flowid=%u,"
+                 " len=%d, enc_len>%d, ts=%u, seq=%u",
             ret, session->flowid, len, enc_len, timestamp, seq);
       return;
    } 
@@ -712,7 +683,7 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
    ret = ice_agent_send(session->agent, stream->id, component->id,
                                  (const char *)&sbuf, enc_len);
    if (ret < enc_len) {
-      DEBUG(log, "only sent %d bytes? (was %d)", ret, enc_len);
+      WARN(log, "only sent %d bytes? (was %d)", ret, enc_len);
    }
 
    //TODO: impl circular buffer to keep sent packets for restransmission.
@@ -723,21 +694,15 @@ send_rtp_pkt_internal(snw_ice_session_t *session,
 void
 send_pkt_callback(void *session, int control, 
       int video, char* buf, int len) {
-  return send_rtp_pkt((snw_ice_session_t*)session,
+   return send_rtp_pkt((snw_ice_session_t*)session,
                control, video, buf, len);
 }
 
 void 
 send_rtp_pkt(snw_ice_session_t *session, 
-  int control, int video, char* buf, int len) {
-   //snw_log_t *log = 0;
+   int control, int video, char* buf, int len) {
 
-   if (!session || !buf)
-      return;
-   //log = session->ice_ctx->log;
-
-   /* check status of receiver */
-   ice_verify_stream_status(session);
+   if (!session || !buf) return;
 
    if (control) {
       send_rtcp_pkt_internal(session,video,0,buf,len);
@@ -750,104 +715,12 @@ send_rtp_pkt(snw_ice_session_t *session,
 
 void 
 ice_relay_rtcp(snw_ice_session_t *session, int video, char *buf, int len) {
-   //snw_log_t *log = 0;
    
    if (!session || !buf || len < 1)
       return;
-   //log = session->ice_ctx->log;
 
    //FIXME: check stuff
    send_rtp_pkt(session,1,video,buf,len);
-   return;
-}
-
-/*
-void 
-snw_ice_handle_lost_packets(snw_ice_session_t *session, snw_ice_stream_t *stream,
-      snw_ice_component_t *component, uint16_t seqno, int video) {
-   snw_log_t *log = 0;
-   uint32_t nack = 0;
-
-   if (!session) return;
-   log = session->ice_ctx->log;
-
-   if (!video) {
-      nack = snw_rtp_slidewin_put(session, &component->v_slidewin, seqno);
-   }
-    
-   if (nack != 0) {
-      char rtcpbuf[RTCP_RTPFB_MSG_LEN];
-      DEBUG(log,"sending rtpfb nack, flowid=%u, local_ssrc=%x, remote_ssrc=%x, payload=%x",
-                              session->flowid,
-                              stream->local_video_ssrc, 
-                              stream->remote_video_ssrc, 
-                              nack);
-                            
-         snw_rtcp_gen_nack(rtcpbuf, RTCP_RTPFB_MSG_LEN, 
-                           stream->local_video_ssrc, 
-                           stream->remote_video_ssrc, 
-                           nack);
-         send_rtcp_pkt_internal(session,video,0,rtcpbuf,RTCP_RTPFB_MSG_LEN);
-   }
-
-   return;
-}
-*/
-
-void
-snw_ice_send_fir(snw_ice_session_t *session, snw_ice_component_t *component, int force) {
-   snw_log_t *log = 0;
-   snw_ice_stream_t *stream = 0;
-
-   if (!session) return;
-   log = session->ice_ctx->log;
-
-   stream = IS_FLAG(session, WEBRTC_BUNDLE)
-               ? (session->audio_stream ? session->audio_stream : session->video_stream)
-               : session->video_stream;
-
-   if (force || (component && (session->curtime - component->fir_latest > 10*ICE_USEC_PER_SEC))) {
-
-      {// send fir command
-         char rtcpbuf[RTCP_PSFB_FIR_MSG_LEN];
-         component->fir_seq++;
-         DEBUG(log,"sending fir request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
-                              session->flowid,
-                              stream->local_video_ssrc, 
-                              stream->remote_video_ssrc, 
-                              component->fir_seq);
-                            
-         snw_rtcp_gen_fir(rtcpbuf, RTCP_PSFB_FIR_MSG_LEN, 
-                           stream->local_video_ssrc, 
-                           stream->remote_video_ssrc, 
-                           component->fir_seq);
-         send_rtcp_pkt_internal(session,1,0,rtcpbuf,RTCP_PSFB_FIR_MSG_LEN);
-      }
-
-      {// send pli report
-         char rtcpbuf[RTCP_PSFB_PLI_MSG_LEN];
-         DEBUG(log,"sending pli request, flowid=%u, local_ssrc=%x, remote_ssrc=%x, fir_seq=%u",
-                              session->flowid,
-                              stream->local_video_ssrc, 
-                              stream->remote_video_ssrc, 
-                              component->fir_seq);
-         snw_rtcp_gen_pli(rtcpbuf, RTCP_PSFB_PLI_MSG_LEN,
-                          stream->local_video_ssrc, 
-                          stream->remote_video_ssrc);
-         send_rtcp_pkt_internal(session,1,0,rtcpbuf,RTCP_PSFB_PLI_MSG_LEN);
-      }
-
-      //if (force) {
-      if (1) {
-         DEBUG(log, "vp8 payload sending fir request, cid=%u, curtime=%lu", 
-                    component->id, session->curtime);
-      }
-
-      if (!force && component) {
-         component->fir_latest = session->curtime;
-      }
-   }
-
    return;
 }
 
@@ -879,20 +752,17 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
          uint16_t seq = ntohs(header->seq);
 
          flowid = session->channel->players[i];
-         DEBUG(log, "relay rtp pkt, flowid: %u, media_type: %u, "
-                    "pkg_type: %u(%u), seq: %u, length=%u", 
-              session->flowid, video, header->pt, VP8_PT, seq,len);
+         DEBUG(log, "relay rtp pkt, flowid=%u, peerid=%u, media_type=%u, "
+                    "pkg_type=%u, seq=%u, length=%u", 
+              session->flowid, flowid, video, header->pt, seq,len);
          s = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
          if (s) {
-            DEBUG(log, "forward, flowid=%u -> forwardid=%u s=%p",
-                  session->flowid, flowid, s);
-
             send_rtp_pkt(s, 0, video, buf, len);
-
             { // handle pkg out
                snw_rtp_ctx_t *rtp_ctx = 0;
                uint32_t remote_ssrc = 0;
                rtp_ctx = &s->rtp_ctx;
+
                //FIXME: more checks here
                rtp_ctx->session = s;
                rtp_ctx->stream = s->audio_stream;
@@ -908,10 +778,7 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
                header->ssrc = htonl(remote_ssrc);
                snw_rtp_handle_pkg_out(rtp_ctx,buf,len);
             }
- 
-
          } else {
-            // failed
             ERROR(log, "session not found, flowid=%u",flowid);
             continue;
          }
@@ -920,7 +787,6 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
 
    return;
 }
-
 
 void
 ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
@@ -959,7 +825,7 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
    ret = srtp_unprotect(component->dtls->srtp_in, buf, &buflen);
    if (ret != err_status_ok) {
-      ERROR(log, "unprotect error, len=%d, buflen=%d, "
+      ERROR(log, "decrypting srtp pkt failed, len=%d, buflen=%d, "
                  "ts=%u, seq=%u, res=%u",
             len, buflen, timestamp, seq, ret);
       return;
@@ -982,7 +848,6 @@ ice_rtp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
       //do nothing
    }
 
-
    /*if (IS_FLAG(session,ICE_PUBLISHER)) {
       //snw_ice_handle_lost_packets(session,stream,
       //    component,ntohs(header->seq),video);
@@ -997,9 +862,9 @@ snw_ice_resend_pkt(snw_ice_session_t *session, snw_ice_component_t *component,
               int video, int seqno, int64_t now) {
    snw_log_t *log = session->ice_ctx->log;
 
-   DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",session->flowid, seqno, now);
    //FIXME: impl
-   
+   //DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",
+   //      session->flowid, seqno, now);
    return 0;
 }
 
@@ -1019,26 +884,11 @@ ice_rtcp_incoming_msg(snw_ice_session_t *session, snw_ice_stream_t *stream,
 
    ret = srtp_unprotect_rtcp(component->dtls->srtp_in, buf, &buflen);
    if (ret != err_status_ok) {
-      DEBUG(log, "SRTCP unprotect error, ret=%u, len=%d, buflen=%d", ret, len, buflen);
+      DEBUG(log, "decrypting srtp pkt failed, ret=%u, len=%d, buflen=%d", ret, len, buflen);
       return;
    }
-
-   //FIXME: remove this part
-   /* Determine which stream: audio or video? */
-
-   /*ssrc = snw_rtcp_get_ssrc(session,buf,len);
-   video = stream->remote_video_ssrc == ssrc ? 1 : 0;
-   DEBUG(log, "ssrc info, flowid=%u, flags=%u, video=%u, ssrc=%u, buflen=%u",
-           session->flowid, session->flags, video, ssrc, buflen);
-   snw_stream_print_ssrc(session->ice_ctx, stream, "stream");*/
-    
-   /* Resend lost packets if having any */
-   //if (IS_FLAG(session,ICE_SUBSCRIBER)) {
-      //FIXME: hanndle at rtcp module
-      //snw_rtcp_handle_nacks(session, component, video, buf, buflen, snw_ice_resend_pkt);
-   //}
-
-   //forward to rtp handler, i.e h264
+   
+   //forward to rtcp handler
    rtp_ctx->stream = stream;
    rtp_ctx->component = component; 
    rtp_ctx->epoch_curtime = session->curtime;
@@ -1089,7 +939,6 @@ void ice_data_recv_cb(agent_t *agent, uint32_t stream_id,
       if (pt == RTP_PT) {
          ice_rtp_incoming_msg(session,stream,component,buf,len);
       } else if (pt == RTCP_PT) {
-         DEBUG(log, "rtcp pkt, flowid=%u", session->flowid);
          ice_rtcp_incoming_msg(session,stream,component,buf,len);
       }
    }
@@ -1189,8 +1038,8 @@ snw_ice_create_media_stream(snw_ice_session_t *session, int video) {
       }
    }*/
 
-   DEBUG(log, "initialize media stream, video=%u, stream_id=%u(%p), %p", 
-              video, stream_id, stream, &session->streams);
+   DEBUG(log, "initialize media stream, video=%u, stream_id=%u", 
+              video, stream_id);
    ice_agent_gather_candidates(session->agent, stream_id);
    ice_agent_attach_recv(session->agent, stream_id, 1, ice_data_recv_cb, rtp);
    if (!IS_FLAG(session, WEBRTC_RTCPMUX) && rtcp != 0)
@@ -1226,7 +1075,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    session->control_mode = ICE_CONTROLLED_MODE;
    SET_FLAG(session, WEBRTC_BUNDLE);
 
-   DEBUG(log,"Creating ICE agent, flowid=%u, ice_lite=%u, control_mode=%u, sdp_len=%u",
+   DEBUG(log,"creating ice agent, flowid=%u, ice_lite=%u, control_mode=%u, sdp_len=%u",
          session->flowid, ice_ctx->ice_lite_enabled, session->control_mode, strlen(sdp));
 
    ret = snw_ice_add_local_addresses(session);
@@ -1262,13 +1111,13 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
       session->streams_num++;
    }
 
-   DEBUG(log, "Checking media stream, offer=%u, audio=%u, video=%u, streams_num=%u, flags=%u",
+   DEBUG(log, "session info, offer=%u, audio=%u, video=%u, streams_num=%u, flags=%u",
          offer,sdp_attr.audio,sdp_attr.video,session->streams_num, IS_FLAG(session, WEBRTC_BUNDLE));
    
    if (IS_FLAG(session, WEBRTC_AUDIO)) { 
       ret = snw_ice_create_media_stream(session,0);
       if (ret < 0) {
-         ERROR(log, "ret=%d", ret);
+         ERROR(log, "failed to create media stream, ret=%d", ret);
          return ret;
       }
    }
@@ -1284,20 +1133,18 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    return 0;
 }
 
-
-//video_offer_sdp
 static int
 snw_ice_offer_sdp(snw_ice_context_t *ice_ctx, 
       snw_ice_session_t *session, uint32_t flowid, int sendonly) {
    static const char *sdp_template = 
          "v=0\r\no=- %lu %lu IN IP4 127.0.0.1\r\ns=%s\r\nt=0 0\r\n%s%s";
-   static  const char *audio_mline_template = 
+   static const char *audio_mline_template = 
          "m=audio 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d opus/48000/2\r\n";
    //static  const char *video_mline_template = 
    //      "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d VP8/90000\r\n"
    //      "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
          //"a=fmtp:100 level-asymmetry-allowed=1;profile-level-id=42e01f\r\n"
-   static  const char *video_mline_template = 
+   static const char *video_mline_template = 
          "m=video 1 RTP/SAVPF %d\r\nc=IN IP4 1.1.1.1\r\na=%s\r\na=rtpmap:%d H264/90000\r\n"
          "a=fmtp:%d level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f\r\n"
          "a=rtcp-fb:%d ccm fir\r\na=rtcp-fb:%d nack\r\na=rtcp-fb:%d nack pli\r\na=rtcp-fb:%d goog-remb\r\n";
@@ -1307,8 +1154,6 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
 
    if (!ice_ctx || !session) return -1;
    log = ice_ctx->log;
-
-   DEBUG(log,"sendonly=%u",sendonly);
 
    memset(audio_mline,0,512);
    snprintf(audio_mline, 256, audio_mline_template,
@@ -1327,14 +1172,13 @@ snw_ice_offer_sdp(snw_ice_context_t *ice_ctx,
    //FIXME: session setup does not require to know sdp in advanced.
    ret = snw_ice_session_setup(ice_ctx, session, 0, (char *)sdp);
    if (ret < 0) {
-      ERROR(log, "Error setting ICE locally, ret=%d",ret);
+      ERROR(log, "failed to setup ice session, ret=%d",ret);
       return -4;
    }
 
    return 0;
 }
 
-//video_start_handler
 void
 snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_context_t *ctx = (snw_context_t*)ice_ctx->ctx;
@@ -1423,14 +1267,12 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
    struct list_head *pos,*n;
    snw_ice_component_t *c = 0;
 
-   if (!components || !component)
-      return;
+   if (!components || !component) return;
    log = ice_ctx->log;
  
    list_for_each_safe(pos,n,&components->list) {
       snw_ice_component_t *t = list_entry(pos,snw_ice_component_t,list);
       if (t->id == component->id) {
-         DEBUG(log, "remove component, cid=%u",t->id);
          list_del(pos);
          c = t;
       }
@@ -1439,7 +1281,7 @@ ice_component_free(snw_ice_context_t *ice_ctx, snw_ice_component_t *components,
    if (c) {
       ice_component_cleanup(ice_ctx,c);
    } else {
-      //ERROR("component not found, cid=%u", component->id);
+      ERROR(log,"component not found, cid=%u", component->id);
    }
 
    return;
@@ -1479,18 +1321,17 @@ ice_stream_free(snw_ice_context_t *ice_ctx, snw_ice_stream_t *streams, snw_ice_s
       return;
    log = ice_ctx->log;
 
-   {//DEBUG
+   /*{//DEBUG
       struct list_head *n;
       list_for_each(n,&streams->list) {
          snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
          DEBUG(log,"view stream, sid=%u(%p)", s->id, s);
       }
-   }
+   }*/
 
    list_for_each_safe(pos,n,&streams->list) {
       snw_ice_stream_t *s = list_entry(pos,snw_ice_stream_t,list);
       if ( s->id == stream->id ) {
-         //DEBUG("delete stream, sid=%u",s->id);
          list_del(pos);
          d = s;
       }
@@ -1535,7 +1376,6 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
 
    list_for_each_safe(n,p,&session->streams.list) {
       snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
-      DEBUG(log, "delete stream, sid=%u(%p)", s->id, s);
       list_del(&s->list);
       //ice_stream_free(session->ice_ctx,&session->streams,s);
       ice_stream_cleanup(session->ice_ctx,s);
@@ -1559,7 +1399,6 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    }
 
    CLEAR_FLAG(session, WEBRTC_READY);
-   DEBUG(log, "WebRTC resources freed, flowid=%u", session->flowid);
    return;
 }
 
@@ -1570,11 +1409,11 @@ snw_ice_stop_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid)
    
    session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx,flowid);
    if (!session) {
-      WARN(log,"session not found, flowid=%u",flowid);
+      ERROR(log,"session not found, flowid=%u",flowid);
       return;
    }
 
-   WARN(log,"stop session, flowid=%u",flowid);
+   DEBUG(log,"stop session, flowid=%u",flowid);
    snw_ice_session_free(ice_ctx,session);
    return;
 }
@@ -1586,7 +1425,6 @@ snw_ice_merge_streams(snw_ice_session_t *session, int audio, int video) {
    if (!session) return -1;
    log = session->ice_ctx->log;
 
-   DEBUG(log, "remove unneccessary RTP components, audio=%u,video=%u",audio,video);
    if (audio) {
       if( !list_empty(&session->streams.list) && session->video_stream) {
          session->audio_stream->local_video_ssrc = session->video_stream->local_video_ssrc;
@@ -1611,7 +1449,6 @@ snw_ice_merge_components(snw_ice_session_t *session) {
    if (!session) return -1;
    log = session->ice_ctx->log;
 
-   DEBUG(log, "removing unneccessary rtcp components");
    if(session->audio_stream && !list_empty(&session->audio_stream->components.list) ) {
       ice_agent_attach_recv(session->agent, session->audio_stream->id, 2, 0, 0);
       ice_component_free(session->ice_ctx, &session->audio_stream->components, 
@@ -1661,7 +1498,7 @@ int ice_setup_remote_credentials(snw_ice_session_t *session, snw_ice_stream_t *s
    if (ufrag && pwd) {
       DEBUG(log, "setting remote credentials, ufrag=%s,pwd=%s",ufrag,pwd);
       if (ice_agent_set_remote_credentials(session->agent, stream->id, ufrag, pwd) != ICE_OK) {
-         DEBUG(log, "failed to set remote credentials, sid=%u, cid=%u",stream->id, component->id);
+         ERROR(log, "failed to set remote credentials, sid=%u, cid=%u",stream->id, component->id);
          return -1;
       }
    }
@@ -1704,16 +1541,15 @@ ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint
    }
 
    if(list_empty(&component->remote_candidates.list)) {
-      DEBUG(log, "candidate list is empty");
+      WARN(log, "candidate list is empty");
       return;
    }
-   DEBUG(log, "Setting credentials of remote candidates, sid=%d, cid=%d", stream_id, component_id);
-   ice_setup_remote_credentials(session,stream,component);
 
+   ice_setup_remote_credentials(session,stream,component);
    added = ice_agent_set_remote_candidates(session->agent, stream_id, 
                 component_id, &component->remote_candidates);
    if(added <=  0 ) { //FIXME: compare to size of list candidates
-      DEBUG(log, "failed to set remote candidates, added=%u", added);
+      ERROR(log, "failed to set remote candidates, added=%u", added);
    } else {
       DEBUG(log, "remote candidates set, added=%u",added);
       component->is_started = 1;
@@ -1721,42 +1557,6 @@ ice_setup_remote_candidates(snw_ice_session_t *session, uint32_t stream_id, uint
 
    return;
 }
-
-
-int
-try_ice_start(snw_ice_session_t *session) {
-   snw_log_t *log = 0;
-
-   if (!session) return -1;
-   log = session->ice_ctx->log;
-
-   //process_pending_trickles(session);
-
-   if (IS_FLAG(session, WEBRTC_TRICKLE) && !IS_FLAG(session, WEBRTC_GATHER_DONE)) {
-      DEBUG(log, "webrtc start with trickle");
-      SET_FLAG(session, WEBRTC_START);
-   } else {
-      /* FIXME: never reach here */
-      DEBUG(log, "Sending connectivity checks, audio_id=%u,video_id=%u",
-             session->audio_stream->id, session->video_stream->id);
-      if (session->audio_stream->id > 0) {
-         ice_setup_remote_candidates(session, session->audio_stream->id, 1);
-         if(!IS_FLAG(session, WEBRTC_RTCPMUX))  {
-            /* section-5.1.3 in rfc5761 */
-            ice_setup_remote_candidates(session, session->audio_stream->id, 2);
-         }
-      }
-      if (session->video_stream->id > 0) {
-         ice_setup_remote_candidates(session, session->video_stream->id, 1);
-         if(!IS_FLAG(session, WEBRTC_RTCPMUX))
-            /* section-5.1.3 in rfc5761 */
-            ice_setup_remote_candidates(session, session->video_stream->id, 2);
-      }
-   }
-
-   return 0;
-}
-
 
 void
 snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
@@ -1836,16 +1636,15 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
             CLEAR_FLAG(session, WEBRTC_RTCPMUX);
          }
 
-         if (sdp_attr.trickle) {
+         //FIXME: handle trickle anywhere?
+         /*if (sdp_attr.trickle) {
             SET_FLAG(session, WEBRTC_TRICKLE);
          } else {
             CLEAR_FLAG(session, WEBRTC_TRICKLE);
-         }
+         }*/
 
          //FIXME: rewrite it, move to sdp_attr_parsing
          verify_disabled_streams(session,sdp_attr.audio,sdp_attr.video,jsep_sdp);
-
-         try_ice_start(session);
 
       } else {
          ERROR(log, "state error, flags=%u",session->flags);
@@ -1854,14 +1653,11 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
 
       root["rc"] = 0;
       output = writer.write(root);
-      DEBUG(log, "Sending result to client, result=%s",output.c_str());
-      //enqueue_msg_to_mcd(output.c_str(),output.size(),flowid);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    } catch (...) {
       root["rc"] = -1;
       output = writer.write(root);
       DEBUG(log, "json format error, root=%s",output.c_str());
-      //enqueue_msg_to_mcd(output.c_str(),output.size(),flowid);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    }
 
@@ -1897,7 +1693,7 @@ int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
                            foundation, &component_id, transport, &priority,
                            ip, &port, type, relip, &relport);
 
-   DEBUG(log, "parsing result, ret=%u, cid:%d sid:%d, type:%s, transport=%s, refaddr=%s:%d, addr=%s:%d",
+   DEBUG(log, "candidate info, ret=%u, cid=%d, sid=%d, type=%s, transport=%s, refaddr=%s:%d, addr=%s:%d",
          ret, component_id, stream->id, type, transport, relip, relport, ip, port);
 
    if (ret >= 7) {
@@ -1906,7 +1702,6 @@ int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
          ERROR(log, "component not found, cid=%u, sid=%u", component_id, stream->id);
          return -3; 
       }   
-         DEBUG(log, "component found, cid=%u, sid=%u", component_id, stream->id);
       c = snw_ice_remote_candidate_new(type,transport);
       if (c != 0) {
          DEBUG(log, "new candidate, cid=%u, sid=%u", component_id, stream->id);
@@ -1952,7 +1747,7 @@ snw_ice_process_new_candidate(snw_ice_session_t *session, Json::Value &candidate
 
    done = candidate["done"];
    if (!done.isNull()) {
-      DEBUG(log, "No more remote candidates");
+      DEBUG(log, "gathering remote candidates is done");
       SET_FLAG(session, WEBRTC_GATHER_DONE);
       return 0;
    }
@@ -1984,13 +1779,12 @@ snw_ice_process_new_candidate(snw_ice_session_t *session, Json::Value &candidate
 
    ret = ice_sdp_handle_candidate(stream, rc.asString().c_str());
    if(ret != 0) {
-      ERROR(log, "failed to handle candidate, ret=%d)", ret);
+      ERROR(log, "failed to handle candidate, ret=%d", ret);
       return -6;
    }
 
    return 0;
 }
-
 
 void
 snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
@@ -2003,7 +1797,7 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
 
    session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
    if (!session) {
-      DEBUG(log, "ice session is 0");
+      DEBUG(log, "session not found, flowid=%u", flowid);
       return;
    }
 
@@ -2012,14 +1806,9 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
 
       output = writer.write(candidate);
       DEBUG(log, "receive candidate, s=%s",output.c_str());
-
-      if (!IS_FLAG(session, WEBRTC_TRICKLE)) {
-         DEBUG(log, "supports trickle even if it didn't negotiate it");
-         SET_FLAG(session, WEBRTC_TRICKLE);
-      }    
      
       if (!session->audio_stream && !session->video_stream) {
-         /* FIXME: save trickle candidate. */
+         ERROR(log, "no stream available");
          return;
       }    
  
@@ -2030,6 +1819,7 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
             return;
          }    
       } else {
+         //discard request
          ERROR(log, "candidate is null");
       }    
 
@@ -2045,8 +1835,6 @@ snw_ice_candidate_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t fl
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),flowid);
    }
 
-
-
    return;
 }
 
@@ -2058,17 +1846,15 @@ snw_ice_publish_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
-   // get session
    session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
    if (!session) return;
    
-   // update session
-   DEBUG(log, "channel is published, flowid=%u, channelid=%u", 
+   DEBUG(log, "channel is publishing, flowid=%u, channelid=%u", 
          flowid, session->channelid);
    SET_FLAG(session,ICE_PUBLISHER);
 
    // start broadcasting session
-   snw_print_channel_info(ice_ctx,session->channel); 
+   //snw_print_channel_info(ice_ctx,session->channel); 
    
    return;
 }
@@ -2100,9 +1886,9 @@ snw_ice_play_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid)
 
 void
 snw_ice_fir_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
-   snw_log_t *log = 0;
-   log = ice_ctx->log;
-   DEBUG(log, "FIXME fir msg");
+   //snw_log_t *log = 0;
+   //log = ice_ctx->log;
+   //FIXME fir msg
    return;
 }
 

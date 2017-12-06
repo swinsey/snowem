@@ -66,7 +66,7 @@ snw_ice_session_get(snw_ice_context_t *ctx, uint32_t flowid, int *is_new) {
       return 0;
 
    if (!(*is_new)) {
-      DEBUG(log,"get old session, flowid=%u, ice_ctx=%p", 
+      WARN(log,"get old session, flowid=%u, ice_ctx=%p", 
             flowid, so->ice_ctx);
       return so;
    }
