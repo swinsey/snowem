@@ -22,63 +22,55 @@ snw_config_init(snw_context_t *ctx, const char *file) {
    }
 
    if (config_lookup_string(&cfg, "ice_cert_file", &str)) {
-      printf("ice_cert_file: %s\n", str);
       ctx->ice_cert_file = strdup(str);
    } else {
-      printf("ice_cert_file not found\n");
+      fprintf(stderr,"ice_cert_file %s not found\n", str);
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "ice_key_file", &str)) {
-      printf("ice_key_file: %s\n", str);
       ctx->ice_key_file = strdup(str);
    } else {
-      printf("ice_cert_file not found\n");
+      fprintf(stderr,"ice_key_file %s not found\n", str);
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_cert_file", &str)) {
-      printf("wss_cert_file: %s\n", str);
       ctx->wss_cert_file = strdup(str);
    } else {
-      printf("wss_cert_file not found\n");
+      fprintf(stderr,"wss_cert_file %s not found\n", str);
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_key_file", &str)) {
-      printf("wss_key_file: %s\n", str);
       ctx->wss_key_file = strdup(str);
    } else {
-      printf("wss_key_file not found\n");
+      fprintf(stderr,"wss_key_file %s not found\n", str);
       exit(0);
    }
 
    if (config_lookup_int(&cfg, "wss_bind_port", &number)) {
-      printf("wss_bind_port: %u\n", number);
       ctx->wss_port = (uint16_t)number;
    } else {
-      printf("wss_bind_port not found\n");
+      fprintf(stderr,"wss_bind_port not found\n");
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_bind_ip", &str)) {
-      printf("wss_bind_ip: %s\n", str);
       ctx->wss_ip = strdup(str);
    } else {
-      printf("wss_bind_ip not found\n");
+      fprintf(stderr,"wss_bind_ip not found\n");
       exit(0);
    }
 
    if (config_lookup_int(&cfg, "log_level", &number)) {
-      printf("log_level: %u\n", number);
       ctx->log_level = number;
    } else {
-      printf("log_level not found\n");
+      fprintf(stderr,"log_level not found\n");
       exit(0);
    }
 
    if (config_lookup_int(&cfg, "ice_log_enabled", &number)) {
-      printf("log_level: %u\n", number);
       ctx->ice_log_enabled = number;
    } else {
       ctx->ice_log_enabled = 0;
@@ -99,8 +91,6 @@ snw_config_init(snw_context_t *ctx, const char *file) {
                && config_setting_lookup_string(elem,"sofile",&sofile)
                && config_setting_lookup_int(elem,"type",&type)))
             continue;
-
-         printf("module info, name=%s, type=%u, sofile=%s\n", name, type, sofile);
 
          module = (snw_module_t*)malloc(sizeof(snw_module_t));
          if (!module) return;

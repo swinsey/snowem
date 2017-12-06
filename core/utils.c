@@ -59,32 +59,6 @@ trimwhitespace(char *str)
   return str;
 }
 
-void 
-hexdump(char* p,int len, const char* type)
-{  
-   char buf[256];
-   int i, j, i0;  
-      
-   //DEBUG("---- dump buffer (%s) ---- len=%d",type,len);
-   
-   for (i = 0; i < len; ) {
-      memset(buf, sizeof(buf), ' ');
-      sprintf(buf, "%5d: ", i);
-
-      i0 = i;
-      for (j=0; j < 16 && i < len; i++, j++)
-         sprintf(buf+7+j*3, "%02x ", (uint8_t)(p[i]));
-   
-      i = i0;   
-      for (j=0; j < 16 && i < len; i++, j++)
-         sprintf(buf+7+j + 48, "%c",
-            isprint(p[i]) ? p[i] : '.'); 
-
-      //DEBUG("%s: %s", type, buf);
-   }
-   return;
-}
-
 char* 
 ip_to_str(unsigned int ip)
 {       
