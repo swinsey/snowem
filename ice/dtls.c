@@ -67,11 +67,11 @@ dtls_send_data(dtls_ctx_t *dtls, int len) {
    //FIXME: a loop is needed to read and send all data?
    sent = BIO_read(dtls->out_bio, data, DTLS_MTU_SIZE);
    if (sent <= 0) {
-      DEBUG(log, "failed to read dtls data, sent=%d", sent);
+      ERROR(log, "failed to read dtls data, sent=%d", sent);
       return -1;
    }
 
-   DEBUG(log, "sending dtls msg, p=%p, len=%u, sent=%u", dtls->out_bio, len, sent);
+   DEBUG(log, "sending dtls msg, len=%u, sent=%u", len, sent);
    bytes = ice_agent_send(session->agent, component->stream->id, 
                           component->id, data, sent);
 
@@ -315,7 +315,6 @@ ice_dtls_handshake_done(snw_ice_session_t *session, snw_ice_component_t *compone
          continue;
       list_for_each(p,&s->components.list) {
          snw_ice_component_t *c = list_entry(p,snw_ice_component_t,list);
-         DEBUG(log, "checking component, sid=%u, cid=%u",s->id, c->id);
          if (!c->dtls || c->dtls->state != DTLS_STATE_CONNECTED) {
             DEBUG(log, "component not ready, sid=%u, cid=%u",s->id, c->id);
             return;
@@ -395,7 +394,8 @@ dtls_srtp_setup(dtls_ctx_t *dtls, snw_ice_session_t *session, snw_ice_component_
       return -4;
    }
 
-   DEBUG(log,"dtls connected");
+   DEBUG(log,"dtls connected, cid=%u, sid=%u", 
+         component->id, component->stream->id);
    dtls->state = DTLS_STATE_CONNECTED;
    ice_dtls_handshake_done(session, component);
      
@@ -431,7 +431,8 @@ dtls_established(dtls_ctx_t *dtls) {
 
    rcert = SSL_get_peer_certificate(dtls->ssl);
    if (!rcert) {
-      ERROR(log,"no remote certificate, s=%s", ERR_reason_error_string(ERR_get_error()));
+      ERROR(log,"no remote certificate, s=%s", 
+            ERR_reason_error_string(ERR_get_error()));
       return -3;
    } 
 
@@ -468,13 +469,12 @@ dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    component = (snw_ice_component_t*)dtls->component;
    log = component->stream->session->ice_ctx->log;
    
-   DEBUG(log, "dtls message, len=%u",len);
 
    written = BIO_write(dtls->in_bio, buf, len);
    if (written != len) {
       ERROR(log, "failed to write, written=%u, len=%u", written, len);
    } else {
-      DEBUG(log, "bio write, written=%u", written);
+      DEBUG(log, "dtls message, len=%u, written-%u",len, written);
    }
 
    // http://net-snmp.sourceforge.net/wiki/index.php/DTLS_Implementation_Notes
@@ -484,7 +484,7 @@ dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
       if (err == SSL_ERROR_SSL) {
          char error[256];
          ERR_error_string_n(ERR_get_error(), error, 256);
-         ERROR(log,"ssl read error: ret=%d, err=%s", read, error);
+         ERROR(log,"ssl read error, ret=%d, err=%s", read, error);
          return -2;
       }
    }
@@ -494,7 +494,7 @@ dtls_process_incoming_msg(dtls_ctx_t *dtls, char *buf, uint16_t len) {
    }
 
    if (dtls->state == DTLS_STATE_CONNECTED) {
-      WARN(log,"dtls data not supported, ret=%u",ret);
+      ERROR(log,"dtls data not supported, ret=%u",ret);
    } else {
       dtls_established(dtls);
    }

@@ -49,7 +49,7 @@ struct snw_ice_session {
    char              *remote_sdp;
 
    int64_t            curtime;
-   int64_t            lasttime; 
+   int64_t            lasttime;  //FIXME: remove it
 
    char remote_hashing[16];
    char remote_fingerprint[256];
