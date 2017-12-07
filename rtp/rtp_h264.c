@@ -27,13 +27,11 @@ snw_rtp_h264_init(void *c) {
       return -1;
    }
 
-   DEBUG(log,"init rtp h264");
-    
    for (i=0; ; i++) {
       snw_rtp_module_t *m = g_rtp_h264_modules[i];
       if (!m) break;
 
-      DEBUG(log,"init module, name=%s",m->name);
+      //DEBUG(log,"init module, name=%s",m->name);
       m->init(ctx);
    }
 
@@ -95,10 +93,10 @@ ice_h264_process_stapa_unit(snw_rtp_ctx_t *ctx, int is_end_frame,
       //nal_size = p[0] << 8 | p[1];
       
       //HEXDUMP(log,(char*)p,2,"stata");
-      nal_size = ntohs(*((short*)p));
-      DEBUG(log, "stapa unit info, nal_size=%u, len=%d, p0=%u, p1=%u", 
-                 nal_size, len, *p, *(((char*)p)+1)); 
+      //DEBUG(log, "stapa unit info, nal_size=%u, len=%d, p0=%u, p1=%u", 
+      //           nal_size, len, *p, *(((char*)p)+1)); 
       //TODO: set stricter condition on nal_size
+      nal_size = ntohs(*((short*)p));
       if (nal_size == 0) {
          ERROR(log,"wrong nal_size, nal_size=%u", nal_size);
          return -1;
@@ -127,14 +125,11 @@ ice_h264_process_fua_unit(snw_rtp_ctx_t *ctx, int is_end_frame,
    log = ctx->log;
 
 
-   //HEXDUMP(log,buf,2,"fua");
    indicator = (fua_indicator_t*)buf;
    hdr = (fua_hdr_t*)(buf+1);
   
    DEBUG(log, "fua indicator info, buflen=%u, f=%u, nir=%u, type=%u, size=%u", 
          buflen, indicator->f, indicator->nir, indicator->type, sizeof(fua_indicator_t));
-   DEBUG(log, "fua hdr info, buflen=%u, s=%u, e=%u, r=%u, type=%u, size=%u", 
-         buflen, hdr->s, hdr->e, hdr->r, hdr->type, sizeof(fua_hdr_t));
    
    if (hdr->s) {
       fua_indicator_t ind;
@@ -143,14 +138,12 @@ ice_h264_process_fua_unit(snw_rtp_ctx_t *ctx, int is_end_frame,
       ind.type = hdr->type;
       memcpy(data,&ind,sizeof(ind));
       len = sizeof(ind);
-      //HEXDUMP(log,(char*)&ind,sizeof(ind),"fua");
    }
 
    memcpy(data+len, buf+2, buflen-2);
    len += buflen-2;
   
    if (hdr->e) {
-      DEBUG(log, "complete fua unit, len=%u",len);
       ice_h264_process_nal_unit(ctx,is_end_frame,data,len);
    }
 
@@ -175,7 +168,6 @@ snw_rtp_h264_handle_pkg_in(void *data, char *buf, int buflen) {
    if (ctx->pkt_type != RTP_VIDEO)
       return 0;   
 
-   //parsing rtp header
    hdr = (rtp_hdr_t*)buf;
    hdrlen = MIN_RTP_HEADER_SIZE + 4*hdr->cc;
    if (hdr->x) {

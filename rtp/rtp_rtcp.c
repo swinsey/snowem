@@ -38,6 +38,69 @@ snw_rtp_rtcp_init(void *c) {
 }
 
 int
+snw_rtcp_resend_pkt(snw_rtp_ctx_t *ctx, int video, int seqno) {
+   /*snw_log_t *log = ctx->log;
+   snw_ice_session_t *session;
+   int64_t now = 0;
+
+   if (!ctx) return -1;
+   log = ctx->log;
+   session = (snw_ice_session_t*)ctx->session;
+
+   //FIXME: impl
+   //DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",
+   //      session->flowid, seqno, now);
+   */
+    
+   return 0;
+}
+
+int
+snw_rtcp_nack_handle_pkg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
+   snw_log_t *log;
+   snw_rtcp_nack_t *nack;
+   char *end;
+   uint16_t pid = 0;
+   uint16_t blp = 0;
+   int i, cnt = 0;
+   int video = 0;
+   
+   if (!ctx || !rtcp) return -1;
+   log = ctx->log;
+
+   if (rtcp->hdr.pt != RTCP_RTPFB || 
+       rtcp->hdr.rc != RTCP_RTPFB_GENERIC_FMT) {
+      ERROR(log,"wrong fb msg, pt=%u, rc=%u", rtcp->hdr.pt, rtcp->hdr.rc);
+      return -1;
+   }
+
+   nack = rtcp->pkt.fb.fci.nack;
+   end = (char*)rtcp + 4*(ntohs(rtcp->hdr.len) + 1);
+
+   cnt = 0;
+   video = ctx->pkt_type && RTP_VIDEO;
+   do {
+      pid = ntohs(nack->pid);
+      blp = ntohs(nack->blp);
+      snw_rtcp_resend_pkt(ctx,video,pid);
+      for (i=0; i<16; i++) {
+         if ((blp & (1 << i)) >> i) {
+            snw_rtcp_resend_pkt(ctx,video,pid+i+1);
+         }
+      }
+      cnt++;
+      nack++;
+      // make sure no loop
+      if (cnt > RTCP_PKT_NUM_MAX) break;
+
+   } while ((char*)nack < end);
+
+   //DEBUG(log, "total lost packets, flowid=%u, num=%d", s->flowid, cnt);
+
+   return 0;
+}
+
+int
 snw_rtp_rtcp_fb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    snw_log_t *log;
   
@@ -69,8 +132,7 @@ snw_rtp_rtcp_psfb_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    switch (rtcp->hdr.rc) {
       case RTCP_PSFB_PLI_FMT:
          // rfc 4585 6.3.1
-         //store the last key frame, and send it
-         DEBUG(log,"rtcp pli");
+         //FIXME: store the last key frame, and send it
          break;
       case RTCP_PSFB_SLI_FMT:
          // rfc 4585 6.3.2
@@ -125,8 +187,6 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    log = ctx->log;
 
    sr = &rtcp->pkt.sr;
-   //HEXDUMP(log,(char*)sr,sizeof(*sr),"sr");
-   //HEXDUMP(log,(char*)&sr->ntp_ts,sizeof(sr->ntp_ts),"ntp");
    DEBUG(log,"rtcp sr, ssrc=%u , ntp_ts=%llu, rtp_ts=%u, "
          "packet_cnt=%u, octet_cnt=%u", ntohl(sr->ssrc), be64toh(sr->ntp_ts), 
          ntohl(sr->rtp_ts), ntohl(sr->pkt_cnt), ntohl(sr->byte_cnt));
@@ -142,9 +202,6 @@ snw_rtp_rtcp_sr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    stats->last_sr_rtp_ts = ntohl(rtcp->pkt.sr.rtp_ts);
    stats->last_sr_recv_ts = ctx->epoch_curtime;
 
-   DEBUG(log,"rtcp sr stats lsr, ssrc=%u, pkt_cnt=%u, byte_cnt=%u, last_sr_ntp=%u", 
-          stats->ssrc, stats->recv_pkt_cnt, stats->recv_byte_cnt, stats->last_sr_ntp);
-   
    //.2 sender bandwidth estimation, SenderBandwidthEstimationHandler
    
    return 0;
@@ -180,8 +237,7 @@ snw_rtp_rtcp_rr_msg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
    
    for (i=0; i<rtcp->hdr.rc; i++) {
       snw_report_block_t *rb = &rr->rb[i];
-      DEBUG(log, "rtcp rr rb, ssrc=%u", ntohl(rb->ssrc));
-      snw_rtp_rtcp_print_rb(log,rb);
+
       stats = snw_rtcp_stats_find(ctx,&ctx->sender_stats,ntohl(rb->ssrc));
       if (!stats) {
          stats = snw_rtcp_stats_new(ctx,&ctx->sender_stats,ntohl(rb->ssrc));

@@ -15,8 +15,6 @@ int snw_rtp_nack_fini();
 
 extern snw_rtp_module_t g_rtp_nack_module;
 
-int snw_rtcp_nack_handle_pkg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp);
-
 #ifdef __cplusplus
 }
 #endif

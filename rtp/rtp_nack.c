@@ -10,72 +10,6 @@
 #include "rtp/rtp_nack.h"
 #include "rtp/rtp_utils.h"
 
-int
-snw_rtcp_resend_pkt(snw_rtp_ctx_t *ctx, int video, int seqno) {
-   snw_log_t *log = ctx->log;
-   snw_ice_session_t *session;
-   int64_t now = 0;
-
-   if (!ctx) return -1;
-   log = ctx->log;
-   session = (snw_ice_session_t*)ctx->session;
-
-   DEBUG(log, "resend seq, flowid=%u, seqno=%u, ts=%llu",
-         session->flowid, seqno, now);
-   //FIXME: impl
-   
-   return 0;
-}
-
-//FIXME: move to rtp_rtcp.c
-int
-snw_rtcp_nack_handle_pkg(snw_rtp_ctx_t* ctx, rtcp_pkt_t *rtcp) {
-   snw_log_t *log;
-   snw_rtcp_nack_t *nack;
-   char *end;
-   uint16_t pid = 0;
-   uint16_t blp = 0;
-   int i, cnt = 0;
-   int video = 0;
-   
-   if (!ctx || !rtcp) return -1;
-   log = ctx->log;
-
-   if (rtcp->hdr.pt != RTCP_RTPFB || 
-       rtcp->hdr.rc != RTCP_RTPFB_GENERIC_FMT) {
-      ERROR(log,"wrong fb msg, pt=%u, rc=%u", rtcp->hdr.pt, rtcp->hdr.rc);
-      return -1;
-   }
-
-   nack = rtcp->pkt.fb.fci.nack;
-   end = (char*)rtcp + 4*(ntohs(rtcp->hdr.len) + 1);
-
-   DEBUG(log,"nacks info, buf=%p, end=%p,nack=%p(%p)", 
-         rtcp,end,nack,rtcp->pkt.fb.fci.nack);
-
-   cnt = 0;
-   video = ctx->pkt_type && RTP_VIDEO;
-   do {
-      pid = ntohs(nack->pid);
-      blp = ntohs(nack->blp);
-      snw_rtcp_resend_pkt(ctx,video,pid);
-      for (i=0; i<16; i++) {
-         if ((blp & (1 << i)) >> i) {
-            snw_rtcp_resend_pkt(ctx,video,pid+i+1);
-         }
-      }
-      cnt++;
-      nack++;
-      // make sure no loop
-      if (cnt > RTCP_PKT_NUM_MAX) break;
-
-   } while ((char*)nack < end);
-
-   //DEBUG(log, "total lost packets, flowid=%u, num=%d", s->flowid, cnt);
-
-   return 0;
-}
-
 
 int
 snw_rtp_nack_init(void *c) {
@@ -89,8 +23,6 @@ snw_rtp_nack_init(void *c) {
       WARN(log,"rtp nack aready init");
       return -1;
    }
-
-   DEBUG(log,"init rtp nack");
 
    //FIXME init nack module
 
@@ -182,8 +114,6 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
          delta = abs(stats->transit - transit);
          stats->jitter += (1.0/16.0)*(delta - stats->jitter);
       }
-      ERROR(log,"jitter info, ssrc=%u, seq=%u, ts=%u, epoch_ts=%llu, delta=%u, jitter=%f, clock=%u", 
-             stats->ssrc, ntohs(hdr->seq), ntohl(hdr->ts), ctx->epoch_curtime, delta, stats->jitter, clockrate);
       stats->transit = transit;
    }
 
@@ -267,7 +197,7 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
             ntohl(rb.hi_seqno), ntohl(rb.jitter), ntohl(rb.lsr), ntohl(rb.dlsr));
       //HEXDUMP(log,(char*)&rb,sizeof(rb),"rb");
 
-      //FIXME: move this code to a function.
+      //FIXME: move this code block to a function.
       // generate rtcp pkt
       {
          char data[RTCP_RR_MSG_LEN] = {0};
@@ -298,6 +228,51 @@ snw_rtp_nack_handle_pkg_in(void *data, char *buf, int buflen) {
       //snw_rtp_send_fir_req(ctx, stream->local_video_ssrc, stream->remote_video_ssrc);
       snw_rtp_send_pli_req(ctx, stream->local_video_ssrc, stream->remote_video_ssrc);
       stats->last_sent_fir_ts = ctx->epoch_curtime;
+   }
+
+   return 0;
+}
+
+int
+snw_rtp_send_empty_rr_rtcp(snw_rtp_ctx_t *ctx) {
+   char data[RTCP_EMPTY_RR_MSG_LEN] = {0};
+   snw_log_t *log = ctx->log;
+   snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
+   snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
+   int ret = 0;
+
+   ret = snw_rtcp_gen_rr(data, RTCP_EMPTY_RR_MSG_LEN, 0, NULL);
+   if (ret == RTCP_EMPTY_RR_MSG_LEN) {
+      ctx->send_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
+           RTCP_RR_MSG_LEN);
+   }
+
+   return 0;
+}
+
+int
+snw_rtp_send_sr_rtcp(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *stats, 
+      uint32_t ssrc, uint32_t ts) {
+   static char data[RTCP_SR_MSG_LEN] = {0};
+   snw_log_t *log = ctx->log;
+   snw_rtcp_sr_t sr;
+   rtcp_hdr_t *rtcp = 0;
+   snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
+   snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
+   int ret = 0;
+
+   memset(&sr,0,sizeof(sr));
+   sr.ssrc = htonl(ssrc);
+	sr.ntp_ts = htobe64(ctx->epoch_curtime);
+	sr.rtp_ts = htonl(ts);
+	sr.pkt_cnt = htonl(stats->sent_pkt_cnt);
+	sr.byte_cnt = htonl(stats->sent_byte_cnt);
+
+   ret = snw_rtcp_gen_sr(data, RTCP_EMPTY_SR_MSG_LEN, &sr);
+
+   if (ret == RTCP_EMPTY_SR_MSG_LEN) {
+      ctx->send_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
+           RTCP_EMPTY_SR_MSG_LEN);
    }
 
    return 0;
@@ -345,54 +320,9 @@ snw_rtp_nack_handle_pkg_out(void *data, char *buf, int buflen) {
    }
    stats->last_send_sr_ts = ctx->epoch_curtime;
 
-   { //send empty rr report
-      char data[RTCP_EMPTY_RR_MSG_LEN] = {0};
-      snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
-      snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
-      int ret = 0;
-
-      ret = snw_rtcp_gen_rr(data, RTCP_EMPTY_RR_MSG_LEN, 0, NULL);
-      if (ret == RTCP_EMPTY_RR_MSG_LEN) {
-         HEXDUMP(log,data,ret,"rr");
-         DEBUG(log,"send rr empty rb, ret=%u, ssrc=%u, len=%u",
-               ret, ssrc, RTCP_EMPTY_RR_MSG_LEN);
-         //send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-         //     RTCP_RR_MSG_LEN);
-         ctx->send_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-              RTCP_RR_MSG_LEN);
-      }
-   }
-
-   DEBUG(log,"send sr, ssrc=%u, ts=%llu, last=%llu", 
-         ssrc, ctx->epoch_curtime, stats->last_send_sr_ts);
-
-   { //send sr rtcp
-      char data[RTCP_SR_MSG_LEN] = {0};
-      snw_rtcp_sr_t sr;
-      rtcp_hdr_t *rtcp = 0;
-      snw_ice_stream_t *stream = (snw_ice_stream_t*)ctx->stream;
-      snw_ice_session_t *session = (snw_ice_session_t*)ctx->session;
-      int ret = 0;
-
-      memset(&sr,0,sizeof(sr));
-      sr.ssrc = htonl(ssrc);
-	   sr.ntp_ts = htobe64(ctx->epoch_curtime);
-	   sr.rtp_ts = hdr->ts;
-	   sr.pkt_cnt = htonl(stats->sent_pkt_cnt);
-	   sr.byte_cnt = htonl(stats->sent_byte_cnt);
-
-      ret = snw_rtcp_gen_sr(data, RTCP_EMPTY_SR_MSG_LEN, &sr);
-
-      if (ret == RTCP_EMPTY_SR_MSG_LEN) {
-         HEXDUMP(log,data,ret,"sr");
-         DEBUG(log,"send sr empty rb, ret=%u, ssrc=%u, len=%u",
-               ret, ntohl(sr.ssrc), RTCP_EMPTY_SR_MSG_LEN);
-         //send_rtp_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-         //     RTCP_EMPTY_SR_MSG_LEN);
-         ctx->send_pkt(session,1, ctx->pkt_type & RTP_VIDEO,data,
-              RTCP_EMPTY_SR_MSG_LEN);
-      }
-   }
+   DEBUG(log,"send empty rr and sr, ssrc=%u", ssrc);
+   snw_rtp_send_empty_rr_rtcp(ctx);
+   snw_rtp_send_sr_rtcp(ctx,stats,ssrc,ntohl(hdr->ts));
 
    return 0;
 }

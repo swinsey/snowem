@@ -38,6 +38,7 @@ snw_rtcp_stats_new(snw_rtp_ctx_t *ctx, snw_rtcp_stats_t *s, uint32_t ssrc) {
       ERROR(log,"not enough memory");
       return 0;
    }
+
    DEBUG(log,"new source stats, ssrc=%u", ssrc);
    SNW_MEMZERO(stats,snw_rtcp_stats_t);
    stats->ssrc = ssrc;
@@ -124,8 +125,8 @@ snw_rtp_slidewin_update(snw_rtp_ctx_t *ctx, rtp_slidewin_t *win, uint16_t seq, u
       i = seq % RTP_SLIDEWIN_SIZE;
    }
 
-   HEXDUMP(log,(char*)&ret, 4, "nack");
-   DEBUG(log,"generated nack, nack=%u", ret);
+   //HEXDUMP(log,(char*)&ret, 4, "nack");
+   //DEBUG(log,"generated nack, nack=%u", ret);
 
    return ret;
 }
@@ -164,7 +165,7 @@ snw_rtp_slidewin_put(snw_rtp_ctx_t *ctx, rtp_slidewin_t *win, uint16_t seq) {
          udelta, seq, win->last_seq, win->head);
 
    if (ctx->epoch_curtime - win->last_ts > RTP_SYNC_TIME_MAX) {
-      WARN(log, "slidewin stream out of sync, seq=%u", seq);
+      WARN(log, "stream out of sync, seq=%u", seq);
       snw_rtp_slidewin_reset(ctx, win, seq);
       win->last_ts = ctx->epoch_curtime;
       return 0;
@@ -183,7 +184,7 @@ snw_rtp_slidewin_put(snw_rtp_ctx_t *ctx, rtp_slidewin_t *win, uint16_t seq) {
    } else if (udelta < RTP_SEQ_NUM_MAX - RTP_SLIDEWIN_SIZE) {
       //make a large jump
       //TODO: generate nack before reset 
-      DEBUG(log, "stream disrupted", udelta); 
+      WARN(log, "stream out of sync, udelta=%u, seq=%u", udelta, seq);
       snw_rtp_slidewin_reset(ctx, win, seq);
       return 0;
    } else {
