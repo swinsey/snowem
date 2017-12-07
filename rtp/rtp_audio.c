@@ -22,8 +22,6 @@ snw_rtp_audio_init(void *c) {
    if (!ctx) return -1;
    log = ctx->log;
    
-   DEBUG(log,"init rtp audio");
-    
    if (MODULE_IS_FLAG(g_rtp_audio_module,M_FLAGS_INIT)) {
       WARN(log,"rtp audio aready init");
       return -1;
@@ -33,7 +31,7 @@ snw_rtp_audio_init(void *c) {
       snw_rtp_module_t *m = g_rtp_audio_modules[i];
       if (!m) break;
 
-      DEBUG(log,"init module, name=%s",m->name);
+      //DEBUG(log,"init module, name=%s",m->name);
       m->init(ctx);
    }
 
@@ -59,7 +57,7 @@ snw_rtp_audio_handle_pkg_in(void *data, char *buf, int buflen) {
       snw_rtp_module_t *m = g_rtp_audio_modules[i];
       if (!m) break;
 
-      DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
+      DEBUG(log,"audio-in handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
                m->name, m->pkt_type, ctx->pkt_type);
       if (ctx->pkt_type & m->pkt_type)
          m->handle_pkg_in(ctx,buf,buflen);
@@ -86,7 +84,7 @@ snw_rtp_audio_handle_pkg_out(void *data, char *buf, int buflen) {
       snw_rtp_module_t *m = g_rtp_audio_modules[i];
       if (!m) break;
 
-      DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
+      DEBUG(log,"audio-out handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
                m->name, m->pkt_type, ctx->pkt_type);
       if (ctx->pkt_type & m->pkt_type)
          m->handle_pkg_out(ctx,buf,buflen);

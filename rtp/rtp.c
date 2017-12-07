@@ -26,7 +26,6 @@ snw_rtp_init(snw_ice_context_t *ctx) {
       snw_rtp_module_t *m = g_rtp_modules[i];
       if (!m) break;
 
-      DEBUG(log,"init module, name=%s",m->name);
       m->init(ctx);
    }
    return 0;
@@ -95,8 +94,6 @@ snw_rtp_handle_pkg_in(snw_rtp_ctx_t *ctx, char *buffer, int len) {
       snw_rtp_module_t *m = g_rtp_modules[i];
       if (!m) break;
 
-      //DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
-      //         m->name, m->pkt_type, ctx->pkt_type);
       if (ctx->pkt_type & m->pkt_type)
          m->handle_pkg_in(ctx,buffer,len);
    }
@@ -116,8 +113,6 @@ snw_rtp_handle_pkg_out(snw_rtp_ctx_t *ctx, char *buffer, int len) {
       snw_rtp_module_t *m = g_rtp_modules[i];
       if (!m) break;
 
-      //DEBUG(log,"rtp handling, name=%s, m_pkt_type=%u, pkt_type=%u", 
-      //         m->name, m->pkt_type, ctx->pkt_type);
       if (ctx->pkt_type & m->pkt_type)
          m->handle_pkg_out(ctx,buffer,len);
    }

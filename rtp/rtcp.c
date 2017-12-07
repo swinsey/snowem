@@ -11,7 +11,6 @@ print_rtcp_header(snw_log_t *log, char *buf, int buflen, const char *msg) {
    int hdrlen = 0;
    int extlen = 0;
 
-   //parsing rtcp header
    hdr = (rtcp_hdr_t*)buf;
    DEBUG(log, "rctp %s info, v=%u, p=%u, rc=%u, pt=%u, len=%u", 
          msg, hdr->v, hdr->p, hdr->rc, hdr->pt, ntohs(hdr->len));
@@ -26,8 +25,7 @@ snw_rtcp_has_payload_type(char *buf, int len, int8_t type) {
 	int total, length;
 	rtcp_hdr_t *rtcp = (rtcp_hdr_t *)buf;
 
-	if (rtcp->v != 2)
-		return 0;
+	if (rtcp->v != 2) return 0;
 
    total = len;
 	while (rtcp) {
@@ -79,65 +77,6 @@ snw_rtcp_get_ssrc(snw_rtp_ctx_t *ctx, char *buf, int len) {
    }
    return 0;
 }
-
-/*
-void 
-snw_rtcp_handle_nacks(snw_ice_session_t *s, snw_ice_component_t *c, 
-       int video, char *buf, int len, resend_callback_fn cb) {
-   snw_log_t *log = 0;
-	rtcp_pkt_t *rtcp = 0;
-   char *end;
-	int total = len;
-   uint16_t pid = 0;
-   uint16_t blp = 0;
-   int i, cnt = 0;
-
-	if (!s || !c || !buf || len == 0) return;
-   log = s->ice_ctx->log;
-
-	rtcp = (rtcp_pkt_t *)buf;
-
-	if (rtcp->hdr.v != RTCP_VERSION) return;
-
-	while (rtcp) {
-		if (rtcp->hdr.pt == RTCP_RTPFB && 
-          rtcp->hdr.rc == RTCP_RTPFB_GENERIC_FMT) {
-         snw_rtcp_nack_t *nack = rtcp->pkt.fb.fci.nack;
-         end = (char*)rtcp + 4*(ntohs(rtcp->hdr.len) + 1);
-
-         DEBUG(log,"nacks info, buf=%p, end=%p,nack=%p(%p)", rtcp,end,nack,rtcp->pkt.fb.fci.nack);
-
-         cnt = 0;
-         do {
-            pid = ntohs(nack->pid);
-            blp = ntohs(nack->blp);
-            if (cb) cb(s,c,video,pid,s->curtime);
-            for (i=0; i<16; i++) {
-               if ((blp & (1 << i)) >> i) {
-                  if (cb) cb(s,c,video,pid+i+1,s->curtime);
-               }
-            }
-            cnt++;
-            nack++;
-            // make sure no loop
-            if (cnt > RTCP_PKT_NUM_MAX) break;
-
-         } while ((char*)nack < end);
-
-         DEBUG(log, "total lost packets, flowid=%u, num=%d", s->flowid, cnt);
-		}
-		int length = ntohs(rtcp->hdr.len);
-		if(length == 0)
-			break;
-		total -= length*4+4;
-		if(total <= 0)
-			break;
-		rtcp = (rtcp_pkt_t *)((uint32_t*)rtcp + length + 1);
-	}
-	return;
-
-}
-*/
 
 int
 snw_rtcp_gen_fir(char *buf, int len, uint32_t local_ssrc, 
@@ -240,7 +179,7 @@ snw_rtcp_gen_rr(char *buf, int len,
 	return RTCP_EMPTY_RR_MSG_LEN;
 }
 
-//TODO: rewrite 
+//TODO: rewrite it with the following arguments
 //snw_rtcp_gen_sr(char *buf, int len, snw_rtcp_sr_t *sr, snw_report_block_t *rb, int rblen)
 
 uint32_t

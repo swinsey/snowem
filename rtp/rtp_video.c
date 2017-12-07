@@ -82,14 +82,11 @@ snw_rtp_video_handle_pkg_out(void *data, char *buf, int buflen) {
       return -1;
    }
    log = ctx->log;
-   
-   print_rtp_header(log,buf,buflen,"video");
 
    for (i=0; ; i++) {
       snw_rtp_module_t *m = g_rtp_video_modules[i];
       if (!m) break;
 
-      DEBUG(log,"handle pkg, module=%s",m->name);
       m->handle_pkg_in(ctx,buf,buflen);
    }
 
