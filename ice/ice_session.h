@@ -30,11 +30,11 @@ struct snw_ice_session {
    uint32_t flowid;
    uint32_t channelid;
    uint32_t live_channelid;
-   int      peer_type;
 
    snw_ice_context_t *ice_ctx;
    struct event_base *base;
    agent_t           *agent;
+   int                peer_type;
    uint32_t           flags;
 
    int                streams_gathering_done;

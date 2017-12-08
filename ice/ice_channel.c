@@ -91,21 +91,28 @@ snw_ice_channel_remove(snw_ice_context_t *ctx, snw_ice_channel_t *sitem) {
 }
 
 
+#ifdef SNW_ENABLE_DEBUG
 void
 snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
+   static char buffer[SNW_ICE_CHANNEL_USER_NUM_MAX * 11];
+   int i = 0;
 
    if (!ctx) return;
 
-   DEBUG(ctx->log, "channel info, id=%u, peerid=%u, players= %u %u %u %u %u", 
-         c->id, c->peerid, c->players[0], c->players[1], c->players[2],
-         c->players[3], c->players[4]);
-
+   memset(buffer,0, SNW_ICE_CHANNEL_USER_NUM_MAX * 11);
+   for(i=0; i< SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
+      sprintf(buffer + i*10, "%9u ", c->players[i]);
+   }
+   DEBUG(ctx->log, "channel info, id=%u, idx=%u, players= %s",
+         c->id, c->idx, buffer);
    return;
 
 }
+#endif
 
 void
-snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, uint32_t channelid, uint32_t flowid) {
+snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, 
+      uint32_t channelid, uint32_t flowid) {
    snw_log_t *log = 0;
    snw_ice_channel_t *channel = 0;
    int found = 0;
@@ -113,24 +120,56 @@ snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, uint32_t channelid, uint3
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
-
    DEBUG(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
    channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
    if (!channel) return;
-   snw_print_channel_info(ice_ctx,channel); 
 
-   for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
-      if (channel->players[i] == 0) {
+   if (channel->idx >= SNW_ICE_CHANNEL_USER_NUM_MAX) {
+      ERROR(log, "channel info full, flowid=%u, channelid=%u", flowid, channelid);
+      return;
+   }
+   channel->players[channel->idx] = flowid;
+   channel->idx++;
+
+#ifdef SNW_ENABLE_DEBUG
+   snw_print_channel_info(ice_ctx,channel); 
+#endif
+
+   return;
+}
+
+void
+snw_channel_remove_subscriber(snw_ice_context_t *ice_ctx, 
+      uint32_t channelid, uint32_t flowid) {
+   snw_log_t *log = 0;
+   snw_ice_channel_t *channel = 0;
+   int found = 0;
+
+   if (!ice_ctx) return;
+   log = ice_ctx->log;
+
+   DEBUG(log, "removing from channel, flowid=%u, channelid=%u", 
+        flowid, channelid);
+   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
+   if (!channel) return;
+
+   for (int i=0; i<channel->idx; i++) {
+      if (channel->players[i] == flowid) {
+         uint32_t tmp;
          found = 1;
-         channel->players[i] = flowid;
+         channel->idx--;
+         channel->players[i] = channel->players[channel->idx];
+         channel->players[channel->idx] = 0;
          break;
       }
    }
+
+#ifdef SNW_ENABLE_DEBUG
    snw_print_channel_info(ice_ctx,channel); 
+#endif
 
    if (!found) {
-      ERROR(log, "channel full, flowid=%u, channelid=%u", flowid, channelid);
-      snw_print_channel_info(ice_ctx,channel); 
+      WARN(log, "not found, flowid=%u, channelid=%u", flowid, channelid);
       return;
    }
 
