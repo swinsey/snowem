@@ -737,14 +737,6 @@ snw_ice_broadcast_rtp_pkg(snw_ice_session_t *session,
    ice_ctx = session->ice_ctx;
    log = ice_ctx->log;
 
-   DEBUG(log, "broadcast session, flowid=%u, players=%u %u %u %u %u", 
-         session->flowid,
-         session->channel->players[0],
-         session->channel->players[1],
-         session->channel->players[2],
-         session->channel->players[3],
-         session->channel->players[4]);
-
    for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
      
       if (session->channel->players[i] != 0) {
@@ -1370,6 +1362,10 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
       session->remote_sdp = 0;
    }
 
+   snw_channel_remove_subscriber(ice_ctx, session->live_channelid, 
+        session->flowid);
+   session->live_channelid = 0;
+
    //FIXME: free streams & components
    if (list_empty(&session->streams.list))
       return;
@@ -1377,26 +1373,9 @@ snw_ice_session_free(snw_ice_context_t *ice_ctx, snw_ice_session_t *session) {
    list_for_each_safe(n,p,&session->streams.list) {
       snw_ice_stream_t *s = list_entry(n,snw_ice_stream_t,list);
       list_del(&s->list);
-      //ice_stream_free(session->ice_ctx,&session->streams,s);
       ice_stream_cleanup(session->ice_ctx,s);
    }
 
-   if (session->live_channelid) {
-      snw_ice_channel_t *channel = 0;
-      DEBUG(log, "search channel, flowid=%u, channelid=%u", session->flowid, session->live_channelid);
-      channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,session->live_channelid);
-      if (!channel) return;
-      snw_print_channel_info(ice_ctx,channel); 
-      for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
-         if (channel->players[i] == session->flowid) {
-            channel->players[i] = 0;
-            DEBUG(log, "found subscriber, flowid=%u, channelid=%u", 
-                  session->flowid, session->live_channelid);
-            snw_print_channel_info(ice_ctx,channel); 
-            break;
-         }
-      }
-   }
 
    CLEAR_FLAG(session, WEBRTC_READY);
    return;

@@ -8,11 +8,19 @@
 extern "C" {
 #endif
 
-#define SNW_ICE_CHANNEL_USER_NUM_MAX 5
+#define SNW_ICE_CHANNEL_USER_NUM_MAX 500
+typedef struct snw_play_list snw_play_list_t;
+struct snw_play_list {
+   uint32_t idx;
+   uint32_t list[SNW_ICE_CHANNEL_USER_NUM_MAX];
+};
+
 typedef struct snw_ice_channel snw_ice_channel_t;
 struct snw_ice_channel {
    uint32_t id;     //channelid
    uint32_t peerid; //owner's peerid
+
+   uint32_t idx;
    uint32_t players[SNW_ICE_CHANNEL_USER_NUM_MAX];
 };
 
@@ -37,6 +45,8 @@ snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c);
 void
 snw_channel_add_subscriber(snw_ice_context_t *ctx, uint32_t channelid, uint32_t flowid);
 
+void
+snw_channel_remove_subscriber(snw_ice_context_t *ctx, uint32_t channelid, uint32_t flowid);
 
 #ifdef __cplusplus
 }
