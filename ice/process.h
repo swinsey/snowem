@@ -1,21 +1,13 @@
 #ifndef _SNOW_ICE_PROCESS_H_
 #define _SNOW_ICE_PROCESS_H_
 
-<<<<<<< HEAD
-#include "core.h"
-=======
 #include "core/core.h"
->>>>>>> dev
 #include "ice_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-<<<<<<< HEAD
-/* SDP offer/answer templates */
-=======
->>>>>>> dev
 #define OPUS_PT   111
 #define VP8_PT    100
 

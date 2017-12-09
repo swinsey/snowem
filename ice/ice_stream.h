@@ -3,19 +3,11 @@
 
 #include <inttypes.h>
 
-<<<<<<< HEAD
-#include "core.h"
-#include "dtls.h"
-#include "ice_component.h"
-#include "ice_types.h"
-#include "linux_list.h"
-=======
 #include "core/core.h"
 #include "core/linux_list.h"
 #include "ice/dtls.h"
 #include "ice/ice_component.h"
 #include "ice/ice_types.h"
->>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {

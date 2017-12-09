@@ -22,99 +22,48 @@ snw_config_init(snw_context_t *ctx, const char *file) {
    }
 
    if (config_lookup_string(&cfg, "ice_cert_file", &str)) {
-<<<<<<< HEAD
-      printf("ice_cert_file: %s\n", str);
-      ctx->ice_cert_file = strdup(str);
-   } else {
-      printf("ice_cert_file not found\n");
-=======
       ctx->ice_cert_file = strdup(str);
    } else {
       fprintf(stderr,"ice_cert_file %s not found\n", str);
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "ice_key_file", &str)) {
-<<<<<<< HEAD
-      printf("ice_key_file: %s\n", str);
-      ctx->ice_key_file = strdup(str);
-   } else {
-      printf("ice_cert_file not found\n");
-=======
       ctx->ice_key_file = strdup(str);
    } else {
       fprintf(stderr,"ice_key_file %s not found\n", str);
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_cert_file", &str)) {
-<<<<<<< HEAD
-      printf("wss_cert_file: %s\n", str);
-      ctx->wss_cert_file = strdup(str);
-   } else {
-      printf("wss_cert_file not found\n");
-=======
       ctx->wss_cert_file = strdup(str);
    } else {
       fprintf(stderr,"wss_cert_file %s not found\n", str);
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_key_file", &str)) {
-<<<<<<< HEAD
-      printf("wss_key_file: %s\n", str);
-      ctx->wss_key_file = strdup(str);
-   } else {
-      printf("wss_key_file not found\n");
-=======
       ctx->wss_key_file = strdup(str);
    } else {
       fprintf(stderr,"wss_key_file %s not found\n", str);
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_int(&cfg, "wss_bind_port", &number)) {
-<<<<<<< HEAD
-      printf("wss_bind_port: %u\n", number);
-      ctx->wss_port = (uint16_t)number;
-   } else {
-      printf("wss_bind_port not found\n");
-=======
       ctx->wss_port = (uint16_t)number;
    } else {
       fprintf(stderr,"wss_bind_port not found\n");
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_string(&cfg, "wss_bind_ip", &str)) {
-<<<<<<< HEAD
-      printf("wss_bind_ip: %s\n", str);
-      ctx->wss_ip = strdup(str);
-   } else {
-      printf("wss_bind_ip not found\n");
-=======
       ctx->wss_ip = strdup(str);
    } else {
       fprintf(stderr,"wss_bind_ip not found\n");
->>>>>>> dev
       exit(0);
    }
 
    if (config_lookup_int(&cfg, "log_level", &number)) {
-<<<<<<< HEAD
-      printf("log_level: %u\n", number);
-      ctx->log_level = number;
-   } else {
-      printf("log_level not found\n");
-      exit(0);
-   }
-
-=======
       ctx->log_level = number;
    } else {
       fprintf(stderr,"log_level not found\n");
@@ -126,8 +75,6 @@ snw_config_init(snw_context_t *ctx, const char *file) {
    } else {
       ctx->ice_log_enabled = 0;
    }
-
->>>>>>> dev
 
    setting = config_lookup(&cfg, "modules");
    if (setting != NULL) {
@@ -144,11 +91,6 @@ snw_config_init(snw_context_t *ctx, const char *file) {
                && config_setting_lookup_int(elem,"type",&type)))
             continue;
 
-<<<<<<< HEAD
-         printf("module info, name=%s, type=%u, sofile=%s\n", name, type, sofile);
-
-=======
->>>>>>> dev
          module = (snw_module_t*)malloc(sizeof(snw_module_t));
          if (!module) return;
          INIT_LIST_HEAD(&module->list);

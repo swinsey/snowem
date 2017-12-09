@@ -43,15 +43,10 @@ void*
 snw_flowset_getobj(snw_flowset_t *s, uint32_t id);
 
 void
-<<<<<<< HEAD
-snw_flowset_free(snw_flowset_t *set);
-
-=======
 snw_flowset_free(snw_flowset_t *s);
 
 int
 snw_flowset_is_in_range(snw_flowset_t *s, uint32_t id);
->>>>>>> dev
 
 #ifdef __cplusplus
 }

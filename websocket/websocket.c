@@ -1,39 +1,15 @@
 #include <assert.h>
-<<<<<<< HEAD
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-#include "core.h"
-#include "evws.h"
-#include "log.h"
-#include "types.h"
-#include "snw_event.h"
-=======
 
 #include "core/core.h"
 #include "core/log.h"
 #include "core/types.h"
 #include "core/snw_event.h"
 #include "evws.h"
->>>>>>> dev
 #include "websocket.h"
 #include "wslistener.h"
 
 static const char* subprotocols[] = {"default"};
 
-<<<<<<< HEAD
-void
-close_handler(struct evwsconn* conn, void* user_data) {
-  snw_event_t event;
-  time_t cur_time;
-  snw_websocket_context_t *ctx = (snw_websocket_context_t *)user_data;
-  snw_context_t *g_ctx = (snw_context_t*)ctx->ctx;
-
-  DEBUG(ctx->log,"close connection, flowid=%u",conn->flowid);
-
-  cur_time = time(NULL);
-=======
 static void
 notify_event(struct evwsconn* conn, uint32_t type,
      snw_websocket_context_t *ctx) {
@@ -68,7 +44,6 @@ close_handler(struct evwsconn* conn, void* user_data) {
   DEBUG(ctx->log,"close connection, flowid=%u",conn->flowid);
 
   /*cur_time = time(NULL);
->>>>>>> dev
   memset(&event,0,sizeof(event));
   event.magic_num = SNW_EVENT_MAGIC_NUM;
   event.event_type = snw_ev_disconnect;
@@ -78,13 +53,8 @@ close_handler(struct evwsconn* conn, void* user_data) {
   event.other = bufferevent_getfd(conn->bev);
 
   snw_shmmq_enqueue(g_ctx->snw_net2core_mq,
-<<<<<<< HEAD
-      cur_time,&event,sizeof(event),conn->flowid);
-  //g_mq_ccd_2_mcd->enqueue(cur_time, &event_header, CCD_EVENT_HEADER_LEN, conn->flowid);
-=======
       cur_time,&event,sizeof(event),conn->flowid);*/
   notify_event(conn,snw_ev_disconnect,ctx);
->>>>>>> dev
 
   snw_flowset_freeid(ctx->flowset,conn->flowid);
   evwsconn_free(conn);
@@ -146,10 +116,6 @@ void message_handler(struct evwsconn* conn, enum evws_data_type data_type,
   return;
 }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> dev
 void 
 new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn, 
                  struct sockaddr *address, int socklen, void* user_data) {
@@ -163,22 +129,15 @@ new_wsconnection(struct evwsconnlistener *wslistener, struct evwsconn *conn,
      return;
   }
 
-<<<<<<< HEAD
-  DEBUG(ctx->log, "new connection, conn=%p, flowid=%u", conn, flowid);
-=======
   DEBUG(ctx->log, "new connection, conn=%p, flowid=%u, baseidx=%u", 
            conn, flowid,ctx->flowset->baseidx);
->>>>>>> dev
   conn->flowid = flowid;
   conn->ip = ((struct sockaddr_in*) address)->sin_addr.s_addr;
   conn->port = ((struct sockaddr_in*) address)->sin_port;
   snw_flowset_setobj(ctx->flowset,flowid,conn);
 
   evwsconn_set_cbs(conn, message_handler, close_handler, error_handler, ctx);
-<<<<<<< HEAD
-=======
   notify_event(conn,snw_ev_connect,ctx);
->>>>>>> dev
 
   return;
 }
@@ -247,14 +206,7 @@ snw_websocket_send_msg(snw_websocket_context_t *ws_ctx, char *buf, int len, uint
    snw_context_t *ctx = ws_ctx->ctx;
    struct evwsconn* conn = 0;
 
-<<<<<<< HEAD
-   if (flow > ws_ctx->flowset->totalnum) {
-      return -1;
-   }
-
-=======
    DEBUG(ctx->log, "get connection, flowid=%u, baseidx=%u", flow, ws_ctx->flowset->baseidx);
->>>>>>> dev
    conn = (struct evwsconn*)snw_flowset_getobj(ws_ctx->flowset,flow);
    if (conn == NULL) {
       ERROR(ctx->log, "connection not found, flowid=%u", flow);

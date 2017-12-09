@@ -35,11 +35,7 @@
 #include <event2/buffer.h>
 #include <wslay/wslay.h>
 
-<<<<<<< HEAD
-#include "log.h"
-=======
 #include "core/log.h"
->>>>>>> dev
 
 static void ws_error(struct evwsconn* conn) {
   conn->alive = 0;

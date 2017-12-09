@@ -2,11 +2,7 @@
 #define _SNOW_ICE_ICETYPES_H_
 
 #include <stdint.h>
-<<<<<<< HEAD
-#include "linux_list.h"
-=======
 #include "core/linux_list.h"
->>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,11 +39,7 @@ typedef struct dtls_ctx dtls_ctx_t;
 #define ICE_ERROR2(...) do {} while(0)
 
 #define ICE_BUFSIZE   8192
-<<<<<<< HEAD
-#define ICE_USEC_PER_SEC 1000000
-=======
 #define ICE_USEC_PER_SEC 10000
->>>>>>> dev
 
 //status
 #define WEBRTC_START           0x0001
@@ -81,11 +73,7 @@ typedef struct dtls_ctx dtls_ctx_t;
 }
 #endif
 
-<<<<<<< HEAD
-#endif //_SNOW_CORE_TYPES_H_
-=======
 #endif //_SNOW_ICE_ICETYPES_H_
->>>>>>> dev
 
 
 

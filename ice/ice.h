@@ -4,21 +4,12 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 
-<<<<<<< HEAD
-#include "cache.h"
-#include "connection.h"
-#include "ice_types.h"
-#include "mempool.h"
-#include "session.h"
-#include "types.h"
-=======
 #include "core/cache.h"
 #include "core/connection.h"
 #include "core/mempool.h"
 #include "core/session.h"
 #include "core/types.h"
 #include "ice_types.h"
->>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {

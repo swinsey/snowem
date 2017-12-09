@@ -1,15 +1,9 @@
 #include <assert.h>
 
-<<<<<<< HEAD
-#include "ice.h"
-#include "ice_stream.h"
-#include "mempool.h"
-=======
 #include "core/mempool.h"
 #include "core/log.h"
 #include "ice/ice.h"
 #include "ice/ice_stream.h"
->>>>>>> dev
 
 void 
 snw_stream_mempool_init(snw_ice_context_t *ctx) {
@@ -93,11 +87,7 @@ snw_stream_print_ssrc(snw_ice_context *ctx, snw_ice_stream_t *s, const char *inf
    if (!ctx || !s) return;
    log = ctx->log;
 
-<<<<<<< HEAD
-   DEBUG(log,"stream ssrcr, info=%s, local_audio_ssrc=%u, remote_audio_ssrc=%u, "
-=======
    DEBUG(log,"stream ssrc, info=%s, local_audio_ssrc=%u, remote_audio_ssrc=%u, "
->>>>>>> dev
              "local_video_ssrc=%u, remote_video_ssrc=%u", info,
          s->local_audio_ssrc,
          s->remote_audio_ssrc,

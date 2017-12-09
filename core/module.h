@@ -14,10 +14,7 @@ enum {
    SNW_ICE = SNW_MSGTYPE_MIN,
    SNW_CORE = 2,
    SNW_EVENT = 3,
-<<<<<<< HEAD
-=======
    SNW_SIG = 4,
->>>>>>> dev
 
    /* reserve range */
    SNW_MSGTYPE_MAX = 255,
@@ -58,17 +55,12 @@ enum {
 enum {
    SNW_EVENT_MIN = 1,
    SNW_EVENT_ICE_CONNECTED = SNW_EVENT_MIN,
-<<<<<<< HEAD
-=======
    SNW_EVENT_PEER_JOINED = 2,
->>>>>>> dev
 
    /* reserved range */
    SNW_EVENT_MAX = 255,
 };
 
-<<<<<<< HEAD
-=======
 /* SIG api code */
 enum {
    SNW_SIG_MIN = 1,
@@ -84,7 +76,6 @@ enum {
    SNW_SIG_MAX = 255,
 };
 
->>>>>>> dev
 typedef struct snw_module_callbacks snw_module_callbacks_t;
 struct snw_module_callbacks {
 

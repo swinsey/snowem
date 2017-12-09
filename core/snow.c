@@ -6,19 +6,13 @@
 
 #include <json/json.h>
 
-<<<<<<< HEAD
-=======
 #include "channel.h"
->>>>>>> dev
 #include "conf.h"
 #include "connection.h"
 #include "core.h"
 #include "log.h"
 #include "module.h"
-<<<<<<< HEAD
-=======
 #include "peer.h"
->>>>>>> dev
 #include "snow.h"
 #include "snw_event.h"
 #include "utils.h"
@@ -26,17 +20,12 @@
 int
 snw_ice_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
 
-<<<<<<< HEAD
-   DEBUG(ctx->log, "ice handler, flowid=%u, len=%u", conn->flowid, len);
-=======
->>>>>>> dev
    snw_shmmq_enqueue(ctx->snw_core2ice_mq, 0, data, len, conn->flowid);
    return 0;
 }
 
 int
-<<<<<<< HEAD
-=======
+
 snw_sig_auth_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
    snw_peer_t *peer = 0;
@@ -311,28 +300,16 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
 }
 
 int
->>>>>>> dev
 snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
    snw_log_t *log = ctx->log;
    struct list_head *p;
    
-<<<<<<< HEAD
-   DEBUG(log, "module handling, type=%x", type);   
-   list_for_each(p,&ctx->modules.list) {
-      snw_module_t *m = list_entry(p,snw_module_t,list);
-      DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
-             m->name, m->type, m->sofile);
-      if (m->type == type) {
-         m->methods->handle_msg(m,conn,data,len);
-         //call snw_videocall_handle_msg
-=======
    list_for_each(p,&ctx->modules.list) {
       snw_module_t *m = list_entry(p,snw_module_t,list);
       //DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
       //       m->name, m->type, m->sofile);
       if (m->type == type) {
          m->methods->handle_msg(m,conn,data,len);
->>>>>>> dev
       }
    }
 
@@ -345,23 +322,11 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
    Json::Value root;
    Json::Reader reader;
    uint32_t msgtype = 0;
-<<<<<<< HEAD
-=======
    uint32_t api = 0;
->>>>>>> dev
    int ret;
 
    ret = reader.parse(data,data+len,root,0);
    if (!ret) {
-<<<<<<< HEAD
-      ERROR(log,"error json format, s=%s",data);
-      return -1;
-   }
-
-   DEBUG(log, "get msg, data=%s", data);
-   try {
-      msgtype = root["msgtype"].asUInt();
-=======
       ERROR(log,"error json format, data=%s",data);
       return -1;
    }
@@ -370,19 +335,15 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
       msgtype = root["msgtype"].asUInt();
       api = root["api"].asUInt();
 
->>>>>>> dev
       switch(msgtype) {
          case SNW_ICE:
             snw_ice_handler(ctx,conn,msgtype,data,len);
             break;
 
-<<<<<<< HEAD
-=======
          case SNW_SIG:
             snw_sig_handler(ctx,conn,root);
             break;
 
->>>>>>> dev
          default:
             snw_module_handler(ctx,conn,msgtype,data,len);
             break;
@@ -396,8 +357,6 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
 }
 
 int
-<<<<<<< HEAD
-=======
 snw_core_connect(snw_context_t *ctx, snw_connection_t *conn) {
 
    //TODO: handle connect activity etc
@@ -406,7 +365,6 @@ snw_core_connect(snw_context_t *ctx, snw_connection_t *conn) {
 }
 
 int
->>>>>>> dev
 snw_core_disconnect(snw_context_t *ctx, snw_connection_t *conn) {
    Json::Value root;
    Json::FastWriter writer;
@@ -453,22 +411,14 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 
    if(header->event_type == snw_ev_connect) {     
       ERROR(log, "event connect error, len=%u,flowid=%u",len,flowid);
-<<<<<<< HEAD
-      return -3;
-=======
       snw_core_connect(ctx,&conn);
       return 0;
->>>>>>> dev
    }    
 
    if(header->event_type == snw_ev_disconnect) {     
       ERROR(log, "event disconnect error, len=%u,flowid=%u",len,flowid);
       snw_core_disconnect(ctx,&conn);
-<<<<<<< HEAD
-      return -3;
-=======
       return 0;
->>>>>>> dev
    }
 
    DEBUG(log, "get msg, srctype: %u, ip: %s, port: %u, flow: %u, data_len: %u, msg_len: %u",
@@ -486,10 +436,6 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 int
 snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
 
-<<<<<<< HEAD
-   DEBUG(ctx->log, "ice preprocess msg, msg=%s",buffer);
-=======
->>>>>>> dev
    snw_shmmq_enqueue(ctx->snw_core2net_mq, 0, buffer, len, flowid);
    return 0;
 }
@@ -510,10 +456,6 @@ snw_ice_msg(int fd, short int event,void* data) {
          break;
       }
 #endif
-<<<<<<< HEAD
-      // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
-=======
->>>>>>> dev
       snw_shmmq_dequeue(ctx->snw_ice2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
 
       if (len == 0) return;
@@ -547,10 +489,6 @@ snw_net_msg(int fd, short int event,void* data) {
          break;
       }
 #endif
-<<<<<<< HEAD
-      // _mq_ccd_2_mcd->dequeue(buffer, MAX_BUFFER_SIZE, len, conn_id);
-=======
->>>>>>> dev
       snw_shmmq_dequeue(ctx->snw_net2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
 
       if (len == 0 || len >= MAX_BUFFER_SIZE) return;
@@ -587,8 +525,6 @@ snw_main_process(snw_context_t *ctx) {
    }
 
    snw_module_init(ctx);
-<<<<<<< HEAD
-=======
    ctx->channel_cache = snw_channel_init();
    if (ctx->channel_cache == 0) {
       ERROR(ctx->log,"failed to init channel cache");
@@ -606,8 +542,6 @@ snw_main_process(snw_context_t *ctx) {
       ERROR(ctx->log,"failed to init channel set");
       return;
    }
-
->>>>>>> dev
 
    ctx->snw_net2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_net2core_mq));
@@ -651,11 +585,7 @@ snw_main_process(snw_context_t *ctx) {
              "/tmp/snw_ice2core_mq.fifo", 0, 0, 
              ICE2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-<<<<<<< HEAD
-      ERROR(ctx->log,"failed to init core2net mq");
-=======
       ERROR(ctx->log,"failed to message queue");
->>>>>>> dev
       return;
    }
 
@@ -669,11 +599,7 @@ snw_main_process(snw_context_t *ctx) {
              "/tmp/snw_core2ice_mq.fifo", 0, 0, 
              CORE2ICE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-<<<<<<< HEAD
-      ERROR(ctx->log,"failed to init core2net mq");
-=======
       ERROR(ctx->log,"failed to message queue");
->>>>>>> dev
       return;
    }
 

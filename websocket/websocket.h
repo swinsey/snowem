@@ -5,13 +5,8 @@
 extern "C" {
 #endif
 
-<<<<<<< HEAD
-#include "core.h"
-#include "flow.h"
-=======
 #include "core/core.h"
 #include "core/flow.h"
->>>>>>> dev
 
 typedef struct snw_websocket_context snw_websocket_context_t;
 struct snw_websocket_context {

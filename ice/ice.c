@@ -1,25 +1,15 @@
 #include <stdio.h>
 
-<<<<<<< HEAD
-#include "core.h"
-=======
 #include "core/core.h"
 #include "core/log.h"
->>>>>>> dev
 #include "ice.h"
 #include "ice_channel.h"
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "json/json.h"
-<<<<<<< HEAD
-#include "log.h"
-#include "sdp.h"
-#include "process.h"
-=======
 #include "sdp.h"
 #include "process.h"
 #include "rtp/rtp.h"
->>>>>>> dev
 
 void
 snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
@@ -41,10 +31,6 @@ snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       return;
    }
 
-<<<<<<< HEAD
-   DEBUG(log, "[new handler] get ice msg, data=%s", data);
-=======
->>>>>>> dev
    try {
       msgtype = root["msgtype"].asUInt();
       if (msgtype != SNW_ICE) {
@@ -56,17 +42,10 @@ snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       ERROR(log, "json format error, data=%s", data);
    }
 
-<<<<<<< HEAD
-   list_for_each(p,&ice_ctx->api_handlers.list) {
-      snw_ice_api_t *a = list_entry(p,snw_ice_api_t,list);
-      if (a->api == api) {
-         DEBUG(log, "got api, api=%u", api);
-=======
    DEBUG(log, "looking for api handler, api=%u", api);
    list_for_each(p,&ice_ctx->api_handlers.list) {
       snw_ice_api_t *a = list_entry(p,snw_ice_api_t,list);
       if (a->api == api) {
->>>>>>> dev
          list_for_each(n,&a->handlers.list) {
             snw_ice_handlers_t *h = list_entry(n,snw_ice_handlers_t,list);
             h->handler(ice_ctx,data,len,flowid);
@@ -74,16 +53,6 @@ snw_ice_api_handler(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32
       }
    }
 
-<<<<<<< HEAD
-   /*DEBUG(log, "num of apis, num=%u", api_num);
-   for (int i=0; i<api_num; i++) {
-      if (apis[i].api == api ) {
-         apis[i].handler(ice_ctx,(char*)&root,0,flowid);
-      }
-   }*/
-
-=======
->>>>>>> dev
    return;
 }
 
@@ -96,10 +65,6 @@ snw_ice_dispatch_msg(int fd, short int event,void* data) {
    uint32_t flowid = 0;
    uint32_t cnt = 0;
    int ret = 0; 
-<<<<<<< HEAD
-   //time_t cur_time = time(0);
-=======
->>>>>>> dev
    
    while (true) {
       len = 0;
@@ -131,11 +96,7 @@ ice_dtls_init(snw_ice_context_t *ctx, const char* pem, const char *key) {
    if (!ctx) return 0;
    log = ctx->log;
 
-<<<<<<< HEAD
-   DEBUG(log, "Using certificates: pem=%s, key%s", pem, key);
-=======
    DEBUG(log, "using certificates: pem=%s, key%s", pem, key);
->>>>>>> dev
 
    server_pem = strdup(pem);
    server_key = strdup(key);
@@ -144,30 +105,13 @@ ice_dtls_init(snw_ice_context_t *ctx, const char* pem, const char *key) {
    OpenSSL_add_all_algorithms();
 
    if (dtls_init(ctx, server_pem, server_key) < 0) { 
-<<<<<<< HEAD
-      ERROR(log, "Failed to init dtls");
-      exit(1);
-   }
-   //ctx->ssl_ctx = srtp_get_ssl_ctx();
-=======
       ERROR(log, "failed to init dtls");
       exit(1);
    }
->>>>>>> dev
 
    return ctx->ssl_ctx;
 }
 
-<<<<<<< HEAD
-void  
-test_api1(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
-   snw_log_t *log = 0;
-   
-   if (!ice_ctx) return;
-   log = ice_ctx->log;
-   
-   DEBUG(log, "got api 1"); 
-=======
 //FIXME: remove these fucntions
 void  
 test_api1(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
@@ -175,38 +119,18 @@ test_api1(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid)
    if (!ice_ctx) return;
    log = ice_ctx->log;
    DEBUG(log, "got api 1");*/
->>>>>>> dev
 
    return;
 }
 
 void  
 test_api2(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
-<<<<<<< HEAD
-   snw_log_t *log = 0;
-   
-   if (!ice_ctx) return;
-   log = ice_ctx->log;
-   
-   DEBUG(log, "got api 2"); 
-=======
->>>>>>> dev
 
    return;
 }
 
 void  
 test_api3(snw_ice_context_t *ice_ctx, char *data, uint32_t len, uint32_t flowid) {
-<<<<<<< HEAD
-   snw_log_t *log = 0;
-   
-   if (!ice_ctx) return;
-   log = ice_ctx->log;
-   
-   DEBUG(log, "got api 3"); 
-
-=======
->>>>>>> dev
    return;
 }
 
@@ -251,15 +175,10 @@ snw_ice_init(snw_context_t *ctx) {
    memset(ice_ctx,0,sizeof(snw_ice_context_t));
    ice_ctx->ctx = ctx;
    ice_ctx->log = ctx->log;
-<<<<<<< HEAD
-   
-   ice_set_log_callback(snw_ice_log_cb,ice_ctx);
-=======
   
    if (ctx->ice_log_enabled) 
       ice_set_log_callback(snw_ice_log_cb,ice_ctx);
 
->>>>>>> dev
    snw_ice_sdp_init(ice_ctx);
    snw_ice_session_init(ice_ctx);
    snw_ice_channel_init(ice_ctx);
@@ -273,10 +192,6 @@ snw_ice_init(snw_context_t *ctx) {
 
    ice_dtls_init(ice_ctx, ctx->wss_cert_file, ctx->wss_key_file);
 
-<<<<<<< HEAD
-   //DEBUG(ctx->log,"core2ice fd=%d",ctx->snw_core2ice_mq->_fd);
-=======
->>>>>>> dev
    q_event = event_new(ctx->ev_base, ctx->snw_core2ice_mq->_fd, 
          EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_dispatch_msg, ice_ctx);
    event_add(q_event, NULL);   
@@ -287,10 +202,6 @@ snw_ice_init(snw_context_t *ctx) {
 
    INIT_LIST_HEAD(&ice_ctx->api_handlers.list);
    for (int i=0; i<api_num; i++) {
-<<<<<<< HEAD
-      //DEBUG(log, "api info, api=%u",apis[i].api);
-=======
->>>>>>> dev
       INIT_LIST_HEAD(&apis[i].list);
       INIT_LIST_HEAD(&apis[i].handlers.list);
       list_add_tail(&apis[i].list, &ice_ctx->api_handlers.list);
@@ -298,21 +209,14 @@ snw_ice_init(snw_context_t *ctx) {
 
    list_for_each(p, &ice_ctx->api_handlers.list) {
       snw_ice_api_t *h = list_entry(p,snw_ice_api_t,list);
-<<<<<<< HEAD
-      DEBUG(log, "api info, api=%u",h->api);
-=======
->>>>>>> dev
       for (int j=0; j<handler_num; j++) {
          if (h->api == handlers[j].api)
             list_add_tail(&handlers[j].list, &h->handlers.list);
       }
    }
 
-<<<<<<< HEAD
-=======
    snw_rtp_init(ice_ctx);
 
->>>>>>> dev
    event_base_dispatch(ctx->ev_base);
    return;
 }
@@ -322,26 +226,14 @@ ice_rtp_established(snw_ice_session_t *session) {
    snw_context_t *ctx = 0;
    snw_ice_context_t *ice_ctx = 0;
    snw_log_t *log = 0;
-<<<<<<< HEAD
-   Json::Value root,notify;
-   Json::FastWriter writer;
-   std::string output;
-=======
->>>>>>> dev
 
    if (!session) return;
    ice_ctx = session->ice_ctx;
    log = ice_ctx->log;
    ctx = (snw_context_t*)ice_ctx->ctx;
 
-<<<<<<< HEAD
-   WARN(log, "ice_rtp_established, flowid=%u", session->flowid);
-   if ( IS_FLAG(session,ICE_SUBSCRIBER) ) {
-      DEBUG(log, "send fir req");
-=======
    DEBUG(log, "ice connection established, flowid=%u", session->flowid);
    if ( IS_FLAG(session,ICE_SUBSCRIBER) ) {
->>>>>>> dev
       //FIXME: request fir 
       /*root["cmd"] = SNW_ICE;
       root["subcmd"] = SNW_ICE_FIR;
@@ -349,28 +241,6 @@ ice_rtp_established(snw_ice_session_t *session) {
       output = writer.write(root);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);*/
    } else if IS_FLAG(session,ICE_PUBLISHER) {
-<<<<<<< HEAD
-      // start recording a stream.
-      /*char filename[256];
-      time_t nowtime = time(NULL);
-      DEBUG(log, "FIXME: start recording a stream");
-      sprintf(filename, "%d_%ld_audio", session->roomid, nowtime);
-      session->a_recorder = recorder_create("/home/tuyettt/record_video", 0, filename);
-      sprintf(filename, "%d_%ld_video", session->roomid, nowtime);
-      session->v_recorder = recorder_create("/home/tuyettt/record_video", 1, filename);*/
-   } else if IS_FLAG(session,ICE_REPLAY) {
-      // start replaying a stream.
-      /*DEBUG("FIXME: start replaying a stream");
-      record_start(session);*/
-   }
-
-   notify["msgtype"] = SNW_EVENT;
-   notify["api"] = SNW_EVENT_ICE_CONNECTED;
-   notify["flowid"] = session->flowid;
-   notify["channelid"] = session->channelid;
-   output = writer.write(notify);
-   snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
-=======
 
       //FIXME: do something
 
@@ -389,7 +259,6 @@ ice_rtp_established(snw_ice_session_t *session) {
       output = writer.write(notify);
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),session->flowid);
    }*/
->>>>>>> dev
 
    return;
 }
@@ -410,23 +279,13 @@ snw_ice_init_ssl(snw_context_t *ctx) {
    SSL_CTX  *server_ctx = NULL;
    std::string cert_str,key_str;
 
-<<<<<<< HEAD
-   DEBUG(ctx->log,"init ssl");
-
-=======
->>>>>>> dev
    /* Initialize the OpenSSL library */
    SSL_load_error_strings();
    SSL_library_init();
    OpenSSL_add_all_algorithms();
 
    /* We MUST have entropy, or else there's no point to crypto. */
-<<<<<<< HEAD
-   if (!RAND_poll())
-      return -1;
-=======
    if (!RAND_poll()) return -1;
->>>>>>> dev
 
    server_ctx = SSL_CTX_new(SSLv23_server_method());
    if (server_ctx == NULL) { 
@@ -434,20 +293,12 @@ snw_ice_init_ssl(snw_context_t *ctx) {
       return -2; 
    }
 
-<<<<<<< HEAD
-   DEBUG(ctx->log,"ssl info, cert_file=%s,key_file=%s",ctx->ice_cert_file,ctx->ice_key_file);
-=======
    DEBUG(ctx->log,"using certificates: cert_file=%s, key_file=%s",ctx->ice_cert_file,ctx->ice_key_file);
->>>>>>> dev
    if (! SSL_CTX_use_certificate_chain_file(server_ctx, ctx->ice_cert_file) ||
        ! SSL_CTX_use_PrivateKey_file(server_ctx, ctx->ice_key_file, SSL_FILETYPE_PEM)) {
        ERROR(ctx->log,"failed to read cert or key files");
        return -3;
    }
-<<<<<<< HEAD
-   //SSL_CTX_set_options(server_ctx, SSL_OP_NO_SSLv2);*/
-=======
->>>>>>> dev
    ctx->ssl_ctx = server_ctx;
 
    return 0;
@@ -467,11 +318,7 @@ snw_ice_init_shmqueue(snw_context_t *ctx) {
              "/tmp/snw_ice2core_mq.fifo", 0, 0, 
              ICE2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-<<<<<<< HEAD
-      ERROR(ctx->log,"failed to init ice2core mq");
-=======
       ERROR(ctx->log,"failed to init message queue");
->>>>>>> dev
       return -2;
    }
 
@@ -485,11 +332,7 @@ snw_ice_init_shmqueue(snw_context_t *ctx) {
              "/tmp/snw_core2ice_mq.fifo", 0, 0, 
              CORE2ICE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-<<<<<<< HEAD
-      ERROR(ctx->log,"failed to init core2ice mq");
-=======
       ERROR(ctx->log,"failed to init message queue");
->>>>>>> dev
       return -2;
    }
 
@@ -512,13 +355,7 @@ snw_ice_setup(snw_context_t *ctx) {
    snw_ice_init_shmqueue(ctx);
    snw_ice_init_ssl(ctx);
 
-<<<<<<< HEAD
-   DEBUG(ctx->log,"start ice process");
    snw_ice_init(ctx);
-
-=======
-   snw_ice_init(ctx);
->>>>>>> dev
    return;
 }
 

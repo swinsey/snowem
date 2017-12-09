@@ -59,35 +59,6 @@ trimwhitespace(char *str)
   return str;
 }
 
-<<<<<<< HEAD
-void 
-hexdump(char* p,int len, const char* type)
-{  
-   char buf[256];
-   int i, j, i0;  
-      
-   //DEBUG("---- dump buffer (%s) ---- len=%d",type,len);
-   
-   for (i = 0; i < len; ) {
-      memset(buf, sizeof(buf), ' ');
-      sprintf(buf, "%5d: ", i);
-
-      i0 = i;
-      for (j=0; j < 16 && i < len; i++, j++)
-         sprintf(buf+7+j*3, "%02x ", (uint8_t)(p[i]));
-   
-      i = i0;   
-      for (j=0; j < 16 && i < len; i++, j++)
-         sprintf(buf+7+j + 48, "%c",
-            isprint(p[i]) ? p[i] : '.'); 
-
-      //DEBUG("%s: %s", type, buf);
-   }
-   return;
-}
-
-=======
->>>>>>> dev
 char* 
 ip_to_str(unsigned int ip)
 {       
@@ -95,13 +66,6 @@ ip_to_str(unsigned int ip)
    inaddr.s_addr=ip;
    return (inet_ntoa(inaddr));
 }       
-<<<<<<< HEAD
-   
-int64_t get_real_time(void) {
-   struct timespec ts; 
-   clock_gettime (CLOCK_REALTIME, &ts);
-   return (ts.tv_sec*1000000) + (ts.tv_nsec/(1000));
-=======
 
 int64_t get_ntp_time(void) {
    struct timespec ts; 
@@ -113,17 +77,12 @@ int64_t get_epoch_time(void) {
    struct timespec ts; 
    clock_gettime (CLOCK_REALTIME, &ts);
    return (ts.tv_sec*1000) + (ts.tv_nsec/(1000000));
->>>>>>> dev
 }           
 
 int64_t get_monotonic_time(void) {
    struct timespec ts; 
    clock_gettime (CLOCK_MONOTONIC, &ts);
-<<<<<<< HEAD
-   return (ts.tv_sec*((int64_t)1000000)) + (ts.tv_nsec/((int64_t)1000));
-=======
    return (ts.tv_sec*((int64_t)1000)) + (ts.tv_nsec/((int64_t)1000000));
->>>>>>> dev
 }
 
 int create_dir(const char *dir, mode_t mode) {

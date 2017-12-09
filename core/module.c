@@ -22,17 +22,9 @@ snw_module_init(snw_context_t *ctx) {
 
    list_for_each(p,&ctx->modules.list) {
       snw_module_t *m = list_entry(p,snw_module_t,list);
-<<<<<<< HEAD
-      DEBUG(log, "initialize module, name=%s, type=0x%0x, sofile=%s", 
-             m->name, m->type, m->sofile);
-      handle = dlopen(m->sofile, RTLD_LAZY);
-      if (!handle) {
-         DEBUG(ctx->log, "failed to load so, s=%s", dlerror());
-=======
       handle = dlopen(m->sofile, RTLD_LAZY);
       if (!handle) {
          ERROR(ctx->log, "failed to load library s=%s", dlerror());
->>>>>>> dev
          exit(1);
       }
       m->ctx = ctx;
@@ -41,24 +33,6 @@ snw_module_init(snw_context_t *ctx) {
       init(m);
    }
 
-<<<<<<< HEAD
-
-   /*DEBUG(ctx->log, "module info, name=%s, type=%0x, sofile=%s", 
-          ctx->module->name,
-          ctx->module->type,
-          ctx->module->sofile);
-   handle = dlopen(ctx->module->sofile, RTLD_LAZY);
-   if (!handle) {
-      DEBUG(ctx->log, "failed to load so, s=%s", dlerror());
-      exit(1);
-   }
-
-   init = (void (*)(void*))dlsym(handle, "module_init");
-   ctx->module->init = init;
-   init(ctx->module);*/
-
-=======
->>>>>>> dev
    return;
 }
 

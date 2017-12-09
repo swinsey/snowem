@@ -1,13 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-<<<<<<< HEAD
-#include "cache.h"
-#include "log.h"
-=======
 #include "core/cache.h"
 #include "core/log.h"
->>>>>>> dev
 #include "ice.h"
 #include "ice_channel.h"
 #include "ice_types.h"
@@ -96,23 +91,6 @@ snw_ice_channel_remove(snw_ice_context_t *ctx, snw_ice_channel_t *sitem) {
 }
 
 
-<<<<<<< HEAD
-void
-snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
-
-   if (!ctx) return;
-
-   DEBUG(ctx->log, "channel info, id=%u, ownerid=%u, players= %u %u %u %u %u", 
-         c->id, c->ownerid, c->players[0], c->players[1], c->players[2],
-         c->players[3], c->players[4]);
-
-   return;
-
-}
-
-void
-snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, uint32_t channelid, uint32_t flowid) {
-=======
 #ifdef SNW_ENABLE_DEBUG
 void
 snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
@@ -135,7 +113,6 @@ snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
 void
 snw_channel_add_subscriber(snw_ice_context_t *ice_ctx, 
       uint32_t channelid, uint32_t flowid) {
->>>>>>> dev
    snw_log_t *log = 0;
    snw_ice_channel_t *channel = 0;
    int found = 0;
@@ -143,26 +120,6 @@ snw_channel_add_subscriber(snw_ice_context_t *ice_ctx,
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
-<<<<<<< HEAD
-
-   DEBUG(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
-   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
-   if (!channel) return;
-   snw_print_channel_info(ice_ctx,channel); 
-
-   for (int i=0; i<SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
-      if (channel->players[i] == 0) {
-         found = 1;
-         channel->players[i] = flowid;
-         break;
-      }
-   }
-   snw_print_channel_info(ice_ctx,channel); 
-
-   if (!found) {
-      ERROR(log, "channel full, flowid=%u, channelid=%u", flowid, channelid);
-      snw_print_channel_info(ice_ctx,channel); 
-=======
    DEBUG(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
    channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
    if (!channel) return;
@@ -213,7 +170,6 @@ snw_channel_remove_subscriber(snw_ice_context_t *ice_ctx,
 
    if (!found) {
       WARN(log, "not found, flowid=%u, channelid=%u", flowid, channelid);
->>>>>>> dev
       return;
    }
 

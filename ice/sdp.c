@@ -1,22 +1,14 @@
 
 #include <sofia-sip/sdp.h>
 
-<<<<<<< HEAD
-#include "log.h"
-=======
 #include "core/log.h"
 #include "core/utils.h"
->>>>>>> dev
 #include "ice.h"
 #include "ice_types.h"
 #include "ice_session.h"
 #include "ice_stream.h"
 #include "sdp.h"
 #include "process.h"
-<<<<<<< HEAD
-#include "utils.h"
-=======
->>>>>>> dev
 
 static su_home_t *g_home = NULL;
 
@@ -25,11 +17,7 @@ snw_ice_sdp_init(snw_ice_context_t *ctx) {
 
    g_home = (su_home_t*)su_home_new(sizeof(su_home_t));
    if(su_home_init(g_home) < 0) {
-<<<<<<< HEAD
-      ERROR(ctx->log,"error setting up sofia-sdp?");
-=======
       ERROR(ctx->log,"error setting up sofia-sdp");
->>>>>>> dev
       return -1; 
    }   
    return 0;
@@ -75,11 +63,7 @@ snw_ice_get_sdp_attr(snw_ice_context_t *ice_ctx, char *sdp, ice_sdp_attr_t *sdp_
 
    parsed_sdp = sdp_session(parser);
    if (!parsed_sdp) {
-<<<<<<< HEAD
-      ERROR(log,"Error parsing SDP, err=%s", sdp_parsing_error(parser));
-=======
       ERROR(log,"failed to parse sdp, err=%s", sdp_parsing_error(parser));
->>>>>>> dev
       sdp_parser_free(parser);
       return -2;
    } 
@@ -97,11 +81,6 @@ snw_ice_get_sdp_attr(snw_ice_context_t *ice_ctx, char *sdp, ice_sdp_attr_t *sdp_
          sdp_attr->audio = sdp_attr->audio + 1;
          a = m->m_attributes;
          while (a) {
-<<<<<<< HEAD
-            DEBUG(log,"audio attr, num=%u, name=%s, value=%s",
-                   sdp_attr->audio, a->a_name, a->a_value);
-=======
->>>>>>> dev
             if (strcasecmp(a->a_name,"rtcp-mux")) {
                sdp_attr->rtcpmux = 1;
             } else if (strcasecmp(a->a_name,"ice-options")) {
@@ -113,11 +92,6 @@ snw_ice_get_sdp_attr(snw_ice_context_t *ice_ctx, char *sdp, ice_sdp_attr_t *sdp_
          sdp_attr->video = sdp_attr->video + 1;
          a = m->m_attributes;
          while (a) {
-<<<<<<< HEAD
-            DEBUG(log,"audio attr, num=%u, name=%s, value=%s",
-                   sdp_attr->video, a->a_name, a->a_value);
-=======
->>>>>>> dev
             if (strcasecmp(a->a_name,"rtcp-mux")) {
                sdp_attr->rtcpmux = 1;
             } else if (strcasecmp(a->a_name,"ice-options")) {
@@ -131,10 +105,6 @@ snw_ice_get_sdp_attr(snw_ice_context_t *ice_ctx, char *sdp, ice_sdp_attr_t *sdp_
 
    a = parsed_sdp->sdp_attributes;
    while (a) {
-<<<<<<< HEAD
-      DEBUG(log,"global attr, name=%s, value=%s",a->a_name, a->a_value);
-=======
->>>>>>> dev
       if (!strcasecmp(a->a_name,"group") && strstr(a->a_value,"BUNDLE") ) {
          sdp_attr->bundle = 1;
       } else {
@@ -143,18 +113,8 @@ snw_ice_get_sdp_attr(snw_ice_context_t *ice_ctx, char *sdp, ice_sdp_attr_t *sdp_
       a = a->a_next;
    }
 
-<<<<<<< HEAD
-   sdp_attr->trickle = 1;
-   ICE_DEBUG2("sdp attribute, audio=%u, video=%u, bundle=%u, trickle=%u, rtcpmux=%u", 
-         sdp_attr->audio, 
-         sdp_attr->video, 
-         sdp_attr->bundle, 
-         sdp_attr->trickle,
-         sdp_attr->rtcpmux);
-=======
    //default to handle trickle
    sdp_attr->trickle = 1;
->>>>>>> dev
 
    sdp_parser_free(parser);
    return 0;
@@ -175,11 +135,7 @@ snw_ice_sdp_add_global_attrs(snw_ice_session_t *session, sdp_session_t *orig_sdp
             orig_sdp->sdp_origin->o_id, orig_sdp->sdp_origin->o_version);
       strncat(sdp, buffer, ICE_BUFSIZE);
    } else {
-<<<<<<< HEAD
-      int64_t sessid = get_real_time();
-=======
       int64_t sessid = get_epoch_time();
->>>>>>> dev
       snprintf(buffer, 512, "o=%s %lu  %lu IN IP4 0.0.0.0\r\n", "-", sessid, sessid/*version*/);
       strncat(sdp, buffer, ICE_BUFSIZE);
    }
@@ -293,11 +249,7 @@ snw_ice_sdp_add_credentials(snw_ice_session_t *session, sdp_media_t *m, int vide
    log = session->ice_ctx->log;
 
    if (video) {
-<<<<<<< HEAD
-      uint32_t id = session->video_stream->id;
-=======
       uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
->>>>>>> dev
 
       DEBUG(log, "add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
 
@@ -379,15 +331,9 @@ snw_ice_sdp_add_single_ssrc(snw_ice_session_t *session, sdp_media_t *m, int vide
       return;
 
    if (video) {
-<<<<<<< HEAD
-      uint32_t id = session->video_stream->id;
-
-      ICE_DEBUG2("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
-=======
       uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
 
       //DEBUG("add credentials, id=%u, bundle=%u",id,IS_FLAG(session, WEBRTC_BUNDLE));
->>>>>>> dev
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_stream->id > 0 ? 
                    session->audio_stream->id : 
@@ -442,21 +388,13 @@ ice_generate_candidate_attribute(snw_ice_session_t *session, char *sdp,
    agent = session->agent;
    stream = snw_stream_find(&session->streams, stream_id);
    if(!stream) {
-<<<<<<< HEAD
-      ERROR(log, "no stream found, sid=%u", stream_id);
-=======
       ERROR(log, "stream not found, sid=%u", stream_id);
->>>>>>> dev
       return;
    }
 
    component = snw_component_find(&stream->components, component_id);
    if (!component) {
-<<<<<<< HEAD
-      ERROR(log, "no component found, cid=%u, sid=%u", component_id, stream_id);
-=======
       ERROR(log, "component not found, cid=%u, sid=%u", component_id, stream_id);
->>>>>>> dev
       return;
    }
 
@@ -486,11 +424,7 @@ ice_generate_candidate_attribute(snw_ice_session_t *session, char *sdp,
             snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ host generation 0\r\n",
                   c->foundation, c->component_id, "udp", c->priority, address, port);
          } else {
-<<<<<<< HEAD
-            DEBUG(log, "only ice-udp supported");
-=======
             WARN(log, "only ice-udp supported for host candidate");
->>>>>>> dev
             candidate_free(c);
             continue;
          }
@@ -501,20 +435,12 @@ ice_generate_candidate_attribute(snw_ice_session_t *session, char *sdp,
             snprintf(buffer, 100, "a=candidate:%s %d %s %d %s %d typ srflx raddr %s rport %d\r\n",
                   c->foundation, c->component_id, "udp", c->priority, address, port, base_address, base_port);
          } else {
-<<<<<<< HEAD
-            DEBUG(log, "only ice-udp supported");
-=======
             WARN(log, "only ice-udp supported for srflx candidate");
->>>>>>> dev
             candidate_free(c);
             continue;
          }
       } else if(c->type == ICE_CANDIDATE_TYPE_PEER_REFLEXIVE) {
-<<<<<<< HEAD
-         DEBUG(log, "skipping prflx candidate");
-=======
          WARN(log, "skipping prflx candidate");
->>>>>>> dev
          candidate_free(c);
          continue;
       } else if(c->type == ICE_CANDIDATE_TYPE_RELAYED) {
@@ -542,26 +468,14 @@ ice_generate_candidate_attribute(snw_ice_session_t *session, char *sdp,
    return;
 }
 
-<<<<<<< HEAD
-
-=======
->>>>>>> dev
 void 
 snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video, char *sdp) {
    snw_ice_stream_t *stream = NULL;
 
-<<<<<<< HEAD
-   if (m == NULL)
-      return;
-
-   if (video) {
-      uint32_t id = session->video_stream->id;
-=======
    if (m == NULL) return;
 
    if (video) {
       uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
->>>>>>> dev
       if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
           id = session->audio_stream->id > 0 ? 
                     session->audio_stream->id : 
@@ -571,12 +485,7 @@ snw_ice_sdp_add_candidates(snw_ice_session_t *session, sdp_media_t *m, int video
       stream = snw_stream_find(&session->streams, session->audio_stream->id);
    }
 
-<<<<<<< HEAD
-   if ( stream == NULL )
-      return;
-=======
    if (stream == NULL) return;
->>>>>>> dev
 
    ice_generate_candidate_attribute(session, sdp, stream->id, 1);
    if(!SET_FLAG(session, WEBRTC_RTCPMUX) && m->m_type != sdp_media_application)
@@ -674,20 +583,12 @@ snw_ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
 
    parser = sdp_parse(g_home, sdpstr, strlen(sdpstr), 0);
    if (!(orig_sdp = sdp_session(parser))) {
-<<<<<<< HEAD
-      ICE_ERROR2("failed to parse sdp, err=%s", sdp_parsing_error(parser));
-=======
->>>>>>> dev
       sdp_parser_free(parser);
       return NULL;
    }
 
    sdp = (char*)malloc(ICE_BUFSIZE);
    if(sdp == NULL) {
-<<<<<<< HEAD
-      ICE_ERROR2("Memory error!");
-=======
->>>>>>> dev
       sdp_parser_free(parser);
       return NULL;
    }
@@ -701,31 +602,19 @@ snw_ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
          if (m->m_type == sdp_media_audio && m->m_port > 0) {
             audio++;
             if(audio > 1 || !session->audio_stream->id) {
-<<<<<<< HEAD
-               ICE_ERROR2("skipping audio, audio=%u, id=%u", audio, session->audio_stream->id);
-=======
->>>>>>> dev
                snw_ice_sdp_add_mline(session,m,1,0,sdp);
             } else {
                snw_ice_sdp_add_mline(session,m,0,0,sdp);
             }
          } else if (m->m_type == sdp_media_video && m->m_port > 0) {
             video++;
-<<<<<<< HEAD
-            uint32_t id = session->video_stream->id;
-=======
             uint32_t id = (session->video_stream == 0) ? 0 : session->video_stream->id;
->>>>>>> dev
             if (id == 0 && IS_FLAG(session, WEBRTC_BUNDLE))
                 id = session->audio_stream->id > 0 ? 
                           session->audio_stream->id : 
                           session->video_stream->id;
 
             if (video > 1 || !id) {
-<<<<<<< HEAD
-               ICE_ERROR2("skipping video line, video=%u, id=%u", video, id);
-=======
->>>>>>> dev
                snw_ice_sdp_add_mline(session,m,1,1,sdp);
             } else {
                snw_ice_sdp_add_mline(session,m,0,1,sdp);
@@ -736,22 +625,12 @@ snw_ice_sdp_merge(snw_ice_session_t *session, const char *sdpstr) {
    }
 
    sdp_parser_free(parser);
-<<<<<<< HEAD
-   ICE_DEBUG2("Merged, old_len=%u, new_len=%u, sdp=%s", 
-         strlen(sdpstr), strlen(sdp),sdp);
-
-=======
->>>>>>> dev
    return sdp;
 }
 
 void 
-<<<<<<< HEAD
-snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream, snw_ice_component_t *component, candidate_t *candidate) {
-=======
 snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream, 
       snw_ice_component_t *component, candidate_t *candidate) {
->>>>>>> dev
    candidate_t candidates;
    candidate_t *c = NULL;
    int added = 0;
@@ -759,13 +638,6 @@ snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream
    if (!session || !stream || !component || !candidate)
       return;
 
-<<<<<<< HEAD
-   ICE_DEBUG2("add candidate, sid=%u, cid=%u, flag=%u, started=%u", 
-         stream->id, component->id,
-         IS_FLAG(session, WEBRTC_START), component->is_started);
-
-=======
->>>>>>> dev
    list_add(&candidate->list,&component->remote_candidates.list);
    if (!IS_FLAG(session, WEBRTC_START)) {
       SET_FLAG(session, WEBRTC_START);
@@ -780,19 +652,11 @@ snw_ice_try_start_component(snw_ice_session_t *session, snw_ice_stream_t *stream
       list_add(&c->list,&candidates.list);
       added = ice_agent_set_remote_candidates(session->agent,stream->id,
                                               component->id,&candidates); 
-<<<<<<< HEAD
-      if ( added < 1) {
-         ICE_ERROR2("failed to add candidate, added=%u",added);
-      } else {
-         ICE_DEBUG2("candidate added, added=%u",added);
-      }
-=======
       if (added < 1) {
          //ERROR("failed to add candidate, added=%u",added);
       }
 
       //DEBUG("candidate added, added=%u",added);
->>>>>>> dev
       /* clean resources */
       INIT_LIST_HEAD(&candidates.list);
       candidate_free(c);
@@ -806,10 +670,6 @@ snw_ice_remote_candidate_new(char *type, char *transport) {
    candidate_t* c = NULL;
 
    if(strcasecmp(transport, "udp")) {
-<<<<<<< HEAD
-      ICE_ERROR2("skipping unsupported transport, s=%s", transport);
-=======
->>>>>>> dev
       return NULL;
    }
 
@@ -821,15 +681,9 @@ snw_ice_remote_candidate_new(char *type, char *transport) {
       c = candidate_new(ICE_CANDIDATE_TYPE_PEER_REFLEXIVE);
    } else if(!strcasecmp(type, "relay")) {
       //c = candidate_new(ICE_CANDIDATE_TYPE_RELAYED);
-<<<<<<< HEAD
-      ICE_DEBUG2("relay candidate not supported, type:%s", type);
-   } else {
-      ICE_DEBUG2("Unknown remote candidate, type:%s", type);
-=======
       //DEBUG("relay candidate not supported, type:%s", type);
    } else {
       //DEBUG("Unknown remote candidate, type:%s", type);
->>>>>>> dev
    }
 
    return c;
@@ -861,20 +715,10 @@ snw_ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
                            foundation, &component_id, transport, &priority,
                            ip, &port, type, relip, &relport);
 
-<<<<<<< HEAD
-   ICE_DEBUG2("parsing result, ret=%u, cid:%d sid:%d, type:%s, transport=%s, refaddr=%s:%d, addr=%s:%d",
-         ret, component_id, stream->id, type, transport, relip, relport, ip, port);
-
-   if (ret >= 7) {
-      component = snw_component_find(&stream->components, component_id);
-      if (component == NULL) {
-         ICE_ERROR2("component not found, cid=%u, sid=%u", component_id, stream->id);
-=======
    if (ret >= 7) {
       component = snw_component_find(&stream->components, component_id);
       if (component == NULL) {
          //ERROR("component not found, cid=%u, sid=%u", component_id, stream->id);
->>>>>>> dev
          return -3;
       } 
 
@@ -903,11 +747,7 @@ snw_ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
          snw_ice_try_start_component(session,stream,component,c);
       }
    } else {
-<<<<<<< HEAD
-      ICE_ERROR2("failed to parse candidate, ret=%d, s=%s", ret, candidate);
-=======
       //ERROR("failed to parse candidate, ret=%d, s=%s", ret, candidate);
->>>>>>> dev
       return ret;
    }
    return 0;
@@ -927,32 +767,18 @@ snw_sdp_stream_update_ssrc(snw_ice_stream_t *stream, const char *ssrc_attr, int 
    if (video) {
       if ( stream->remote_video_ssrc == 0 ) {
          stream->remote_video_ssrc = ssrc;
-<<<<<<< HEAD
-         ICE_DEBUG2("peer video ssrc, ssrc=%u", stream->remote_video_ssrc);
-      } else {
-         ICE_ERROR2("video ssrc updated, ssrc=%u, new_ssrc=%u", 
-               stream->remote_video_ssrc,ssrc);
-=======
       } else {
          //ERROR("video ssrc updated, ssrc=%u, new_ssrc=%u", 
          //      stream->remote_video_ssrc,ssrc);
          return -3;
->>>>>>> dev
       }
    } else {
       if(stream->remote_audio_ssrc == 0) {
          stream->remote_audio_ssrc = ssrc;
-<<<<<<< HEAD
-         ICE_DEBUG2("peer audio ssrc, ssrc=%u", stream->remote_audio_ssrc);
-      } else {
-         ICE_ERROR2("audio ssrc update, ssrc=%u, new_ssrc=%u", 
-               stream->remote_audio_ssrc,ssrc);
-=======
       } else {
          //ERROR("audio ssrc update, ssrc=%u, new_ssrc=%u", 
          //      stream->remote_audio_ssrc,ssrc);
          return -4;
->>>>>>> dev
       }
    }
 
@@ -1034,11 +860,7 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
    while (a) {
       if (a->a_name) {
          if (!strcasecmp(a->a_name, "fingerprint")) {
-<<<<<<< HEAD
-            ICE_DEBUG2("global credentials, value=%s", a->a_value);
-=======
             //DEBUG("global credentials, value=%s", a->a_value);
->>>>>>> dev
             if (strcasestr(a->a_value, "sha-256 ") == a->a_value) {
                remote_hashing = "sha-256";
                remote_fingerprint = a->a_value + strlen("sha-256 ");
@@ -1046,11 +868,7 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
                remote_hashing = "sha-1";
                remote_fingerprint = a->a_value + strlen("sha-1 ");
             } else {
-<<<<<<< HEAD
-               ICE_DEBUG2("unknown algorithm, s=%s",a->a_name);
-=======
                //DEBUG("unknown algorithm, s=%s",a->a_name);
->>>>>>> dev
             }    
          } else if(!strcasecmp(a->a_name, "ice-ufrag")) {
             remote_user = a->a_value;
@@ -1062,11 +880,7 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
    }
 
    if (!remote_user || !remote_pass || !remote_hashing || !remote_fingerprint) {
-<<<<<<< HEAD
-      ICE_ERROR2("global credentials not found");
-=======
       //ERROR("global credentials not found");
->>>>>>> dev
       return -1;
    }
 
@@ -1075,15 +889,9 @@ snw_ice_sdp_get_global_credentials(snw_ice_session_t *session, sdp_session_t *re
    memcpy(session->remote_hashing,remote_hashing,strlen(remote_hashing));
    memcpy(session->remote_fingerprint,remote_fingerprint,strlen(remote_fingerprint));
 
-<<<<<<< HEAD
-   ICE_DEBUG2("global credentials, ruser=%s, rpass=%s, rhashing=%s, rfingerprint=%s",
-         session->remote_user, session->remote_pass, 
-         session->remote_hashing, session->remote_fingerprint);
-=======
    //DEBUG("global credentials, ruser=%s, rpass=%s, rhashing=%s, rfingerprint=%s",
    //      session->remote_user, session->remote_pass, 
    //      session->remote_hashing, session->remote_fingerprint);
->>>>>>> dev
 
    return 0;
 }
@@ -1098,11 +906,7 @@ snw_ice_sdp_get_candidate(snw_ice_session_t *session, snw_ice_stream_t *stream, 
          if (!strcasecmp(a->a_name, "candidate")) {
             int ret = snw_ice_sdp_handle_candidate(stream, (const char *)a->a_value);
             if (ret != 0) {
-<<<<<<< HEAD
-               ICE_DEBUG2("failed to parse candidate, ret=%d", ret);
-=======
                //DEBUG("failed to parse candidate, ret=%d", ret);
->>>>>>> dev
             }
          }
 
@@ -1110,11 +914,7 @@ snw_ice_sdp_get_candidate(snw_ice_session_t *session, snw_ice_stream_t *stream, 
             int video = m->m_type == sdp_media_video;
             int ret = snw_sdp_stream_update_ssrc(stream, (const char *)a->a_value, video);
             if (ret != 0) {
-<<<<<<< HEAD
-               ICE_DEBUG2("failed to update SSRC, ret=%d", ret);
-=======
                //DEBUG("failed to update SSRC, ret=%d", ret);
->>>>>>> dev
             }
          }
       }
@@ -1133,11 +933,7 @@ snw_ice_sdp_handle_answer(snw_ice_session_t *session, char *sdp) {
    sdp_parser_t *parser = 0;
    int audio = 0, video = 0; 
 
-<<<<<<< HEAD
-   if (!session) return -1;
-=======
    if (!session || !session->ice_ctx) return -1;
->>>>>>> dev
    log = session->ice_ctx->log;
 
    parser = snw_ice_sdp_get_parser(session->ice_ctx, sdp);
