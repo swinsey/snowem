@@ -1,18 +1,39 @@
 #ifndef _SNOW_ICE_CHANNEL_H_
 #define _SNOW_ICE_CHANNEL_H_
 
+<<<<<<< HEAD
 #include "ice_types.h"
 #include "types.h"
+=======
+#include "core/types.h"
+#include "ice_types.h"
+>>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+<<<<<<< HEAD
 #define SNW_ICE_CHANNEL_USER_NUM_MAX 5
 typedef struct snw_ice_channel snw_ice_channel_t;
 struct snw_ice_channel {
    uint32_t id;
    uint32_t ownerid;
+=======
+#define SNW_ICE_CHANNEL_USER_NUM_MAX 500
+typedef struct snw_play_list snw_play_list_t;
+struct snw_play_list {
+   uint32_t idx;
+   uint32_t list[SNW_ICE_CHANNEL_USER_NUM_MAX];
+};
+
+typedef struct snw_ice_channel snw_ice_channel_t;
+struct snw_ice_channel {
+   uint32_t id;     //channelid
+   uint32_t peerid; //owner's peerid
+
+   uint32_t idx;
+>>>>>>> dev
    uint32_t players[SNW_ICE_CHANNEL_USER_NUM_MAX];
 };
 
@@ -37,6 +58,11 @@ snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c);
 void
 snw_channel_add_subscriber(snw_ice_context_t *ctx, uint32_t channelid, uint32_t flowid);
 
+<<<<<<< HEAD
+=======
+void
+snw_channel_remove_subscriber(snw_ice_context_t *ctx, uint32_t channelid, uint32_t flowid);
+>>>>>>> dev
 
 #ifdef __cplusplus
 }

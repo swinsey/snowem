@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <jansson.h>
 
+<<<<<<< HEAD
 #include "cicero/agent.h"
 #include "core.h"
 #include "dtls.h"
@@ -11,6 +12,16 @@
 #include "packet.h"
 #include "rtp.h"
 #include "vp8.h"
+=======
+#include "cice/agent.h"
+#include "core/core.h"
+#include "ice/dtls.h"
+#include "ice/ice_types.h"
+//#include "ice/vp8.h"
+#include "rtp/packet.h"
+#include "rtp/rtp.h"
+#include "rtp/rtp_nack.h"
+>>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,6 +38,10 @@ struct snw_ice_component {
    int64_t           fir_latest;   
    uint8_t           fir_seq;
 
+<<<<<<< HEAD
+=======
+   //TODO: store them in rtp_nack module
+>>>>>>> dev
    rtp_slidewin_t    a_slidewin;
    rtp_slidewin_t    v_slidewin;
 

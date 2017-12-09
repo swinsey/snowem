@@ -37,9 +37,21 @@ snw_flowset_init(uint32_t num) {
    for (i = 1; i < num; i++) {
       flow = flowset->data + i;
       INIT_LIST_HEAD(&flow->list);
+<<<<<<< HEAD
       flow->flowid = i;
       flow->obj = 0;
       list_add_tail(&flow->list, &flowset->freelist);
+=======
+      //flow->flowid = i;
+      flow->flowid = i + flowset->baseidx;
+      flow->obj = 0;
+      if (random()%2) {
+         list_add(&flow->list, &flowset->freelist);
+      } else {
+         list_add_tail(&flow->list, &flowset->freelist);
+      }
+      //list_add_tail(&flow->list, &flowset->freelist);
+>>>>>>> dev
    }
 
    return flowset;
@@ -69,10 +81,17 @@ snw_flowset_freeid(snw_flowset_t *s, uint32_t id) {
    if (s == 0 || id == 0)
       return;
    
+<<<<<<< HEAD
    if (id >= s->totalnum)
       return;
    
    flow = s->data + id;
+=======
+   if (!snw_flowset_is_in_range(s,id))
+      return;
+   
+   flow = s->data + (id - s->baseidx);
+>>>>>>> dev
    flow->obj = 0;
    list_move_tail(&flow->list,&s->freelist);
    if (s->usednum == 0)
@@ -90,10 +109,17 @@ snw_flowset_setobj(snw_flowset_t *s, uint32_t id, void *obj) {
    if (s == 0 || id == 0)
       return;
    
+<<<<<<< HEAD
    if (id >= s->totalnum)
       return;
  
    flow = s->data + id;
+=======
+   if (!snw_flowset_is_in_range(s,id))
+      return;
+ 
+   flow = s->data + (id - s->baseidx);
+>>>>>>> dev
    flow->obj = obj;
    return;
 }
@@ -105,10 +131,17 @@ snw_flowset_getobj(snw_flowset_t *s, uint32_t id) {
    if (s == 0 || id == 0)
       return 0;
    
+<<<<<<< HEAD
    if (id >= s->totalnum)
       return 0;
  
    flow = s->data + id;
+=======
+   if (!snw_flowset_is_in_range(s,id))
+      return 0;
+
+   flow = s->data + (id - s->baseidx);
+>>>>>>> dev
    return flow->obj;
 }
 
@@ -118,6 +151,14 @@ snw_flowset_free(snw_flowset_t *set) {
    return;
 }
 
+<<<<<<< HEAD
+=======
+int
+snw_flowset_is_in_range(snw_flowset_t *s, uint32_t id) {
+   if (!s) return 0;
+   return s->totalnum > (id - s->baseidx);
+}
+>>>>>>> dev
 
 
 

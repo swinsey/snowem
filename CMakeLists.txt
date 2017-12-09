@@ -6,10 +6,8 @@ include(CheckLibraryExists)
 include(CheckSymbolExists)
 include(CheckTypeSize)
 
-add_subdirectory(cicero)
+add_subdirectory(cice)
 add_subdirectory(wslay)
-add_subdirectory(modules/videocall)
-#add_subdirectory(modules/democall)
 
 SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 
@@ -18,22 +16,17 @@ SET(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
 file(GLOB sources 
        core/*.c core/*.cpp core/*.h 
        ice/*.c ice/*.h 
-       #modules/*.c modules/*.h 
        jsoncpp/*.cpp jsoncpp/json/*.h
-       websocket/*.c websocket/*.h)
+       websocket/*.c websocket/*.h
+       rtp/*.c rtp/*.h
+       )
 file(GLOB c_sources core/*.c ice/*.c websocket/*.c)
 SET_SOURCE_FILES_PROPERTIES(${c_source} PROPERTIES LANGUAGE CXX)
 
-## target definitions #########################################################
-#add_executable(example ${sources} ${data})
+## target definitions #
 add_executable(snowem ${sources})
-
-# Just for example add some compiler flags.
 target_compile_options(snowem PUBLIC -g -Wall)
-#add_definitions(-DBASE_FILE_NAME="$(<F)")
-
-# This allows to include files relative to the root of the src directory with a <> pair
-target_include_directories(snowem PUBLIC . jsoncpp core ice modules)
+target_include_directories(snowem PUBLIC . jsoncpp)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindDL.cmake)
 if (${DL_FOUND})
@@ -106,9 +99,6 @@ else ()
    MESSAGE(FATAL_ERROR LIBCONFIG not found)
 endif ()
 
-
-
-
 #include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindFFmpeg.cmake)
 #if (${FFMPEG_FOUND})
 #   target_include_directories(snowem PUBLIC ${FFMPEG_INCLUDE_DIR})
@@ -116,9 +106,8 @@ endif ()
 #   MESSAGE(FATAL_ERROR FFMPEG not found)
 #endif (${FFMPEG_FOUND})
 
-
 target_link_libraries(snowem PUBLIC
-  cicero
+  cice
   wslay
   ${DL_LIBRARIES}
   ${OPENSSL_LIBRARIES}
@@ -131,21 +120,10 @@ target_link_libraries(snowem PUBLIC
   ${CONFIG_LIBRARIES}
 )
 
-## packaging ##################################################################
-# All install commands get the same destination. this allows us to use paths
-# relative to the executable.
+# packaging #
 install(TARGETS snowem DESTINATION bin)
-
-# Now comes everything we need, to create a package
-# there are a lot more variables you can set, and some
-# you need to set for some package types, but we want to
-# be minimal here.
 set(CPACK_PACKAGE_NAME "snowem")
 set(CPACK_PACKAGE_VERSION "1.0.0")
-
-# We don't want to split our program up into several incomplete pieces.
 set(CPACK_MONOLITHIC_INSTALL 1)
-
-# This must be last
 include(CPack)
 

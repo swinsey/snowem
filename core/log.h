@@ -48,8 +48,13 @@ extern "C" {
 
 enum {           
 	SNW_TRACE = 0,
+<<<<<<< HEAD
 	SNW_INFO  = 1,
    SNW_DEBUG = 2,
+=======
+   SNW_DEBUG = 1,
+	SNW_INFO  = 2,
+>>>>>>> dev
    SNW_WARN  = 3,
    SNW_ERROR = 4,
    SNW_FATAL = 5

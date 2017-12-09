@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+<<<<<<< HEAD
 #define CCD_OK (0)
 #define CCD_ERR (-1)
 
@@ -61,6 +62,15 @@ char* trimwhitespace(char *str);
 void hexdump(char* p,int len, const char* type);
 char* ip_to_str(unsigned int ip);
 int64_t get_real_time(void);
+=======
+#define NTP_EPOCH_DIFF 2208988800000L
+
+void print_buffer(char *p, int len, const char *prefix);
+char* trimwhitespace(char *str);
+char* ip_to_str(unsigned int ip);
+int64_t get_ntp_time(void);
+int64_t get_epoch_time(void);
+>>>>>>> dev
 int64_t get_monotonic_time(void);
 int create_dir(const char *dir, mode_t mode);
 

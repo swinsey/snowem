@@ -10,7 +10,11 @@
 #include "mq.h"
 #include "module.h"
 #include "log.h"
+<<<<<<< HEAD
 #include "ice.h"
+=======
+#include "ice/ice.h"
+>>>>>>> dev
 #include "websocket/websocket.h"
 
 snw_context_t*
@@ -81,8 +85,11 @@ snw_net_init_ssl(snw_context_t *ctx) {
    SSL_CTX  *server_ctx = NULL;
    std::string cert_str,key_str;
 
+<<<<<<< HEAD
    DEBUG(ctx->log,"init net ssl");
 
+=======
+>>>>>>> dev
    /* Initialize the OpenSSL library */
    SSL_load_error_strings();
    SSL_library_init();
@@ -94,18 +101,30 @@ snw_net_init_ssl(snw_context_t *ctx) {
 
    server_ctx = SSL_CTX_new(SSLv23_server_method());
    if (server_ctx == NULL) { 
+<<<<<<< HEAD
       ERROR(ctx->log,"failed to init ssll");
       return -2; 
    }
 
    DEBUG(ctx->log,"ssl info, cert_file=%s,key_file=%s",ctx->wss_cert_file,ctx->wss_key_file);
+=======
+      ERROR(ctx->log,"failed to create ssl ctx");
+      return -2; 
+   }
+
+   DEBUG(ctx->log,"ssl info, cert_file=%s, key_file=%s",
+         ctx->wss_cert_file,ctx->wss_key_file);
+>>>>>>> dev
 
    if (! SSL_CTX_use_certificate_chain_file(server_ctx, ctx->wss_cert_file) ||
        ! SSL_CTX_use_PrivateKey_file(server_ctx, ctx->wss_key_file, SSL_FILETYPE_PEM)) {
        ERROR(ctx->log,"failed to read cert or key files");
        return -3;
    }
+<<<<<<< HEAD
    //SSL_CTX_set_options(server_ctx, SSL_OP_NO_SSLv2);*/
+=======
+>>>>>>> dev
    ctx->ssl_ctx = server_ctx;
 
    return 0;
@@ -121,6 +140,7 @@ snw_net_dispatch_msg(int fd, short int event,void* data) {
    uint32_t flowid = 0;
    uint32_t cnt = 0;
    int ret = 0; 
+<<<<<<< HEAD
    //time_t cur_time = time(0);
    
    DEBUG(ctx->log,"net dispatch msg");
@@ -131,6 +151,15 @@ snw_net_dispatch_msg(int fd, short int event,void* data) {
      //if ( cnt % 10000 == 0 ) break;
      if ( cnt >= 100) {
          //DEBUG("dequeue_from_ccd: breaking the loop, cnt=%d", cnt);
+=======
+   
+   while (true) {
+     len = 0;
+     flowid = 0;
+     cnt++;
+
+     if ( cnt >= 100) {
+>>>>>>> dev
          break;
      }
 
@@ -161,7 +190,11 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
              "/tmp/snw_net2core_mq.fifo", 0, 0, 
              NET2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
+<<<<<<< HEAD
       ERROR(ctx->log,"failed to init net2core mq");
+=======
+      ERROR(ctx->log,"failed to message queue");
+>>>>>>> dev
       return -2;
    }
 
@@ -175,10 +208,16 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
              "/tmp/snw_core2net_mq.fifo", 0, 0, 
              CORE2NET_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
+<<<<<<< HEAD
       ERROR(ctx->log,"failed to init net2core mq");
       return -2;
    }
    DEBUG(ctx->log,"core2net fd=%d",ctx->snw_core2net_mq->_fd);
+=======
+      ERROR(ctx->log,"failed to message queue");
+      return -2;
+   }
+>>>>>>> dev
 
    return 0;
 }
@@ -199,7 +238,10 @@ snw_net_setup(snw_context_t *ctx) {
    snw_net_init_shmqueue(ctx);
    snw_net_init_ssl(ctx);
 
+<<<<<<< HEAD
    DEBUG(ctx->log,"start websocket process");
+=======
+>>>>>>> dev
    snw_websocket_init(ctx,snw_net_dispatch_msg);
   
    return;
@@ -212,7 +254,12 @@ snw_worker_setup(snw_context_t *ctx) {
    if ( ctx->log == 0 )
       exit(0);   
 
+<<<<<<< HEAD
    DEBUG(ctx->log,"start worker process");
+=======
+   //FIXME: impl
+
+>>>>>>> dev
    return;
 }
 

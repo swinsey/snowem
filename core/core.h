@@ -12,11 +12,19 @@
 #include <openssl/rand.h>
 
 #include "cache.h"
+<<<<<<< HEAD
+=======
+#include "channel_mgr.h"
+#include "ice/ice.h"
+>>>>>>> dev
 #include "mempool.h"
 #include "mq.h"
 #include "module.h"
 #include "types.h"
+<<<<<<< HEAD
 #include "ice.h"
+=======
+>>>>>>> dev
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +57,10 @@ struct snw_context {
    uint32_t            log_file_maxsize;
    uint32_t            log_rotate_num;
    uint32_t            log_level;
+<<<<<<< HEAD
+=======
+   int                 ice_log_enabled;
+>>>>>>> dev
 
    /* message queues */
    snw_shmmq_t  *snw_ice2core_mq;
@@ -57,7 +69,15 @@ struct snw_context {
    snw_shmmq_t  *snw_core2net_mq;
 
    /* caches */
+<<<<<<< HEAD
    snw_hashbase_t *session_cache;
+=======
+   snw_hashbase_t *channel_cache;
+   snw_hashbase_t *peer_cache;
+
+   /* channel set */
+   snw_set_t      *channel_mgr;
+>>>>>>> dev
 
    /* mempool for fixed-size objects */
    snw_mempool_t *rcvvars_mp;

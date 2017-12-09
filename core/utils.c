@@ -59,6 +59,7 @@ trimwhitespace(char *str)
   return str;
 }
 
+<<<<<<< HEAD
 void 
 hexdump(char* p,int len, const char* type)
 {  
@@ -85,6 +86,8 @@ hexdump(char* p,int len, const char* type)
    return;
 }
 
+=======
+>>>>>>> dev
 char* 
 ip_to_str(unsigned int ip)
 {       
@@ -92,17 +95,35 @@ ip_to_str(unsigned int ip)
    inaddr.s_addr=ip;
    return (inet_ntoa(inaddr));
 }       
+<<<<<<< HEAD
    
 int64_t get_real_time(void) {
    struct timespec ts; 
    clock_gettime (CLOCK_REALTIME, &ts);
    return (ts.tv_sec*1000000) + (ts.tv_nsec/(1000));
+=======
+
+int64_t get_ntp_time(void) {
+   struct timespec ts; 
+   clock_gettime (CLOCK_REALTIME, &ts);
+   return ((ts.tv_sec + 2208988800L)*1000) + (ts.tv_nsec/(1000000));
+} 
+
+int64_t get_epoch_time(void) {
+   struct timespec ts; 
+   clock_gettime (CLOCK_REALTIME, &ts);
+   return (ts.tv_sec*1000) + (ts.tv_nsec/(1000000));
+>>>>>>> dev
 }           
 
 int64_t get_monotonic_time(void) {
    struct timespec ts; 
    clock_gettime (CLOCK_MONOTONIC, &ts);
+<<<<<<< HEAD
    return (ts.tv_sec*((int64_t)1000000)) + (ts.tv_nsec/((int64_t)1000));
+=======
+   return (ts.tv_sec*((int64_t)1000)) + (ts.tv_nsec/((int64_t)1000000));
+>>>>>>> dev
 }
 
 int create_dir(const char *dir, mode_t mode) {
