@@ -15,6 +15,8 @@ Snowem depends on the following libraries to build:
 ```shell
 git clone https://github.com/jackiedinh8/snowem.git
 cd snowem
+git submodule init
+git submodule update
 mkdir build
 cd build
 cmake ..
