@@ -51,19 +51,19 @@ struct snw_adapctl
 typedef struct snw_shmmq snw_shmmq_t;
 struct snw_shmmq
 {
-	snw_shm_t* _shm;
-   uint32_t        _fd;          //fifo file, used for notification.
-   uint32_t        _wait_sec;
-   uint32_t        _wait_usec;
-   uint32_t        _count;
-   snw_adapctl_t *_adaptive_ctrl;
+  snw_shm_t* _shm;
+  uint32_t        _fd;          //fifo file, used for notification.
+  uint32_t        _wait_sec;
+  uint32_t        _wait_usec;
+  uint32_t        _count;
+  snw_adapctl_t *_adaptive_ctrl;
 
-	uint32_t*       _head;
-	uint32_t*       _tail;
-	char*           _block;
-	uint32_t        _block_size;
-   uint32_t*       _enqueued_msg_cnt;
-   uint32_t*       _dequeued_msg_cnt;
+  uint32_t*       _head;
+  uint32_t*       _tail;
+  char*           _block;
+  uint32_t        _block_size;
+  uint32_t*       _enqueued_msg_cnt;
+  uint32_t*       _dequeued_msg_cnt;
 }__attribute__((packed));
 
 void 
