@@ -111,7 +111,6 @@ void message_handler(struct evwsconn* conn, enum evws_data_type data_type,
    
   snw_shmmq_enqueue(g_ctx->snw_net2core_mq,
       cur_time,buf,len+sizeof(event),conn->flowid);
-  //g_mq_ccd_2_mcd->enqueue(cur_time,buf,len+sizeof(header),conn->flowid);
 
   return;
 }

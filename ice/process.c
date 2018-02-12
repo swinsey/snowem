@@ -1554,7 +1554,6 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
    Json::FastWriter writer;
    const char *jsep_type = 0;
    char *jsep_sdp = 0;
-   //sdp_parser_t *sdp_parser = 0;
    std::string output;
    int ret = 0;
 
@@ -1604,7 +1603,7 @@ snw_ice_sdp_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) 
 
       if (!IS_FLAG(session, WEBRTC_READY)) {
          session->remote_sdp = strdup(jsep_sdp);
-         snw_ice_sdp_handle_answer(session, jsep_sdp);//sdp_parser);
+         snw_ice_sdp_handle_answer(session, jsep_sdp);
 
          DEBUG(log, "setting webrtc flags, bundle=%u,rtcpmux=%u,trickle=%u",
                   sdp_attr.bundle,sdp_attr.rtcpmux,sdp_attr.trickle);
@@ -1652,6 +1651,7 @@ jsondone:
       free(jsep_sdp);
    return;
 }
+
 int ice_sdp_handle_candidate(snw_ice_stream_t *stream, const char *candidate) {
    snw_log_t *log = 0;
    snw_ice_session_t *session = 0;
@@ -1863,7 +1863,6 @@ snw_ice_play_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid)
    }
    snw_channel_add_subscriber(ice_ctx, channelid, flowid);
    session->live_channelid = channelid;
-
   
    return;
 }
