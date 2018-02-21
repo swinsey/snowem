@@ -18,9 +18,17 @@ struct snw_peer_list {
    struct list_head list;
 };
 
+/* Channel type */
+enum {
+   SNW_BCST_CHANNEL_TYPE = 0,
+   SNW_CALL_CHANNEL_TYPE = 1,
+   SNW_CONF_CHANNEL_TYPE = 2,
+};
+
 typedef struct snw_channel snw_channel_t;
 struct snw_channel {
    uint32_t id;     //channelid
+   uint32_t type;   //channel type
    uint32_t flowid; //owner's flowid
    uint32_t peerid; //owner's peerid
    uint32_t peers[SNW_CORE_CHANNEL_USER_NUM_MAX];
