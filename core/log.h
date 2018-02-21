@@ -48,11 +48,11 @@ extern "C" {
 
 enum {           
 	SNW_TRACE = 0,
-   SNW_DEBUG = 1,
+  SNW_DEBUG = 1,
 	SNW_INFO  = 2,
-   SNW_WARN  = 3,
-   SNW_ERROR = 4,
-   SNW_FATAL = 5
+  SNW_WARN  = 3,
+  SNW_ERROR = 4,
+  SNW_FATAL = 5
 };
 
 struct snw_log {
@@ -75,8 +75,8 @@ void
 snw_log_write_pure(snw_log_t *log, uint32_t level, const char* msg, ...);
 
 #define LOG(_log_,_level_,fmt, ...) \
-{ snw_log_write(_log_,_level_,__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
-//{ snw_log_write(_log_,_level_,__FUNCTION__, __LINE__,fmt, ##__VA_ARGS__); }
+{ snw_log_write(_log_,_level_,__FUNCTION__, __LINE__,fmt, ##__VA_ARGS__); }
+//{ snw_log_write(_log_,_level_,__FILE__, __LINE__,fmt, ##__VA_ARGS__); }
 
 #define TRACE(_log_,_fmt, ...) do {} while(0)
 #define INFO(_log_,_fmt, ...)  do {} while(0)
