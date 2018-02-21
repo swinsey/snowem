@@ -71,6 +71,8 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
    snw_channel_t *channel = 0;
    snw_peer_t *peer = 0;
    uint32_t channelid = 0;
+   std::string type_str;
+   uint32_t channel_type = 0;
    uint32_t peerid = 0;
    int is_new = 0;
    
@@ -80,6 +82,20 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
       if (!peer) {
          ERROR(log, "peer not found, flowid=%u, peerid=%u", conn->flowid, peerid);
          return -1;
+      }
+
+      type_str = root["type"].asString();
+      if (!strcmp(type_str.c_str(),"broadcast")) {
+        channel_type = SNW_BCST_CHANNEL_TYPE;
+      } else 
+      if (!strcmp(type_str.c_str(),"call")) {
+        channel_type = SNW_CALL_CHANNEL_TYPE;
+      } else 
+      if (!strcmp(type_str.c_str(),"conference")) {
+        channel_type = SNW_CONF_CHANNEL_TYPE;
+      } else {
+        ERROR(log, "unknow channel type: %s", type_str.c_str());
+        return -2;
       }
 
       //Step1: get channel id from a pool.
@@ -102,6 +118,7 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
       }
       channel->flowid = conn->flowid;
       channel->peerid = peer->peerid;
+      channel->type = channel_type;
       peer->channelid = channelid;
        
       DEBUG(log,"create channel, channelid=%u", channelid);
