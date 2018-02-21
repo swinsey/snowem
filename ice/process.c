@@ -239,8 +239,10 @@ snw_ice_create_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowi
       }
       DEBUG(log,"new channel created, channelid=%u", channelid);
       channel->peerid = flowid;
+
+      //TODO: not useful for frontend?
       root["id"] = flowid;
-      root["channelid"] = flowid; //FIXME: create 'real' sessionid
+      root["channelid"] = channelid;
       root["rc"] = 0;
       snw_ice_send_msg_to_core(ice_ctx,root,flowid,0);
 
