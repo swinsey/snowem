@@ -68,6 +68,8 @@ enum {
    SNW_SIG_CREATE = 2,
    SNW_SIG_CONNECT = 3,
    SNW_SIG_CALL = 4,
+   SNW_SIG_PUBLISH = 5,
+   SNW_SIG_PLAY = 6,
 
    // internal api
    SNW_SIG_SDP = 128,

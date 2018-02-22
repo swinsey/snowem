@@ -11,6 +11,7 @@ extern "C" {
 #include "types.h"
 
 #define SNW_CORE_CHANNEL_USER_NUM_MAX 100
+#define SNW_SUBCHANNEL_NUM_MAX 10
 
 typedef struct snw_peer_list snw_peer_list_t;
 struct snw_peer_list {
@@ -27,10 +28,12 @@ enum {
 
 typedef struct snw_channel snw_channel_t;
 struct snw_channel {
-   uint32_t id;     //channelid
-   uint32_t type;   //channel type
-   uint32_t flowid; //owner's flowid
-   uint32_t peerid; //owner's peerid
+   uint32_t id;       //channelid
+   uint32_t type;     //channel type
+   uint32_t flowid;   //owner's flowid
+   uint32_t peerid;   //owner's peerid
+   uint32_t parentid; //parent channel's id
+   uint32_t subchannels[SNW_SUBCHANNEL_NUM_MAX];
    uint32_t peers[SNW_CORE_CHANNEL_USER_NUM_MAX];
 };
 
