@@ -96,12 +96,15 @@ void
 snw_print_channel_info(snw_ice_context_t *ctx, snw_ice_channel_t *c) {
    static char buffer[SNW_ICE_CHANNEL_USER_NUM_MAX * 11];
    int i = 0;
+   int j = 0;
 
    if (!ctx) return;
 
    memset(buffer,0, SNW_ICE_CHANNEL_USER_NUM_MAX * 11);
-   for(i=0; i< SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
-      sprintf(buffer + i*10, "%9u ", c->players[i]);
+   for(i=0,j=0; i< SNW_ICE_CHANNEL_USER_NUM_MAX; i++) {
+     if(c->players[i] == 0) continue;
+     sprintf(buffer + j*10, "%9u ", c->players[i]);
+     j++;
    }
    DEBUG(ctx->log, "channel info, id=%u, idx=%u, players= %s",
          c->id, c->idx, buffer);

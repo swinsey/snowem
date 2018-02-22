@@ -1212,7 +1212,8 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    DEBUG(log,"init new session, channelid=%u, peer_type=%s, flowid=%u", 
          channelid, peer_type.c_str(), session->flowid);
    
-   session->channelid = channelid;
+   session->channelid = 0;
+   session->channel = 0;
    session->control_mode = ICE_CONTROLLED_MODE;
    session->base = ctx->ev_base;
    session->flags = 0;
@@ -1233,14 +1234,6 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
       session->peer_type = PEER_TYPE_UNKNOWN;
       return;
    }
-
-   DEBUG(log,"search channel, flowid=%u, channelid=%u",flowid,channelid);
-   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
-   if (!channel) {
-      ERROR(log,"channel not found, flowid=%u, channleid=%u",flowid,channelid);
-      return;
-   }
-   session->channel = channel;
 
    snw_ice_offer_sdp(ice_ctx,session,flowid,0);
 
@@ -1831,15 +1824,32 @@ void
 snw_ice_publish_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid) {
    snw_log_t *log = 0;
    snw_ice_session_t *session = 0;
+   uint32_t channelid;
+   snw_ice_channel_t *channel = 0;
 
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
    session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
    if (!session) return;
-   
+
+   try {
+     channelid = root["channelid"].asUInt();
+   } catch (...) {
+     ERROR(log, "json format error");
+     return;
+   }
+
    DEBUG(log, "channel is publishing, flowid=%u, channelid=%u", 
-         flowid, session->channelid);
+         flowid, channelid);
+   session->channelid = channelid;
+   channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
+   if (!channel) {
+      ERROR(log,"channel not found, flowid=%u, channleid=%u",flowid,channelid);
+      return;
+   }
+   session->channel = channel;
+
    SET_FLAG(session,ICE_PUBLISHER);
    
    return;
@@ -1857,7 +1867,7 @@ snw_ice_play_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flowid)
    session = (snw_ice_session_t*)snw_ice_session_search(ice_ctx, flowid);
    if (!session) return;
    SET_FLAG(session,ICE_SUBSCRIBER);
-   
+
    try {
       channelid = root["channelid"].asUInt();
    } catch (...) {

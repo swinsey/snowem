@@ -85,13 +85,13 @@ snw_sig_create_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root
       }
 
       type_str = root["type"].asString();
-      if (!strcmp(type_str.c_str(),"broadcast")) {
+      if (!strncmp(type_str.c_str(),"broadcast",9)) {
         channel_type = SNW_BCST_CHANNEL_TYPE;
       } else 
-      if (!strcmp(type_str.c_str(),"call")) {
+      if (!strncmp(type_str.c_str(),"call",4)) {
         channel_type = SNW_CALL_CHANNEL_TYPE;
       } else 
-      if (!strcmp(type_str.c_str(),"conference")) {
+      if (!strncmp(type_str.c_str(),"conference",10)) {
         channel_type = SNW_CONF_CHANNEL_TYPE;
       } else {
         ERROR(log, "unknow channel type: %s", type_str.c_str());
@@ -230,8 +230,8 @@ snw_sig_call_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) 
       //TODO: verify peer in channel
       //channelid = root["channelid"].asUInt();
       
-      DEBUG(log,"forward call req to peer, flowid=%u, peerid=%u",conn->flowid, peerid);
       output = writer.write(root);
+      //FIXME: correct me, not ice2core!!!
       snw_shmmq_enqueue(ctx->snw_ice2core_mq,0,output.c_str(),output.size(),peerid);
    } catch (...) {
       ERROR(log, "json format error");
@@ -240,6 +240,137 @@ snw_sig_call_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) 
    return 0;
 }
 
+void
+snw_sig_add_subchannel(snw_channel_t *channel, uint32_t channelid) {
+
+  if (!channel) return;
+
+  for (int i=0; i < SNW_SUBCHANNEL_NUM_MAX; i++) {
+    if (channel->subchannels[i] == 0)
+      channel->subchannels[i] = channelid;
+  }
+
+  return;
+}
+
+int
+snw_sig_publish_subchannel(snw_context_t *ctx, snw_connection_t *conn,
+    snw_channel_t *channel, Json::Value &root) {
+  snw_log_t *log = ctx->log;
+  uint32_t channelid = 0;
+  int is_new = 0;
+  snw_channel_t *subchannel = 0;
+  Json::FastWriter writer;
+  Json::Value req;
+  std::string output;
+
+  channelid = snw_set_getid(ctx->channel_mgr);
+  if (channelid == 0) {
+    ERROR(log, "can not create channel, flowid=%u", conn->flowid);
+    return -1;
+  }
+
+  subchannel = snw_channel_get(ctx->channel_cache,channelid,&is_new);
+  if (channel == 0) {
+    ERROR(log, "can not create channel, flowid=%u", conn->flowid);
+    return -2;
+  }
+  if (!is_new) {
+    ERROR(log,"reseting existing channel, channelid=%u",channelid);
+    memset(channel,0,sizeof(snw_channel_t));
+    subchannel->id = channelid;
+    return -3;
+  }
+  subchannel->flowid = channel->flowid;
+  subchannel->peerid = channel->peerid;
+  subchannel->parentid = channel->id;
+  subchannel->type = SNW_BCST_CHANNEL_TYPE;
+  snw_sig_add_subchannel(channel, channelid);
+
+  // send resp msg
+  root["subchannelid"] = channelid;
+  root["rc"] = 0;
+  output = writer.write(root);
+  snw_shmmq_enqueue(ctx->snw_core2net_mq,0,output.c_str(),
+       output.size(),conn->flowid);
+
+  //inform ice component about new channel
+  req["msgtype"] = SNW_ICE;
+  req["api"] = SNW_ICE_CREATE;
+  req["channelid"] = channelid;
+  output = writer.write(req);
+  snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),
+        output.size(),conn->flowid);
+
+  // publish subchannel
+  req["api"] = SNW_ICE_PUBLISH;
+  output = writer.write(req);
+  snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),
+        output.size(),conn->flowid);
+
+  return channelid;
+}
+
+int
+snw_sig_publish_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+   uint32_t channelid = 0;
+   uint32_t sub_channelid = 0;
+   snw_channel_t *channel = 0;
+
+   try {
+
+     channelid = root["channelid"].asUInt();
+     channel = snw_channel_search(ctx->channel_cache,channelid);
+     if (!channel) {
+       ERROR(log, "channel not found, channelid=%u", channelid);
+       return -1;
+     }
+     DEBUG(log,"publish req, flowid=%u, channelid=%u, type=%u",
+       conn->flowid, channelid, channel->type);
+
+     if (channel->type == SNW_CONF_CHANNEL_TYPE) {
+       sub_channelid = snw_sig_publish_subchannel(ctx, conn, channel, root);
+       return 0;
+     }
+
+     if (channel->type != SNW_CALL_CHANNEL_TYPE
+         && channel->type != SNW_BCST_CHANNEL_TYPE) {
+       ERROR(log, "unknow channel type, type=%u", channel->type);
+       return -2;
+     }
+
+     root["msgtype"] = SNW_ICE;
+     root["api"] = SNW_ICE_PUBLISH;
+     output = writer.write(root);
+     snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch (...) {
+     ERROR(log, "json format error");
+   }
+
+   return 0;
+}
+
+int
+snw_sig_play_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
+   snw_log_t *log = ctx->log;
+   Json::FastWriter writer;
+   std::string output;
+
+   try {
+
+      root["msgtype"] = SNW_ICE;
+      root["api"] = SNW_ICE_PLAY;
+      output = writer.write(root);
+      snw_shmmq_enqueue(ctx->snw_core2ice_mq,0,output.c_str(),output.size(),conn->flowid);
+   } catch (...) {
+      ERROR(log, "json format error");
+   }
+
+   return 0;
+}
 
 int
 snw_sig_sdp_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
@@ -297,6 +428,12 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
             break;
          case SNW_SIG_CALL:
             snw_sig_call_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_PUBLISH:
+            snw_sig_publish_msg(ctx,conn,root);
+            break;
+         case SNW_SIG_PLAY:
+            snw_sig_play_msg(ctx,conn,root);
             break;
          case SNW_SIG_SDP:
             snw_sig_sdp_msg(ctx,conn,root);
