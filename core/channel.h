@@ -26,6 +26,12 @@ enum {
    SNW_CONF_CHANNEL_TYPE = 2,
 };
 
+typedef struct snw_subchannel snw_subchannel_t;
+struct snw_subchannel {
+  uint32_t peerid;
+  uint32_t channelid;
+};
+
 typedef struct snw_channel snw_channel_t;
 struct snw_channel {
    uint32_t id;       //channelid
@@ -33,7 +39,9 @@ struct snw_channel {
    uint32_t flowid;   //owner's flowid
    uint32_t peerid;   //owner's peerid
    uint32_t parentid; //parent channel's id
-   uint32_t subchannels[SNW_SUBCHANNEL_NUM_MAX];
+   snw_subchannel_t subchannels[SNW_SUBCHANNEL_NUM_MAX];
+
+   int      idx;
    uint32_t peers[SNW_CORE_CHANNEL_USER_NUM_MAX];
 };
 
@@ -51,6 +59,7 @@ snw_channel_insert(snw_hashbase_t *ctx, snw_channel_t *sitem);
 
 int 
 snw_channel_remove(snw_hashbase_t *ctx, snw_channel_t *sitem);
+
 
 
 #ifdef __cplusplus

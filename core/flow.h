@@ -9,6 +9,9 @@ extern "C" {
 
 #include "linux_list.h"
 
+#define SNW_CORE_FLOW_BASE_IDX 33212368
+#define SNW_CORE_FLOW_NUM_MAX  10*1024
+
 typedef struct snw_flow snw_flow_t;
 struct snw_flow {
    struct list_head  list;

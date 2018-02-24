@@ -123,7 +123,7 @@ snw_channel_add_subscriber(snw_ice_context_t *ice_ctx,
    if (!ice_ctx) return;
    log = ice_ctx->log;
 
-   DEBUG(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
+   ERROR(log, "subscribing channel, flowid=%u, channelid=%u", flowid, channelid);
    channel = (snw_ice_channel_t*)snw_ice_channel_search(ice_ctx,channelid);
    if (!channel) return;
 
