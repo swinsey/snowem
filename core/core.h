@@ -13,6 +13,7 @@
 
 #include "cache.h"
 #include "channel_mgr.h"
+#include "flow.h"
 #include "ice/ice.h"
 #include "mempool.h"
 #include "mq.h"
@@ -70,7 +71,21 @@ struct snw_context {
 
    snw_module_t  *module;
    snw_module_t   modules;
+
+   /* map from flowid to peerid */
+   uint32_t flow2peer[SNW_CORE_FLOW_NUM_MAX];
 };
+
+#define SET_FLOW2PEER(flowid,peerid) \
+  if (flowid > SNW_CORE_FLOW_BASE_IDX \
+      && ((flowid - SNW_CORE_FLOW_BASE_IDX) < SNW_CORE_FLOW_NUM_MAX)) { \
+    ctx->flow2peer[flowid-SNW_CORE_FLOW_BASE_IDX] = peerid; \
+  }
+
+#define GET_FLOW2PEER(flowid) \
+  (flowid > SNW_CORE_FLOW_BASE_IDX \
+      && ((flowid - SNW_CORE_FLOW_BASE_IDX) < SNW_CORE_FLOW_NUM_MAX)) ?  \
+    ctx->flow2peer[flowid-SNW_CORE_FLOW_BASE_IDX] : 0;
 
 snw_context_t*
 snw_create_context();

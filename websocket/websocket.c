@@ -167,7 +167,7 @@ snw_websocket_init(snw_context_t *ctx, dispatch_fn cb) {
    ws_ctx->ssl_ctx = ctx->ssl_ctx;
    ws_ctx->log = ctx->log;
 
-   flowset = snw_flowset_init(10*1024);
+   flowset = snw_flowset_init(SNW_CORE_FLOW_NUM_MAX);
    if (flowset == 0) {
       free(ws_ctx);
       assert(0);

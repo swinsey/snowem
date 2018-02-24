@@ -22,22 +22,20 @@ snw_flowset_init(uint32_t num) {
 
    res = posix_memalign((void **)&flowset->data, getpagesize(), total_size);
    if (res != 0) {
-      //printf("posix_memalign failed, size=%ld\n", total_size);
       assert(0);
       if (flowset) free(flowset);
       return 0;
    }
-
    /* init flow set */
    flowset->totalnum = num;
    flowset->usednum = 0;
-   flowset->baseidx = random()%1000000;
+   //flowset->baseidx = random()%1000000;
+   flowset->baseidx = SNW_CORE_FLOW_BASE_IDX;
    INIT_LIST_HEAD(&flowset->freelist);
    INIT_LIST_HEAD(&flowset->usedlist);
    for (i = 1; i < num; i++) {
       flow = flowset->data + i;
       INIT_LIST_HEAD(&flow->list);
-      //flow->flowid = i;
       flow->flowid = i + flowset->baseidx;
       flow->obj = 0;
       if (random()%2) {
@@ -45,7 +43,6 @@ snw_flowset_init(uint32_t num) {
       } else {
          list_add_tail(&flow->list, &flowset->freelist);
       }
-      //list_add_tail(&flow->list, &flowset->freelist);
    }
 
    return flowset;
