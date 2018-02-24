@@ -216,10 +216,8 @@ snw_sig_call_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) 
    snw_log_t *log = ctx->log;
    Json::FastWriter writer;
    snw_peer_t *peer = 0;
-   //snw_channel_t *channel = 0;
    std::string output;
    std::string peer_type;
-   //uint32_t channelid = 0;
    uint32_t peerid = 0;
    
    try {
@@ -719,7 +717,7 @@ snw_core_disconnect(snw_context_t *ctx, snw_connection_t *conn) {
      //snw_channel_remove(ctx->channel_cache, channel);
    } else
    if (channel->type == SNW_CONF_CHANNEL_TYPE) {
-     // FIXME: check and clean
+     // TODO: check and clean
    }
 
    return 0;
@@ -733,7 +731,6 @@ snw_net_preprocess_msg(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t 
 
    ctx->cur_time = time(0);
 
-   //hexdump(buf,len,"req");
    if (len < SNW_EVENT_HEADER_LEN) {
       ERROR(log, "msg too small, len=%u,flowid=%u",len,flowid);
       return -1;
@@ -947,7 +944,6 @@ snw_main_process(snw_context_t *ctx) {
    q_event = event_new(ctx->ev_base, ctx->snw_ice2core_mq->_fd, 
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_msg, ctx);
    event_add(q_event, NULL);
-
    event_base_dispatch(ctx->ev_base);
 
    return;
@@ -959,7 +955,6 @@ main(int argc, char** argv) {
    snw_context_t *ctx;
 
    srand(time(NULL));
-
    ctx = snw_create_context();
    if (ctx == NULL)
       exit(-1);
