@@ -32,7 +32,6 @@ struct snw_ice_session {
    uint32_t live_channelid;
 
    snw_ice_context_t *ice_ctx;
-   struct event_base *base;
    agent_t           *agent;
    int                peer_type;
    uint32_t           flags;

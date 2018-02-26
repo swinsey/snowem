@@ -4,6 +4,8 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 
+#include "cice/event.h"
+
 #include "core/cache.h"
 #include "core/connection.h"
 #include "core/mempool.h"
@@ -32,6 +34,8 @@ struct snw_ice_api {
 
 struct snw_ice_context {
    void      *ctx;
+   struct event_base  *ev_base;
+   event_ctx_t        *ev_ctx;
    snw_log_t *log;
 
    int        rtcpmux_enabled;
