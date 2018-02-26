@@ -175,10 +175,14 @@ snw_ice_init(snw_context_t *ctx) {
    memset(ice_ctx,0,sizeof(snw_ice_context_t));
    ice_ctx->ctx = ctx;
    ice_ctx->log = ctx->log;
-  
+
    if (ctx->ice_log_enabled) 
       ice_set_log_callback(snw_ice_log_cb,ice_ctx);
 
+   ice_ctx->ev_base = ctx->ev_base;
+   ice_ctx->ev_ctx = create_event_ctx(ice_ctx->ev_base);
+   if (!ice_ctx->ev_ctx) return;
+  
    snw_ice_sdp_init(ice_ctx);
    snw_ice_session_init(ice_ctx);
    snw_ice_channel_init(ice_ctx);

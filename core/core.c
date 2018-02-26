@@ -161,8 +161,8 @@ snw_net_init_shmqueue(snw_context_t *ctx) {
    }
 
    ctx->snw_core2net_mq = (snw_shmmq_t *)
-          malloc(sizeof(*ctx->snw_net2core_mq));
-   if (ctx->snw_net2core_mq == 0) {
+          malloc(sizeof(*ctx->snw_core2net_mq));
+   if (ctx->snw_core2net_mq == 0) {
       return -1;
    }
 

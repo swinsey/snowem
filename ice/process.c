@@ -1059,7 +1059,7 @@ snw_ice_session_setup(snw_ice_context_t *ice_ctx, snw_ice_session_t *session, in
    if (!ice_ctx || !session || !sdp) return -1;
    log = ice_ctx->log;
 
-   agent = (agent_t*)ice_agent_new(session->base,ICE_COMPATIBILITY_RFC5245,0);
+   agent = (agent_t*)ice_agent_new(ice_ctx->ev_ctx,ICE_COMPATIBILITY_RFC5245,0);
    if (!agent) return -1;
 
 
@@ -1215,7 +1215,6 @@ snw_ice_connect_msg(snw_ice_context_t *ice_ctx, Json::Value &root, uint32_t flow
    session->channelid = 0;
    session->channel = 0;
    session->control_mode = ICE_CONTROLLED_MODE;
-   session->base = ctx->ev_base;
    session->flags = 0;
    snw_rtp_ctx_init(&session->rtp_ctx);
    session->rtp_ctx.session = session;
