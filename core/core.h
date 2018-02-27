@@ -7,6 +7,7 @@
 #include <event.h>
 #include <event2/listener.h>
 #include <event2/bufferevent_ssl.h>
+#include <evhttp.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
@@ -30,12 +31,15 @@ extern "C" {
 #define CORE2ICE_KEY 1168647513
 #define NET2CORE_KEY 1168647514
 #define CORE2NET_KEY 1168647515
+#define HTTP2CORE_KEY 1168647516
+#define CORE2HTTP_KEY 1168647517
 
 typedef void (*dispatch_fn)(int fd, short int event,void* data);
 struct snw_context {
    snw_log_t          *log;
    time_t              cur_time;
    struct event_base  *ev_base;
+   struct evhttp      *httpd;
    SSL_CTX            *ssl_ctx;
 
    const char         *config_file;
@@ -59,6 +63,8 @@ struct snw_context {
    snw_shmmq_t  *snw_core2ice_mq;
    snw_shmmq_t  *snw_net2core_mq;
    snw_shmmq_t  *snw_core2net_mq;
+   snw_shmmq_t  *snw_http2core_mq;
+   snw_shmmq_t  *snw_core2http_mq;
 
    /* caches */
    snw_hashbase_t *channel_cache;

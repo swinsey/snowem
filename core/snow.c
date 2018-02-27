@@ -10,6 +10,7 @@
 #include "conf.h"
 #include "connection.h"
 #include "core.h"
+#include "http.h"
 #include "log.h"
 #include "module.h"
 #include "peer.h"
@@ -980,6 +981,16 @@ main(int argc, char** argv) {
       printf("error");
    } else if (pid == 0) {
       snw_net_setup(ctx);
+      return 0;
+   } else {
+      //continue
+   }
+
+   pid = fork();
+   if (pid < 0) {
+      printf("error");
+   } else if (pid == 0) {
+      snw_http_setup(ctx);
       return 0;
    } else {
       //continue
