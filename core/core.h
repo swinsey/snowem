@@ -39,7 +39,6 @@ struct snw_context {
    snw_log_t          *log;
    time_t              cur_time;
    struct event_base  *ev_base;
-   struct evhttp      *httpd;
    SSL_CTX            *ssl_ctx;
 
    const char         *config_file;
