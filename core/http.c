@@ -123,24 +123,152 @@ snw_http_init_ssl(snw_context_t *ctx) {
 }
 
 void
-process_request(struct evhttp_request *req, void *arg) { 
-  snw_context_t *ctx = (snw_context_t*)arg;
+snw_process_http_get(snw_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
-  struct evbuffer *buf = evbuffer_new();
+  struct evbuffer *buf = 0;
 
   ERROR(log, "Requested: %s", evhttp_request_uri(req));
 
+  buf = evbuffer_new();
   if (buf == NULL) return;
 
   evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
   evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+void
+snw_process_http_post(snw_context_t *ctx, struct evhttp_request *req) {
+  snw_log_t *log = ctx->log;
+  struct evbuffer *buf = 0;
+
+  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+
+  buf = evbuffer_new();
+  if (buf == NULL) return;
+
+  evhttp_add_header(evhttp_request_get_output_headers(req), 
+                     "Access-Control-Allow-Origin", "*");
+
+  evbuffer_add_printf(buf, "%s\n", "{data: 'data'}");
+  evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+void
+snw_process_http_options(snw_context_t *ctx, struct evhttp_request *req) {
+  snw_log_t *log = ctx->log;
+  struct evbuffer *buf = 0;
+
+  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+
+  buf = evbuffer_new();
+  if (buf == NULL) return;
+
+  evhttp_add_header(evhttp_request_get_output_headers(req), 
+                     "Access-Control-Allow-Headers", "*");
+  evhttp_add_header(evhttp_request_get_output_headers(req), 
+                     "Access-Control-Allow-Origin", "*");
+  evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
+  evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+void
+snw_process_http_put(snw_context_t *ctx, struct evhttp_request *req) {
+  snw_log_t *log = ctx->log;
+  struct evbuffer *buf = 0;
+
+  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+
+  buf = evbuffer_new();
+  if (buf == NULL) return;
+
+  evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
+  evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+void
+snw_process_http_head(snw_context_t *ctx, struct evhttp_request *req) {
+  snw_log_t *log = ctx->log;
+  struct evbuffer *buf = 0;
+
+  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+
+  buf = evbuffer_new();
+  if (buf == NULL) return;
+
+  evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
+  evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+void
+snw_process_http_delete(snw_context_t *ctx, struct evhttp_request *req) {
+  snw_log_t *log = ctx->log;
+  struct evbuffer *buf = 0;
+
+  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+
+  buf = evbuffer_new();
+  if (buf == NULL) return;
+
+  evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
+  evhttp_send_reply(req, HTTP_OK, "OK", buf);
+
+  if (buf) evbuffer_free(buf);
+  return;
+}
+
+
+void
+snw_process_http_request(struct evhttp_request *req, void *arg) {
+  snw_context_t *ctx = (snw_context_t*)arg;
+  snw_log_t *log = ctx->log;
+  evhttp_cmd_type type;
+
+  type = evhttp_request_get_command(req);
+  switch(type) {
+    case EVHTTP_REQ_GET:
+      snw_process_http_get(ctx,req);
+      break;
+    case EVHTTP_REQ_POST:
+      snw_process_http_post(ctx,req);
+      break;
+    case EVHTTP_REQ_OPTIONS:
+      snw_process_http_options(ctx,req);
+      break;
+    case EVHTTP_REQ_HEAD:
+      snw_process_http_head(ctx,req);
+      break;
+    case EVHTTP_REQ_PUT:
+      snw_process_http_put(ctx,req);
+      break;
+    case EVHTTP_REQ_DELETE:
+      snw_process_http_delete(ctx,req);
+      break;
+    default:
+      ERROR(log, "not supported http method, type=%u", type);
+      break;
+  }
+
   return;
 }
 
 static
-struct bufferevent* bevcb(struct event_base *base, void *arg) {
+struct bufferevent* snw_setup_connection_https(struct event_base *base, void *arg) {
   snw_context_t *ctx = (snw_context_t*)arg;
-  snw_log_t *log = ctx->log;
   struct bufferevent* r;
   SSL_CTX *ssl_ctx = ctx->ssl_ctx;
 
@@ -153,7 +281,7 @@ struct bufferevent* bevcb(struct event_base *base, void *arg) {
 
 static snw_log_t *g_log = 0;
 void
-libevent_log_cb(int severity, const char *msg) {
+snw_libevent_log_cb(int severity, const char *msg) {
   if (g_log)
     ERROR(g_log, "libevent: %s",msg);
 }
@@ -175,7 +303,7 @@ snw_http_setup(snw_context_t *ctx) {
   if (ctx->libevent_log_enabled) {
     g_log = ctx->log;
     event_enable_debug_logging(EVENT_DBG_ALL);
-    event_set_log_callback(libevent_log_cb);
+    event_set_log_callback(snw_libevent_log_cb);
   }
 
   ctx->httpd = evhttp_new(ctx->ev_base);
@@ -192,8 +320,8 @@ snw_http_setup(snw_context_t *ctx) {
       EVHTTP_REQ_PUT |
       EVHTTP_REQ_DELETE);
 
-  evhttp_set_bevcb(ctx->httpd, bevcb, ctx);
-  evhttp_set_gencb(ctx->httpd, process_request, ctx);
+  evhttp_set_bevcb(ctx->httpd, snw_setup_connection_https, ctx);
+  evhttp_set_gencb(ctx->httpd, snw_process_http_request, ctx);
   event_base_dispatch(ctx->ev_base);
 
   return;
