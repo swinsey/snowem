@@ -216,7 +216,6 @@ int
 snw_sig_call_msg(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
    snw_log_t *log = ctx->log;
    Json::FastWriter writer;
-   snw_peer_t *peer = 0;
    std::string output;
    std::string peer_type;
    uint32_t peerid = 0;
@@ -580,13 +579,10 @@ snw_sig_handler(snw_context_t *ctx, snw_connection_t *conn, Json::Value &root) {
 
 int
 snw_module_handler(snw_context_t *ctx, snw_connection_t *conn, uint32_t type, char *data, uint32_t len) {
-   snw_log_t *log = ctx->log;
    struct list_head *p;
    
    list_for_each(p,&ctx->modules.list) {
       snw_module_t *m = list_entry(p,snw_module_t,list);
-      //DEBUG(log, "module info, name=%s, type=%0x, sofile=%s", 
-      //       m->name, m->type, m->sofile);
       if (m->type == type) {
          m->methods->handle_msg(m,conn,data,len);
       }
@@ -601,7 +597,7 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
    Json::Value root;
    Json::Reader reader;
    uint32_t msgtype = 0;
-   uint32_t api = 0;
+   //uint32_t api = 0;
    int ret;
 
    ret = reader.parse(data,data+len,root,0);
@@ -612,7 +608,7 @@ snw_core_process_msg(snw_context_t *ctx, snw_connection_t *conn, char *data, uin
 
    try {
       msgtype = root["msgtype"].asUInt();
-      api = root["api"].asUInt();
+      //api = root["api"].asUInt();
 
       switch(msgtype) {
          case SNW_ICE:
@@ -778,6 +774,13 @@ snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_
    return 0;
 }
 
+int
+snw_process_msg_from_http(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
+
+   snw_shmmq_enqueue(ctx->snw_core2http_mq, 0, buffer, len, flowid);
+   return 0;
+}
+
 void
 snw_ice_msg(int fd, short int event,void* data) {
    static char buffer[MAX_BUFFER_SIZE];
@@ -841,6 +844,39 @@ snw_net_msg(int fd, short int event,void* data) {
 #endif
 
    return;
+}
+
+void
+snw_http_msg(int fd, short int event,void* data) {
+   static char buffer[MAX_BUFFER_SIZE];
+   snw_context_t *ctx = (snw_context_t *)data;
+   uint32_t len = 0;
+   uint32_t flowid = 0;
+   uint32_t cnt = 0;
+
+#ifdef USE_ADAPTIVE_CONTROL
+   while(true){
+      len = 0; flowid = 0; cnt++;
+      if ( cnt >= 10000) {
+         DEBUG(ctx->log, "breaking the loop, cnt=%d", cnt);
+         break;
+      }
+#endif
+      snw_shmmq_dequeue(ctx->snw_http2core_mq, buffer, MAX_BUFFER_SIZE, &len, &flowid);
+
+      if (len == 0) return;
+
+      DEBUG(ctx->log,"dequeue msg from http, flowid=%u, len=%u, cnt=%d",
+          flowid, len, cnt);
+      buffer[len] = 0;
+      snw_process_msg_from_http(ctx,buffer,len,flowid);
+
+#ifdef USE_ADAPTIVE_CONTROL
+   }
+#endif
+
+   return;
+
 }
 
 void
@@ -935,7 +971,7 @@ snw_main_process(snw_context_t *ctx) {
    }
 
    ret = snw_shmmq_init(ctx->snw_core2ice_mq,
-             "/tmp/snw_core2ice_mq.fifo", 0, 0, 
+             "/tmp/snw_core2ice_mq.fifo", 0, 0,
              CORE2ICE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
       ERROR(ctx->log,"failed to message queue");
@@ -945,6 +981,39 @@ snw_main_process(snw_context_t *ctx) {
    q_event = event_new(ctx->ev_base, ctx->snw_ice2core_mq->_fd, 
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_msg, ctx);
    event_add(q_event, NULL);
+
+   ctx->snw_http2core_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_http2core_mq));
+   if (ctx->snw_http2core_mq == 0) {
+      return;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_http2core_mq,
+             "/tmp/snw_http2core_mq.fifo", 0, 0,
+             HTTP2CORE_KEY, SHAREDMEM_SIZE);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to message queue");
+      return;
+   }
+
+   ctx->snw_core2http_mq = (snw_shmmq_t *)
+          malloc(sizeof(*ctx->snw_core2http_mq));
+   if (ctx->snw_core2http_mq == 0) {
+      return;
+   }
+
+   ret = snw_shmmq_init(ctx->snw_core2http_mq,
+             "/tmp/snw_core2http_mq.fifo", 0, 0,
+             CORE2HTTP_KEY, SHAREDMEM_SIZE);
+   if (ret < 0) {
+      ERROR(ctx->log,"failed to message queue");
+      return;
+   }
+
+   q_event = event_new(ctx->ev_base, ctx->snw_http2core_mq->_fd,
+        EV_TIMEOUT|EV_READ|EV_PERSIST, snw_http_msg, ctx);
+   event_add(q_event, NULL);
+
    event_base_dispatch(ctx->ev_base);
 
    return;

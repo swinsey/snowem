@@ -60,6 +60,7 @@ typedef struct snw_module snw_module_t;
 #define SNW_SEEK(_f,_offset,_whence) lseek(_f,_offset,_whence)
 
 #define MAX_BUFFER_SIZE 16*1024*1024
+#define MAX_HTTP_BUFFER_SIZE 4*1024*1024
 
 #ifdef __cplusplus
 }

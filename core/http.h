@@ -41,6 +41,17 @@ extern "C" {
 
 #include "core/core.h"
 
+
+typedef struct snw_http_context snw_http_context_t;
+struct snw_http_context {
+   snw_context_t  *ctx;
+   snw_log_t      *log;
+   snw_flowset_t  *flowset;
+	 struct event_base  *ev_base;
+   struct evhttp      *httpd;
+   SSL_CTX            *ssl_ctx;
+};
+
 void
 snw_http_setup(snw_context_t *ctx);
 

@@ -44,9 +44,9 @@
 #include "core/log.h"
 
 void
-snw_http_init_log(snw_context_t *ctx) {
+snw_http_init_log(snw_http_context_t *ctx) {
    /*TODO: get log file from config*/  
-   ctx->log = snw_log_init("./http.log",0,0,0);
+   ctx->log = snw_log_init("./http.log",ctx->ctx->log_level,0,0);
    if (ctx->log == 0) {
       exit(-1);   
    }
@@ -60,21 +60,24 @@ snw_http_init_shmqueue(snw_context_t *ctx) {
 
    ctx->snw_http2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_http2core_mq));
-   if (ctx->snw_net2core_mq == 0) {
+   if (ctx->snw_http2core_mq == 0) {
+      ERROR(ctx->log,"failed to alloc message queue");
       return -1;
    }
 
+   ERROR(ctx->log,"init message queue, p=%p",ctx->snw_http2core_mq);
    ret = snw_shmmq_init(ctx->snw_http2core_mq,
              "/tmp/snw_http2core_mq.fifo", 0, 0, 
              HTTP2CORE_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-      ERROR(ctx->log,"failed to message queue");
+      ERROR(ctx->log,"failed to init message queue");
       return -2;
    }
 
    ctx->snw_core2http_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_core2http_mq));
    if (ctx->snw_core2http_mq == 0) {
+      ERROR(ctx->log,"failed to alloc message queue");
       return -1;
    }
 
@@ -82,7 +85,7 @@ snw_http_init_shmqueue(snw_context_t *ctx) {
              "/tmp/snw_core2http_mq.fifo", 0, 0, 
              CORE2HTTP_KEY, SHAREDMEM_SIZE);
    if (ret < 0) {
-      ERROR(ctx->log,"failed to message queue");
+      ERROR(ctx->log,"failed to init message queue");
       return -2;
    }
 
@@ -90,7 +93,8 @@ snw_http_init_shmqueue(snw_context_t *ctx) {
 }
 
 int
-snw_http_init_ssl(snw_context_t *ctx) {
+snw_http_init_ssl(snw_http_context_t *ctx) {
+   snw_context_t *main_ctx = (snw_context_t*)ctx->ctx;
    SSL_CTX  *server_ctx = NULL;
    std::string cert_str,key_str;
 
@@ -110,10 +114,10 @@ snw_http_init_ssl(snw_context_t *ctx) {
    }
 
    DEBUG(ctx->log,"ssl info, cert_file=%s, key_file=%s",
-         ctx->wss_cert_file,ctx->wss_key_file);
+         main_ctx->wss_cert_file, main_ctx->wss_key_file);
 
-   if (! SSL_CTX_use_certificate_chain_file(server_ctx, ctx->wss_cert_file) ||
-       ! SSL_CTX_use_PrivateKey_file(server_ctx, ctx->wss_key_file, SSL_FILETYPE_PEM)) {
+   if (! SSL_CTX_use_certificate_chain_file(server_ctx, main_ctx->wss_cert_file) ||
+       ! SSL_CTX_use_PrivateKey_file(server_ctx, main_ctx->wss_key_file, SSL_FILETYPE_PEM)) {
        ERROR(ctx->log,"failed to read cert or key files");
        return -3;
    }
@@ -123,7 +127,7 @@ snw_http_init_ssl(snw_context_t *ctx) {
 }
 
 void
-snw_process_http_get(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_get(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
@@ -140,27 +144,37 @@ snw_process_http_get(snw_context_t *ctx, struct evhttp_request *req) {
 }
 
 void
-snw_process_http_post(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_post(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
-  struct evbuffer *buf = 0;
+  static char* data[MAX_HTTP_BUFFER_SIZE];
+  size_t datalen = 0;
+  struct evbuffer *inbuf = 0;
+  uint32_t flowid = 0;
 
-  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+  inbuf = evhttp_request_get_input_buffer(req);
+  if (!inbuf) {
+    //TODO: call err handler
+    return;
+  }
+  datalen = evbuffer_copyout(inbuf,data, MAX_HTTP_BUFFER_SIZE);
+  data[datalen] = 0;
 
-  buf = evbuffer_new();
-  if (buf == NULL) return;
+  flowid = snw_flowset_getid(ctx->flowset);
+  if (flowid ==0) {
+     ERROR(log, "connection limit reached");
+     return;
+  }
 
-  evhttp_add_header(evhttp_request_get_output_headers(req), 
-                     "Access-Control-Allow-Origin", "*");
+  DEBUG(log, "new req: %s, flowid=%u, datalen=%lu, data=%s",
+    evhttp_request_uri(req), flowid, datalen, data);
+  snw_flowset_setobj(ctx->flowset,flowid,req);
+  snw_shmmq_enqueue(ctx->ctx->snw_http2core_mq, 0, data, datalen, flowid);
 
-  evbuffer_add_printf(buf, "%s\n", "{data: 'data'}");
-  evhttp_send_reply(req, HTTP_OK, "OK", buf);
-
-  if (buf) evbuffer_free(buf);
   return;
 }
 
 void
-snw_process_http_options(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_options(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
@@ -169,9 +183,9 @@ snw_process_http_options(snw_context_t *ctx, struct evhttp_request *req) {
   buf = evbuffer_new();
   if (buf == NULL) return;
 
-  evhttp_add_header(evhttp_request_get_output_headers(req), 
+  evhttp_add_header(evhttp_request_get_output_headers(req),
                      "Access-Control-Allow-Headers", "*");
-  evhttp_add_header(evhttp_request_get_output_headers(req), 
+  evhttp_add_header(evhttp_request_get_output_headers(req),
                      "Access-Control-Allow-Origin", "*");
   evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
   evhttp_send_reply(req, HTTP_OK, "OK", buf);
@@ -181,7 +195,7 @@ snw_process_http_options(snw_context_t *ctx, struct evhttp_request *req) {
 }
 
 void
-snw_process_http_put(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_put(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
@@ -198,7 +212,7 @@ snw_process_http_put(snw_context_t *ctx, struct evhttp_request *req) {
 }
 
 void
-snw_process_http_head(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_head(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
@@ -215,7 +229,7 @@ snw_process_http_head(snw_context_t *ctx, struct evhttp_request *req) {
 }
 
 void
-snw_process_http_delete(snw_context_t *ctx, struct evhttp_request *req) {
+snw_process_http_delete(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
@@ -224,17 +238,18 @@ snw_process_http_delete(snw_context_t *ctx, struct evhttp_request *req) {
   buf = evbuffer_new();
   if (buf == NULL) return;
 
+  //snw_flowset_getid();
+
   evbuffer_add_printf(buf, "Requested: %s\n", evhttp_request_uri(req));
   evhttp_send_reply(req, HTTP_OK, "OK", buf);
 
   if (buf) evbuffer_free(buf);
   return;
 }
-
 
 void
 snw_process_http_request(struct evhttp_request *req, void *arg) {
-  snw_context_t *ctx = (snw_context_t*)arg;
+  snw_http_context_t *ctx = (snw_http_context_t*)arg;
   snw_log_t *log = ctx->log;
   evhttp_cmd_type type;
 
@@ -268,7 +283,7 @@ snw_process_http_request(struct evhttp_request *req, void *arg) {
 
 static
 struct bufferevent* snw_setup_connection_https(struct event_base *base, void *arg) {
-  snw_context_t *ctx = (snw_context_t*)arg;
+  snw_http_context_t *ctx = (snw_http_context_t*)arg;
   struct bufferevent* r;
   SSL_CTX *ssl_ctx = ctx->ssl_ctx;
 
@@ -286,33 +301,99 @@ snw_libevent_log_cb(int severity, const char *msg) {
     ERROR(g_log, "libevent: %s",msg);
 }
 
+int
+snw_http_send_msg(snw_http_context_t *ctx, char *buf, int len, uint32_t flowid) {
+  struct evhttp_request *req = 0;
+  struct evbuffer *outbuf = 0;
+
+  DEBUG(ctx->log,"send http msg, len=%u, data=%s",len,buf);
+
+  req = (struct evhttp_request *)snw_flowset_getobj(ctx->flowset,flowid);
+  if (!req) return -1;
+
+  evhttp_add_header(evhttp_request_get_output_headers(req),
+                     "Access-Control-Allow-Origin", "*");
+
+  outbuf = evhttp_request_get_output_buffer(req);
+  if (outbuf == NULL) return -2;
+  evbuffer_add_printf(outbuf, "%s\n", buf);
+  evhttp_send_reply(req, HTTP_OK, "OK", outbuf);
+
+  snw_flowset_freeid(ctx->flowset,flowid);
+  return 0;
+}
+
+void
+snw_http_dispatch_msg(int fd, short int event,void* data) {
+   static char buf[MAX_BUFFER_SIZE];
+   snw_http_context_t *http_ctx = (snw_http_context_t *)data;
+   snw_context_t *ctx = http_ctx->ctx;
+   uint32_t len = 0;
+   uint32_t flowid = 0;
+   uint32_t cnt = 0;
+   int ret = 0;
+
+   while (true) {
+     len = 0;
+     flowid = 0;
+     cnt++;
+
+     if (cnt >= 100) {
+         break;
+     }
+
+     ret = snw_shmmq_dequeue(ctx->snw_core2http_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
+     if ( (len == 0 && ret == 0) || (ret < 0) )
+        return;
+
+     buf[len] = 0;
+     snw_http_send_msg(http_ctx,buf,len,flowid);
+   }
+
+   return;
+}
+
 void
 snw_http_setup(snw_context_t *ctx) {
+  snw_http_context_t *http_ctx = 0;
+  snw_flowset_t *flowset = 0;
+  struct event *q_event;
+
   if (ctx == 0)
     return;
 
-  ctx->ev_base = event_base_new();
-  if (ctx->ev_base == 0) {
+  http_ctx = (snw_http_context_t*)malloc(sizeof(snw_http_context_t));
+  if (!http_ctx) exit(-4);
+  http_ctx->ctx = ctx;
+
+  http_ctx->ev_base = event_base_new();
+  if (http_ctx->ev_base == 0) {
     exit(-2);
   }
 
-  snw_http_init_log(ctx);
   snw_http_init_shmqueue(ctx);
-  snw_http_init_ssl(ctx);
+  snw_http_init_log(http_ctx);
+  snw_http_init_ssl(http_ctx);
 
   if (ctx->libevent_log_enabled) {
-    g_log = ctx->log;
+    g_log = http_ctx->log;
     event_enable_debug_logging(EVENT_DBG_ALL);
     event_set_log_callback(snw_libevent_log_cb);
   }
 
-  ctx->httpd = evhttp_new(ctx->ev_base);
-  if (!ctx->httpd) exit(-3);
+  flowset = snw_flowset_init(SNW_CORE_FLOW_NUM_MAX);
+  if (flowset == 0) {
+     free(http_ctx);
+     assert(0);
+  }
+  http_ctx->flowset = flowset;
+  http_ctx->httpd = evhttp_new(http_ctx->ev_base);
+  if (!http_ctx->httpd) exit(-3);
 
-  if (evhttp_bind_socket(ctx->httpd, "0.0.0.0", 8868) != 0)
+  if (evhttp_bind_socket(http_ctx->httpd, "0.0.0.0", 8868) != 0)
     exit(-4);
 
-  evhttp_set_allowed_methods(ctx->httpd,
+  evhttp_set_allowed_methods(http_ctx->httpd,
       EVHTTP_REQ_GET |
       EVHTTP_REQ_POST |
       EVHTTP_REQ_OPTIONS |
@@ -320,10 +401,15 @@ snw_http_setup(snw_context_t *ctx) {
       EVHTTP_REQ_PUT |
       EVHTTP_REQ_DELETE);
 
-  evhttp_set_bevcb(ctx->httpd, snw_setup_connection_https, ctx);
-  evhttp_set_gencb(ctx->httpd, snw_process_http_request, ctx);
-  event_base_dispatch(ctx->ev_base);
+  evhttp_set_bevcb(http_ctx->httpd, snw_setup_connection_https, http_ctx);
+  evhttp_set_gencb(http_ctx->httpd, snw_process_http_request, http_ctx);
 
+  //get response from main
+  q_event = event_new(http_ctx->ev_base, ctx->snw_core2http_mq->_fd,
+        EV_TIMEOUT|EV_READ|EV_PERSIST, snw_http_dispatch_msg, http_ctx);
+  event_add(q_event, NULL);
+
+  event_base_dispatch(http_ctx->ev_base);
   return;
 }
 
