@@ -15,6 +15,12 @@ extern "C" {
 #define CORE_PEER_HASHTIME  10
 #define CORE_PEER_HASHLEN   100
 
+#define CORE_ROOMINFO_SHM_KEY   0x081003
+#define CORE_ROOMINFO_HASHTIME  10
+#define CORE_ROOMINFO_HASHLEN   100
+
+#define ROOM_NAME_LEN 64
+
 typedef struct snw_log snw_log_t;
 typedef struct snw_context snw_context_t;
 typedef struct snw_module snw_module_t;
