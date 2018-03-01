@@ -15,6 +15,7 @@ enum {
    SNW_CORE = 2,
    SNW_EVENT = 3,
    SNW_SIG = 4,
+   SNW_CHANNEL = 5,
 
    /* reserve range */
    SNW_MSGTYPE_MAX = 255,
@@ -78,6 +79,14 @@ enum {
    SNW_SIG_CANDIDATE = 129,
 
    SNW_SIG_MAX = 255,
+};
+
+/* CHANNEL api code */
+enum {
+   SNW_CHANNEL_MIN = 1,
+   SNW_CHANNEL_CREATE = SNW_CHANNEL_MIN,
+
+   SNW_CHANNEL_MAX = 255,
 };
 
 typedef struct snw_module_callbacks snw_module_callbacks_t;

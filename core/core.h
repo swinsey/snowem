@@ -68,6 +68,7 @@ struct snw_context {
    /* caches */
    snw_hashbase_t *channel_cache;
    snw_hashbase_t *peer_cache;
+   snw_hashbase_t *roominfo_cache;
 
    /* channel set */
    snw_set_t      *channel_mgr;

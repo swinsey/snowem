@@ -148,6 +148,7 @@ snw_process_http_post(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   static char* data[MAX_HTTP_BUFFER_SIZE];
   size_t datalen = 0;
+  size_t readlen = 0;
   struct evbuffer *inbuf = 0;
   uint32_t flowid = 0;
 
@@ -156,7 +157,8 @@ snw_process_http_post(snw_http_context_t *ctx, struct evhttp_request *req) {
     //TODO: call err handler
     return;
   }
-  datalen = evbuffer_copyout(inbuf,data, MAX_HTTP_BUFFER_SIZE);
+  readlen = evbuffer_get_length(inbuf);
+  datalen = evbuffer_copyout(inbuf,data, readlen);
   data[datalen] = 0;
 
   flowid = snw_flowset_getid(ctx->flowset);
@@ -165,8 +167,8 @@ snw_process_http_post(snw_http_context_t *ctx, struct evhttp_request *req) {
      return;
   }
 
-  DEBUG(log, "new req: %s, flowid=%u, datalen=%lu, data=%s",
-    evhttp_request_uri(req), flowid, datalen, data);
+  DEBUG(log, "new req: %s, flowid=%u, datalen=%lu, readlen=%lu data=%s",
+    evhttp_request_uri(req), flowid, datalen, readlen, data);
   snw_flowset_setobj(ctx->flowset,flowid,req);
   snw_shmmq_enqueue(ctx->ctx->snw_http2core_mq, 0, data, datalen, flowid);
 
@@ -178,7 +180,7 @@ snw_process_http_options(snw_http_context_t *ctx, struct evhttp_request *req) {
   snw_log_t *log = ctx->log;
   struct evbuffer *buf = 0;
 
-  ERROR(log, "Requested: %s", evhttp_request_uri(req));
+  DEBUG(log, "Requested: %s", evhttp_request_uri(req));
 
   buf = evbuffer_new();
   if (buf == NULL) return;
@@ -311,6 +313,8 @@ snw_http_send_msg(snw_http_context_t *ctx, char *buf, int len, uint32_t flowid) 
   req = (struct evhttp_request *)snw_flowset_getobj(ctx->flowset,flowid);
   if (!req) return -1;
 
+  evhttp_add_header(evhttp_request_get_output_headers(req),
+                     "Content-type", "application/json");
   evhttp_add_header(evhttp_request_get_output_headers(req),
                      "Access-Control-Allow-Origin", "*");
 

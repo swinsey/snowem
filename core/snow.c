@@ -14,6 +14,7 @@
 #include "log.h"
 #include "module.h"
 #include "peer.h"
+#include "roominfo.h"
 #include "snow.h"
 #include "snw_event.h"
 #include "utils.h"
@@ -775,9 +776,73 @@ snw_process_msg_from_ice(snw_context_t *ctx, char *buffer, uint32_t len, uint32_
 }
 
 int
-snw_process_msg_from_http(snw_context_t *ctx, char *buffer, uint32_t len, uint32_t flowid) {
+snw_process_msg_from_http(snw_context_t *ctx, char *data, uint32_t len, uint32_t flowid) {
+   snw_log_t *log = ctx->log;
+   Json::Value root;
+   Json::Reader reader;
+   Json::FastWriter writer;
+   snw_roominfo_t *room = 0;
+   snw_channel_t *channel = 0;
+   uint32_t msgtype = 0;
+   uint32_t api = 0;
+   std::string roomname;
+   std::string output;
+   uint32_t channelid;
+   int is_new = 0;
+   int ret;
 
-   snw_shmmq_enqueue(ctx->snw_core2http_mq, 0, buffer, len, flowid);
+   ret = reader.parse(data,data+len,root,0);
+   if (!ret) {
+      ERROR(log,"error json format, data=%s",data);
+      return -1;
+   }
+
+   try {
+      msgtype = root["msgtype"].asUInt();
+      api = root["api"].asUInt();
+      roomname = root["name"].asString();
+      
+   } catch (...) {
+      ERROR(log, "json format error, data=%s", data);
+      return -1;
+   }
+
+   if (msgtype != SNW_CHANNEL ||  api != SNW_CHANNEL_CREATE)
+     return -2;
+
+   //handle create channel
+   DEBUG(log,"create channel with name, name=%s",roomname.c_str());
+   if (roomname.size() == 0)
+     return -3;
+   room = snw_roominfo_get(ctx->roominfo_cache,
+     roomname.c_str(),roomname.size(),&is_new);
+   if (!room) {
+     ERROR(log,"failed to get room name, s=%s",roomname.c_str());
+     return -4;
+   }
+   DEBUG(log,"create channelid, is_new=%u, name=%s", is_new, roomname.c_str());
+   if (!is_new) goto done;
+
+   channelid = snw_set_getid(ctx->channel_mgr);
+   if (channelid == 0) {
+     snw_roominfo_remove(ctx->roominfo_cache, room);
+     return -5;
+   }
+   channel = snw_channel_get(ctx->channel_cache,channelid,&is_new);
+   if (!channel) {
+     snw_roominfo_remove(ctx->roominfo_cache, room);
+     return -6;
+   }
+   memcpy(channel->name,room->name,ROOM_NAME_LEN);
+   room->channelid = channelid;
+
+done:
+   root["channelid"] = room->channelid;
+   root["rc"] = 0;
+   output = writer.write(root);
+   snw_shmmq_enqueue(ctx->snw_core2http_mq, 0, 
+   output.c_str(), output.size(), flowid);
+ 
    return 0;
 }
 
@@ -911,12 +976,17 @@ snw_main_process(snw_context_t *ctx) {
       return;
    }
 
+   ctx->roominfo_cache = snw_roominfo_init();
+   if (ctx->roominfo_cache == 0) {
+      ERROR(ctx->log,"failed to init roominfo cache");
+      return;
+   }
+
    ctx->channel_mgr = snw_set_init(1100000, 10000);
    if (ctx->channel_mgr == 0) {
       ERROR(ctx->log,"failed to init channel set");
       return;
    }
-
 
    ctx->snw_net2core_mq = (snw_shmmq_t *)
           malloc(sizeof(*ctx->snw_net2core_mq));
@@ -1015,7 +1085,6 @@ snw_main_process(snw_context_t *ctx) {
    event_add(q_event, NULL);
 
    event_base_dispatch(ctx->ev_base);
-
    return;
 }
 

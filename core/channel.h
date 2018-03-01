@@ -39,6 +39,7 @@ struct snw_channel {
    uint32_t flowid;   //owner's flowid
    uint32_t peerid;   //owner's peerid
    uint32_t parentid; //parent channel's id
+   char     name[ROOM_NAME_LEN];
    snw_subchannel_t subchannels[SNW_SUBCHANNEL_NUM_MAX];
 
    int      idx;
