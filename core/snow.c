@@ -788,6 +788,8 @@ snw_process_msg_from_http(snw_context_t *ctx, char *data, uint32_t len, uint32_t
    std::string roomname;
    std::string output;
    uint32_t channelid;
+   std::string type_str;
+   uint32_t channel_type;
    int is_new = 0;
    int ret;
 
@@ -801,6 +803,7 @@ snw_process_msg_from_http(snw_context_t *ctx, char *data, uint32_t len, uint32_t
       msgtype = root["msgtype"].asUInt();
       api = root["api"].asUInt();
       roomname = root["name"].asString();
+      type_str = root["type"].asString();
       
    } catch (...) {
       ERROR(log, "json format error, data=%s", data);
@@ -809,6 +812,19 @@ snw_process_msg_from_http(snw_context_t *ctx, char *data, uint32_t len, uint32_t
 
    if (msgtype != SNW_CHANNEL ||  api != SNW_CHANNEL_CREATE)
      return -2;
+
+   if (!strncmp(type_str.c_str(),"broadcast",9)) {
+     channel_type = SNW_BCST_CHANNEL_TYPE;
+   } else 
+   if (!strncmp(type_str.c_str(),"call",4)) {
+     channel_type = SNW_CALL_CHANNEL_TYPE;
+   } else 
+   if (!strncmp(type_str.c_str(),"conference",10)) {
+     channel_type = SNW_CONF_CHANNEL_TYPE;
+   } else {
+     ERROR(log, "unknow channel type: %s", type_str.c_str());
+     return -2;
+   }
 
    //handle create channel
    DEBUG(log,"create channel with name, name=%s",roomname.c_str());
@@ -834,7 +850,9 @@ snw_process_msg_from_http(snw_context_t *ctx, char *data, uint32_t len, uint32_t
      return -6;
    }
    memcpy(channel->name,room->name,ROOM_NAME_LEN);
+   channel->type = channel_type;
    room->channelid = channelid;
+
 
 done:
    root["channelid"] = room->channelid;
