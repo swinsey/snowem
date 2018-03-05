@@ -1034,7 +1034,7 @@ snw_main_process(snw_context_t *ctx) {
       return;
    }
 
-   q_event = event_new(ctx->ev_base, ctx->snw_net2core_mq->_fd, 
+   q_event = event_new(ctx->ev_base, ctx->snw_net2core_mq->fd, 
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_net_msg, ctx);
    event_add(q_event, NULL);
 
@@ -1066,7 +1066,7 @@ snw_main_process(snw_context_t *ctx) {
       return;
    }
 
-   q_event = event_new(ctx->ev_base, ctx->snw_ice2core_mq->_fd, 
+   q_event = event_new(ctx->ev_base, ctx->snw_ice2core_mq->fd, 
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_msg, ctx);
    event_add(q_event, NULL);
 
@@ -1098,7 +1098,7 @@ snw_main_process(snw_context_t *ctx) {
       return;
    }
 
-   q_event = event_new(ctx->ev_base, ctx->snw_http2core_mq->_fd,
+   q_event = event_new(ctx->ev_base, ctx->snw_http2core_mq->fd,
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_http_msg, ctx);
    event_add(q_event, NULL);
 

@@ -409,7 +409,7 @@ snw_http_setup(snw_context_t *ctx) {
   evhttp_set_gencb(http_ctx->httpd, snw_process_http_request, http_ctx);
 
   //get response from main
-  q_event = event_new(http_ctx->ev_base, ctx->snw_core2http_mq->_fd,
+  q_event = event_new(http_ctx->ev_base, ctx->snw_core2http_mq->fd,
         EV_TIMEOUT|EV_READ|EV_PERSIST, snw_http_dispatch_msg, http_ctx);
   event_add(q_event, NULL);
 

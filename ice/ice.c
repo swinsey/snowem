@@ -74,7 +74,7 @@ snw_ice_dispatch_msg(int fd, short int event,void* data) {
 
       ret = snw_shmmq_dequeue(ctx->snw_core2ice_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
       //DEBUG(ice_ctx->log,"core2ice fd=%d, ret=%d, len=%u, flowid=%u",
-      //              ctx->snw_core2ice_mq->_fd, ret, len, flowid);
+      //              ctx->snw_core2ice_mq->fd, ret, len, flowid);
       if ((len == 0 && ret == 0) || (ret < 0))
          return;
       
@@ -196,7 +196,7 @@ snw_ice_init(snw_context_t *ctx) {
 
    ice_dtls_init(ice_ctx, ctx->wss_cert_file, ctx->wss_key_file);
 
-   q_event = event_new(ctx->ev_base, ctx->snw_core2ice_mq->_fd, 
+   q_event = event_new(ctx->ev_base, ctx->snw_core2ice_mq->fd, 
          EV_TIMEOUT|EV_READ|EV_PERSIST, snw_ice_dispatch_msg, ice_ctx);
    event_add(q_event, NULL);   
 

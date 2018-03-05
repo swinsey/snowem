@@ -174,8 +174,8 @@ snw_websocket_init(snw_context_t *ctx, dispatch_fn cb) {
    }
    ws_ctx->flowset = flowset;
 
-   DEBUG(ctx->log,"core2net fd=%d",ctx->snw_core2net_mq->_fd);
-   q_event = event_new(ctx->ev_base, ctx->snw_core2net_mq->_fd, 
+   DEBUG(ctx->log,"core2net fd=%d",ctx->snw_core2net_mq->fd);
+   q_event = event_new(ctx->ev_base, ctx->snw_core2net_mq->fd, 
          EV_TIMEOUT|EV_READ|EV_PERSIST, cb, ws_ctx);
    event_add(q_event, NULL);   
 
