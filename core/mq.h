@@ -61,8 +61,6 @@ struct snw_shmmq
   uint32_t        fd;
   snw_shm_t      *shm;
   snw_shmctrl_t  *shm_ctrl;
-  //uint32_t       *head;
-  //uint32_t       *tail;
   char           *data;
   uint32_t        size;
 }__attribute__((packed));
