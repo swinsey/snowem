@@ -131,7 +131,7 @@ snw_net_dispatch_msg(int fd, short int event,void* data) {
 
      ret = snw_shmmq_dequeue(ctx->snw_core2net_mq, buf, MAX_BUFFER_SIZE, &len, &flowid);
      DEBUG(ctx->log,"core2net fd=%d, ret=%d, len=%u, flowid=%u",
-                    ctx->snw_core2net_mq->_fd, ret, len, flowid);
+                    ctx->snw_core2net_mq->fd, ret, len, flowid);
      if ( (len == 0 && ret == 0) || (ret < 0) )
         return;
      

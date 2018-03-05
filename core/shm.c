@@ -52,32 +52,24 @@
 static const int SHM_DEFAULT_OPEN_FLAG = 0666;
 
 snw_shm_t* 
-snw_shm_open(key_t key, size_t size)
-{
-   snw_shm_t* shm = NULL;
-   int id; 
+snw_shm_open(key_t key, size_t size) {
+  snw_shm_t* shm = NULL;
+  int id; 
 
-   id = shmget(key, size, SHM_DEFAULT_OPEN_FLAG);
-	if (id < 0) {
-		//ERROR("error: %s", strerror(errno));
-      return 0;
-   }
+  id = shmget(key, size, SHM_DEFAULT_OPEN_FLAG);
+	if (id < 0) return 0;
 	
-   shm = (snw_shm_t *) malloc(sizeof(snw_shm_t));
-   if ( shm == NULL ) {
-      //ERROR("malloc failed\n");
-      return 0;
-   }
-   shm->key = key;
-   shm->size = size;
-   shm->id = id;
+  shm = (snw_shm_t *) malloc(sizeof(snw_shm_t));
+  if ( shm == NULL ) return 0;
+  shm->key = key;
+  shm->size = size;
+  shm->id = id;
 
 	shm->addr = (char*)snw_shmat(id);
-
-   if ( shm->addr == NULL ) {
-      free(shm);
-      return 0;
-   }
+  if ( shm->addr == NULL ) {
+    free(shm);
+    return 0;
+  }
 
 	return shm;
 }
@@ -85,40 +77,31 @@ snw_shm_open(key_t key, size_t size)
 snw_shm_t* 
 snw_shm_create(key_t key, size_t size)
 {
-   snw_shm_t* shm = NULL;
-   int id;
+  snw_shm_t* shm = NULL;
+  int id;
 
-   id = shmget(key, size, SHM_DEFAULT_OPEN_FLAG | IPC_CREAT | IPC_EXCL);
-	if (id < 0) {
-      //WARN("failed to create shm, key=%d, size=%d", key, size);   
-      return 0;
-   }
+  id = shmget(key, size, SHM_DEFAULT_OPEN_FLAG | IPC_CREAT | IPC_EXCL);
+	if (id < 0) return 0;
 
 	shm = (snw_shm_t *) malloc(sizeof(snw_shm_t));
-   if ( shm == NULL ) {
-      //ERROR("malloc failed\n");
-      return 0;
-   }
-   shm->key = key;
-   shm->size = size;
-   shm->id = id;
+  if ( shm == NULL ) return 0;
+  shm->key = key;
+  shm->size = size;
+  shm->id = id;
 
 	shm->addr = (char*)snw_shmat(id);
-
-   if ( shm->addr == NULL ) {
-      free(shm);
-      return 0;
-   }
+  if (shm->addr == NULL) {
+    free(shm);
+    return 0;
+  }
 
 	return shm;
 }
 
 char* 
-snw_shmat(int _id)
-{
+snw_shmat(int _id) {
 	char* p = (char*) shmat(_id, NULL, 0);
 	if (p == (char*)-1) {
-		//ERROR("error: %s", strerror(errno));
       return 0;
    }
 
@@ -126,8 +109,7 @@ snw_shmat(int _id)
 }
 
 void 
-snw_shmdt(char* _mem)
-{
+snw_shmdt(char* _mem) {
 	if (_mem == NULL)
 		return;
 	
@@ -139,40 +121,32 @@ snw_shmdt(char* _mem)
 }
 
 int
-snw_shm_alloc(snw_shm_t *shm)
-{
-    int  id;
+snw_shm_alloc(snw_shm_t *shm) {
+  int  id;
    
-    if ( shm->key == 0 )
-       id = shmget(IPC_PRIVATE, shm->size, (SHM_R|SHM_W|IPC_CREAT));
-    else
-       id = shmget(shm->key, shm->size, (SHM_R|SHM_W|IPC_CREAT));
+  if ( shm->key == 0 )
+     id = shmget(IPC_PRIVATE, shm->size, (SHM_R|SHM_W|IPC_CREAT));
+  else
+     id = shmget(shm->key, shm->size, (SHM_R|SHM_W|IPC_CREAT));
 
-    if (id == -1) {
-        //ERROR("Could not get shm, key=%lu", shm->key);
+  if (id == -1) {
+      return -1;
+  }
+
+  shm->addr = (char*)shmat(id, NULL, 0);
+
+  if (shm->addr == (void *) -1) {
         return -1;
-    }
+  }
 
-    shm->addr = (char*)shmat(id, NULL, 0);
-
-    if (shm->addr == (void *) -1) {
-        //ERROR("Could not attach shm, key=%lu", shm->key);
-        return -1;
-    }
-
-    // remove the segment from the system, no futher attachment is possible.
-    //if (shmctl(id, IPC_RMID, NULL) == -1) {
-    //    ERROR("Could not isolate shm, key=%lu", shm->key);
-    //    return -2;
-    //}
-
-    return (shm->addr == (void *) -1) ? -3 : 0;
+  return (shm->addr == (void *) -1) ? -3 : 0;
 }
 
 void snw_shm_free(snw_shm_t *shm)
 {
-    if (shmdt(shm->addr) == -1) {
-        // TODO print log
-    }
+  if (shmdt(shm->addr) == -1) {
+    // TODO
+  }
+  return;
 }
 
