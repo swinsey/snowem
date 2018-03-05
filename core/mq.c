@@ -133,7 +133,7 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
     ret = 0;
   }
 
-  assert(shm_size > MQ_HEADER_SIZE + (int32_t)sizeof(*mq->_shm_ctrl));
+  assert(shm_size > (int32_t)sizeof(*mq->_shm_ctrl));
 
   mq->shm = snw_shm_create(shm_key, shm_size);
   if (mq->shm == NULL) {
@@ -148,7 +148,6 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
     mem_addr = mq->shm->addr;
   }
 
-  //memset(mem_addr, 0, MQ_HEADER_SIZE + sizeof(*mq->shm_ctrl));
   memset(mem_addr, 0, sizeof(*mq->shm_ctrl));
   mq->shm_ctrl = (snw_shmctrl_t *)mem_addr;
   mq->shm_ctrl->period_time = 1;
@@ -161,12 +160,6 @@ snw_shmmq_init(snw_shmmq_t *mq, const char* fifo_path,
 setup:
   mq->shm_ctrl = (snw_shmctrl_t *)mem_addr;
   mem_addr += sizeof(*mq->shm_ctrl);
-
-  // set head and tail
-  //mq->head = (uint32_t*)mem_addr;
-  //mq->tail = mq->head+1;
-  //mq->data = (char*) (mq->tail+1);
-  //mq->size = shm_size - (MQ_HEADER_SIZE + sizeof(*mq->shm_ctrl));
   mq->data = (char*) mem_addr;
   mq->size = shm_size - (sizeof(*mq->shm_ctrl));
 
