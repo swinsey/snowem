@@ -1,0 +1,99 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+Config	lib.js	/^   }$/;"	c
+Globals	lib.js	/^   function Globals() {$/;"	c
+PHONE	phone.js	/^    var PHONE         = function(){};$/;"	f	function:var
+PHONE.connect	phone.js	/^    PHONE.debug      = function(cb) { debugcb      = cb };$/;"	f
+PHONE.dial	phone.js	/^    };$/;"	f
+PHONE.disconnect	phone.js	/^    PHONE.connect    = function(cb) { connectcb    = cb };$/;"	f
+PHONE.hangup	phone.js	/^    };$/;"	f
+PHONE.history	phone.js	/^    };$/;"	f
+PHONE.number	phone.js	/^    }$/;"	f
+PHONE.receive	phone.js	/^    PHONE.reconnect  = function(cb) { reconnectcb  = cb };$/;"	f
+PHONE.reconnect	phone.js	/^    PHONE.disconnect = function(cb) { disconnectcb = cb };$/;"	f
+PHONE.send	phone.js	/^    };$/;"	f
+PHONE.snap	phone.js	/^    };$/;"	f
+PeerAgent	lib.js	/^}$/;"	c
+PeerCall	lib.js	/^   var PeerCall = window.PeerCall;$/;"	v
+PeerCall	lib.js	/^var PeerCall = window.PeerCall;$/;"	v
+PeerCall.getAvailableChannel	lib.js	/^   var agents = {};$/;"	f
+PeerCall.init	widget.js	/^   }$/;"	f
+PeerCall.listen	lib.js	/^   var listeners = {};$/;"	f
+PeerCall.publish	lib.js	/^   }$/;"	f
+PeerCall.subscribe	lib.js	/^   }$/;"	f
+PeerCall.unlisten	lib.js	/^   }$/;"	f
+add_ice_route	phone.js	/^    function add_ice_route(message) {$/;"	f	function:PHONE.disconnect
+add_sdp_offer	phone.js	/^    function add_sdp_offer(message) {$/;"	f	function:PHONE.disconnect
+add_servers	phone.js	/^    function add_servers(servers) {$/;"	f
+agents	lib.js	/^   var agents = {};$/;"	v
+audio	lib.js	/^        this.replay_constraints = { audio: true, $/;"	p	class:Globals.replay_constraints
+broadcast	lib.js	/^   function broadcast(eventName) {$/;"	f
+browserDetection	lib.js	/^        function browserDetection() {$/;"	f
+callstatuscb	phone.js	/^    var callstatuscb = function(){};$/;"	f
+close_conversation	phone.js	/^    function close_conversation(number) {$/;"	f	function:PHONE.receive
+config	lib.js	/^   var config = PeerCall.Config();$/;"	v
+connectcb	phone.js	/^    var connectcb    = function(){};$/;"	f
+create_thumbnail	phone.js	/^    function create_thumbnail(message) {$/;"	f	function:PHONE.disconnect
+debugcb	phone.js	/^    var debugcb      = function(){};$/;"	f
+decode	widget.js	/^      function decode(string) {$/;"	f	function:getQueryParameters
+disconnectcb	phone.js	/^    var disconnectcb = function(){};$/;"	f
+drawWidget	widget.js	/^   function drawWidget() {$/;"	f
+entry	widget.js	/^      var entry = document.getElementsByTagName('script')[0];$/;"	v
+flashVersion	lib.js	/^               var flashVersion = 'no check';$/;"	v
+getBrowserInfo	lib.js	/^        this.getBrowserInfo = function() {$/;"	f
+getPeerAgent	lib.js	/^   function getPeerAgent(channel_id) {$/;"	f
+getQueryParameters	widget.js	/^   function getQueryParameters(query) {$/;"	f
+getRatingData	widget.js	/^   function getRatingData(params, callback) {$/;"	f
+getScriptUrl	widget.js	/^   function getScriptUrl(re) {$/;"	f
+getWidgetParams	widget.js	/^   function getWidgetParams() {$/;"	f
+get_browser_info	lib.js	/^        function get_browser_info() {$/;"	f
+get_conversation	phone.js	/^    function get_conversation(number) {$/;"	f	function:PHONE.receive
+getusermedia	phone.js	/^    function getusermedia() {$/;"	f	function:PHONE.receive
+globals	lib.js	/^   var globals = PeerCall.Globals();$/;"	v
+height	phone.js	/^        var snap    = { width: 240, height: 180 };$/;"	p	class:PHONE.receive.snapshots_setup.snap
+i	peer.js	/^\/*! peerjs build:0.3.13, development. Copyright(c) 2013 Michelle Bu <michelle@michellebu.com> *\/(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){$/;"	v
+iceServers	lib.js	/^        this.pc_config = {'iceServers':[{'urls':'stun:peercall.vn:8478'},$/;"	p	class:pc_config
+iceServers	lib.js	/^        this.replay_pc_config = {'iceServers':[{'urls':'stun:peercall.vn:8478'},$/;"	p	class:replay_pc_config
+iceServers	phone.js	/^    var rtcconfig = { iceServers : [{ "url" :$/;"	p	class:var.rtcconfig
+id	phone.js	/^        var message = { packet : packet, id : sessionid, number : number };$/;"	p	class:transmit.message
+init	lib.js	/^   Config.prototype.init= function(config) {$/;"	m	class:Config
+init	lib.js	/^PeerAgent.prototype.init = function(config) {$/;"	m	class:PeerAgent
+isWsReady	lib.js	/^   var isWsReady = false;$/;"	v
+listeners	lib.js	/^   var listeners = {};$/;"	v
+loadScript	widget.js	/^   function loadScript(url, callback) {$/;"	f
+loadSupportingFiles	widget.js	/^   function loadSupportingFiles(callback) {$/;"	f
+mandatory	lib.js	/^        this.sdpConstraints = {'mandatory': {$/;"	p	class:sdpConstraints
+mandatory	lib.js	/^        this.video_sdpConstraints = {'mandatory': {$/;"	p	class:video_sdpConstraints
+mandatory	lib.js	/^        this.view_sdpConstraints = {'mandatory': {$/;"	p	class:view_sdpConstraints
+messagecb	phone.js	/^    var messagecb    = function(){};$/;"	f
+number	phone.js	/^        var message = { packet : packet, id : sessionid, number : number };$/;"	p	class:transmit.message
+onaddstream	phone.js	/^    function onaddstream(obj) {$/;"	f	function:PHONE.receive
+onicecandidate	phone.js	/^    function onicecandidate(event) {$/;"	f	function:PHONE.receive
+onmessage	lib.js	/^   function onmessage(evt) {$/;"	f
+onready	phone.js	/^    function onready(subscribed) {$/;"	f	function:PHONE.receive
+optional	lib.js	/^        this.pc_constraints = {$/;"	p	class:pc_constraints
+osVersion	lib.js	/^               var osVersion = unknown;$/;"	v
+packet	phone.js	/^        var message = { packet : packet, id : sessionid, number : number };$/;"	p	class:transmit.message
+readycb	phone.js	/^    var readycb      = function(){};$/;"	f
+receive	phone.js	/^    function receive(message) {$/;"	f	function:PHONE.reconnect
+receivercb	phone.js	/^    var receivercb   = function(){};$/;"	f
+reconnectcb	phone.js	/^    var reconnectcb  = function(){};$/;"	f
+snapper	phone.js	/^        canvas.height = snap.height;$/;"	f
+snapper	phone.js	/^    var snapper       = function(){ return ' ' }$/;"	f	function:var
+snapshots_setup	phone.js	/^    function snapshots_setup(stream) {$/;"	f	function:PHONE.receive
+subscribe	phone.js	/^    function subscribe() {$/;"	f	function:PHONE.receive
+transmit	phone.js	/^    function transmit( phone, packet, times, time ) {$/;"	f	function:PHONE.receive
+unablecb	phone.js	/^    var unablecb     = function(){};$/;"	f
+update_conversation	phone.js	/^    function update_conversation( talk, status ) {$/;"	f	function:PHONE.receive
+video	lib.js	/^        this.replay_constraints = { audio: true, $/;"	p	class:Globals.replay_constraints
+websocket.onmessage	lib.js	/^      };$/;"	f
+websocket.onopen	lib.js	/^      websocket.binaryType = 'blob';$/;"	f
+width	phone.js	/^        var snap    = { width: 240, height: 180 };$/;"	p	class:PHONE.receive.snapshots_setup.snap
+wsClient.initWebSocket	lib.js	/^var wsClient = {};$/;"	f
+wsClient.onMessage	lib.js	/^}$/;"	f
+wsClient.send	lib.js	/^}$/;"	f
+wsClient.setOnMessageCB	lib.js	/^}$/;"	f

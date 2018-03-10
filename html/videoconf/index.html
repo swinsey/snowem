@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" ng-app="peerApp">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<title>PeerCall Service</title>
+
+   <link rel="stylesheet" href="css/bootstrap/css/bootstrap.min.css">
+   <link rel="stylesheet" href="css/fontawesome/css/font-awesome.min.css">
+   <link rel="stylesheet" href="css/themify-icons/themify-icons.min.css">
+
+   <link rel="stylesheet" href="css/peercall.css">
+   <link rel="stylesheet" href="css/styles.css">
+   <link rel="stylesheet" href="css/plugins.css">
+
+
+</head>
+
+<body>
+
+<div class="callbox">
+<div class="video-container">
+    <div class="videobox">
+       <div class='video-wrapper' id='videoWrapper'>
+          <div class='video-insider'>
+              <video id='localVideo' class="local-video" autoplay="none" 
+                     data-setup='{}' preload="none"> </video> 
+              <video id='remoteVideo' class="remote-video" autoplay="none" 
+                     data-setup='{}' preload="none"> </video>
+    
+             <div class="float-peercall-div">
+                <div class="float-right" style="padding:10px;">
+                   <strong><a>PeerCall Live</a></strong>
+                </div>
+             </div>
+             <div class="float-btn-div">
+               <!--<button id="publishBtn" type="button" class="btn btn-secondary">Publish</button>
+               <button id="subscribeBtn" type="button" class="btn btn-secondary">Subscribe</button>-->
+               <button id="stopBtn" type="button" class="btn btn-secondary">Stop</button>
+             </div>
+
+          </div> <!-- video-insider -->
+       </div> <!-- video-wrapper -->
+    </div> <!-- videobox -->
+</div> <!-- video-container -->
+</div>
+<div>
+  <button id="publishBtn" type="button" class="btn-o btn-primary">Publish</button>
+  <span id="yourId"></span>
+</div>
+<div>
+  <button id="subscribeBtn" type="button" class="btn-o btn-secondary">Subscribe</button>
+  <input type="text" id="subscribeRoomId" ng-model="Room.roomid">
+</div>
+
+
+  <!-- Custom Scripts -->
+  <script type="text/javascript" src="js/opus.js"></script>
+  <script type="text/javascript" src="js/md5.js"></script>
+  <script type="text/javascript" src="js/adapter.js"></script> <!-- wrapper of webrtc api -->
+  <script type="text/javascript" src="js/global.js"></script>
+  <script type="text/javascript" src="js/room.js"></script>
+  <!--<script type="text/javascript" src="js/app.js"></script>-->
+  <script>
+  (function(){
+     var script = document.createElement('script');
+     script.src = 'https://sdk.peercall.vn/sdk/widget.js?apikey=1235';
+     script.async = true;
+     var entry = document.getElementsByTagName('script')[0];
+     entry.parentNode.insertBefore(script, entry);
+  })();
+  window.peerCallAsyncInit = function() {
+     PeerCall.init(
+        {api_key: "demo", version: "version"},
+        function() {
+           var is_publisher = 0;
+           var roomid = 0;
+
+           PeerCall.listen('onCreate', function(agent) {
+              console.log("onCreate: agent=" + JSON.stringify(agent));
+              document.getElementById("yourId").innerHTML = agent.peerId;
+              agent.connect({name: "demo"});
+           });
+
+           PeerCall.listen('onIceConnected', function(agent) {
+              console.log("ice connected: agent=" + JSON.stringify(agent));
+              if (is_publisher) {
+                 agent.publish({'name': "demo", 'channelid': roomid});
+              } else {
+                 agent.play({'name': "demo", 'channelid': roomid});
+              }
+           });
+
+           //API calls go here.
+           document.getElementById("publishBtn").addEventListener("click", function() {
+              //var channelId = PeerCall.getAvailableChannel();
+              //PeerCall.publish({channel_id: channelId});
+              is_publisher = 1;
+              PeerCall.create();
+           });
+
+           document.getElementById("subscribeBtn").addEventListener("click", function() {
+              //var channelId = PeerCall.getAvailableChannel();
+              //PeerCall.publish({channel_id: channelId});
+              roomid = parseInt(document.getElementById("subscribeRoomId").value);
+              PeerCall.create();
+           });
+
+        }
+     );
+  }
+  </script>
+		
+</body>
+</html>
+
+
+

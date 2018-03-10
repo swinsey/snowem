@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+  <title>OTT Service</title>
+
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/call.css" />
+
+</head>
+
+<body>
+
+<div class="videobox">
+   <div class='video-wrapper' id='videoWrapper'>
+      <div class='video-insider'>
+          <video class="local_video" id='localVideo'  autoplay muted
+                 preload="none" tabindex="0" poster="images/webcam.png" > </video> 
+          <video class="remote_video" id='remoteVideo' autoplay
+                 preload="none" tabindex="0" poster="images/avatar.png"> </video>
+      </div>    
+   </div>
+</div>
+
+<div class="chatbox">
+  <div id="chat_msg_id" class="chat_msg" style="overflow:scroll;" >
+    <div class="nopadding" ng-repeat="msg in getMsgs()">
+       <p style="text-align:left">
+          <span class="sender">{{msg.name}} :</span>
+          <span class="msg">{{msg.msg}}</span>
+       </p>
+    </div>
+  </div>
+
+  <div class="chat_footer">
+    <div class="chat_input_box"><input class="chat_input" text="text" placeholder="Type here"  my-enter="sendMsg()" ng-model="Room.msg"/></div>
+    <div class="chat_button_box">
+       <button class="chat_button" id="sendButton" ng-click="sendMsg()">Send</button>
+    </div>
+  </div>
+</div>
+
+
+<!--
+  <div id="videos">
+    <video id="localVideo" autoplay muted></video>
+    <video id="remoteVideo" autoplay></video>
+  </div>
+-->
+
+</body>
+
+</html>
